@@ -1,9 +1,28 @@
-import React from 'react';
-import { connect } from 'react-redux';
-import "./Pinball.css"
+import React, { Component } from 'react';
+import Ball from './Ball';
+import Flipper from './Flipper';
+import PinballStore from './PinballStore';
+import { moveBall, resetBall } from './actions/PinballActions';
 
-const Pinball = ({ ballPosition, moveBall, resetBall }) => {
-  const handleKeyDown = (event) => {
+class Pinball extends Component {
+  constructor(props) {
+    super(props);
+    this.state = PinballStore.getState();
+  }
+
+  componentDidMount() {
+    PinballStore.addChangeListener(this.handleStoreChange);
+  }
+
+  componentWillUnmount() {
+    PinballStore.removeChangeListener(this.handleStoreChange);
+  }
+
+  handleStoreChange = () => {
+    this.setState(PinballStore.getState());
+  };
+
+  handleKeyDown = (event) => {
     if (event.key === 'ArrowLeft') {
       moveBall(-1);
     } else if (event.key === 'ArrowRight') {
@@ -13,33 +32,17 @@ const Pinball = ({ ballPosition, moveBall, resetBall }) => {
     }
   };
 
-  React.useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, []);
+  render() {
+    const { ballPosition } = this.state;
 
-  return (
-    <div className="pinball-container">
-      <div className="pinball-ball" style={{ left: ballPosition }}></div>
-      <div className="pinball-flipper"></div>
-      <div className="pinball-flipper"></div>
-    </div>
-  );
-};
+    return (
+      <div className="pinball-container" onKeyDown={this.handleKeyDown} tabIndex={0}>
+        <Ball position={ballPosition} />
+        <Flipper />
+        <Flipper />
+      </div>
+    );
+  }
+}
 
-const mapStateToProps = (state) => {
-  return {
-    ballPosition: state.ball.position,
-  };
-};
-
-const mapDispatchToProps = (dispatch) => {
-  return {
-    moveBall: (direction) => dispatch({ type: 'MOVE_BALL', payload: direction }),
-    resetBall: () => dispatch({ type: 'RESET_BALL' }),
-  };
-};
-
-export default connect(mapStateToProps, mapDispatchToProps)(Pinball);
+export default Pinball;

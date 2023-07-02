@@ -1,10 +1,29 @@
 import { combineReducers } from 'redux';
 
+// Action types
+export const MOVE_BALL = 'MOVE_BALL';
+export const RESET_BALL = 'RESET_BALL';
+
 const initialState = {
   ball: {
     position: 0,
   },
 };
+
+// Action creators
+export const moveBall = (direction) => {
+  return {
+    type: MOVE_BALL,
+    payload: direction,
+  };
+};
+
+export const resetBall = () => {
+  return {
+    type: RESET_BALL,
+  };
+};
+
 
 const ballReducer = (state = initialState.ball, action) => {
   switch (action.type) {
