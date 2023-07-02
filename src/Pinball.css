@@ -1,0 +1,63 @@
+.pinball-container {
+    position: relative;
+    width: 380px;
+    height: 520px;
+    margin: 20px auto;
+    background: #444;
+    border: 4px solid #000;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+  }
+  
+  .plunger {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 50px;
+    background: #999;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  
+  .flipper {
+    position: absolute;
+    bottom: 0;
+    width: 30px;
+    height: 50px;
+    background: #666;
+    border-radius: 2px;
+    transition: transform 0.1s ease-out;
+  }
+  
+  .flipper.left {
+    left: 40px;
+  }
+  
+  .flipper.right {
+    right: 40px;
+  }
+  
+  .flipper.active {
+    transform: rotate(-30deg);
+  }
+  
+  .ball {
+    position: absolute;
+    bottom: 110px;
+    left: 190px;
+    width: 20px;
+    height: 20px;
+    background: #f00;
+    border-radius: 50%;
+  }
+  
+  .score {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: #fff;
+    font-size: 16px;
+  }
+  
