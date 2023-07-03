@@ -16,28 +16,32 @@ const PinballGame = styled.div`
   position: relative;
 `;
 
-const FlippersContainer = styled.div`
-  display: flex;
-  justify-content: space-between;
-  padding: 20px;
+const Road = styled.div`
+  width: 80px;
+  height: 600px;
+  background-color: #333;
+  position: absolute;
+  left: 160px;
 `;
 
-const FlipperBase = styled.div`
-  width: 80px;
-  height: 20px;
+const Flipper = styled.div`
+  width: 20px;
+  height: 100px;
   background-color: #777;
   position: absolute;
   bottom: 0;
+  ${(props) => (props.side === 'left' ? 'left' : 'right')}: 0;
+  transform-origin: bottom center;
+  transform: ${(props) => (props.up ? 'rotate(-45deg)' : 'none')};
 `;
 
-const LeftFlipper = styled(FlipperBase)`
-  transform-origin: right center;
-  transform: rotate(${(props) => (props.up ? '-45deg' : '0deg')});
-`;
-
-const RightFlipper = styled(FlipperBase)`
-  transform-origin: left center;
-  transform: rotate(${(props) => (props.up ? '45deg' : '0deg')});
+const Block = styled.div`
+  width: 40px;
+  height: 20px;
+  background-color: #999;
+  position: absolute;
+  top: ${(props) => props.position.y}px;
+  left: ${(props) => props.position.x}px;
 `;
 
 const Ball = styled.div`
@@ -86,47 +90,50 @@ function Pinball() {
     const handleGameLoop = () => {
       if (gameOver) return;
 
-      const newBallPosition = {
-        x: ballPosition.x,
-        y: ballPosition.y + 2,
-      };
-
-      // Check for collision with flippers
-      const ballCenterX = newBallPosition.x + 10;
-      const leftFlipperX = 120;
-      const rightFlipperX = 200;
-
-      if (
-        newBallPosition.y >= 530 &&
-        ((ballCenterX >= leftFlipperX && ballCenterX <= leftFlipperX + 80) ||
-          (ballCenterX >= rightFlipperX && ballCenterX <= rightFlipperX + 80))
-      ) {
-        // Ball hits a flipper, increase score
-        setScore(score + 10);
-      }
-
-      // Check for game over condition (ball falls off the bottom)
-      if (newBallPosition.y >= 590) {
-        setGameOver(true);
-      }
-
-      setBallPosition(newBallPosition);
+      setBallPosition((prevPosition) => ({
+        x: prevPosition.x,
+        y: prevPosition.y + 2,
+      }));
     };
 
     const interval = setInterval(handleGameLoop, 16);
     return () => {
       clearInterval(interval);
     };
-  }, [ballPosition, gameOver]);
+  }, [gameOver]);
+
+  useEffect(() => {
+    const checkCollision = () => {
+      const ballCenterX = ballPosition.x + 10;
+      const leftFlipperX = 0;
+      const rightFlipperX = 380;
+
+      if (
+        ballPosition.y >= 530 &&
+        ((ballCenterX >= leftFlipperX && ballCenterX <= leftFlipperX + 20) ||
+          (ballCenterX >= rightFlipperX && ballCenterX <= rightFlipperX + 20))
+      ) {
+        setScore((prevScore) => prevScore + 10);
+      }
+
+      if (ballPosition.y >= 590) {
+        setGameOver(true);
+      }
+    };
+
+    checkCollision();
+  }, [ballPosition]);
 
   return (
     <Container>
       <PinballGame>
-        <FlippersContainer>
-          <LeftFlipper up={leftFlipperUp} />
-          <RightFlipper up={rightFlipperUp} />
-        </FlippersContainer>
+        <Road />
+        <Flipper side="left" up={leftFlipperUp} />
+        <Flipper side="right" up={rightFlipperUp} />
         <Ball position={ballPosition} />
+        <Block position={{ x: 160, y: 450 }} />
+        <Block position={{ x: 200, y: 400 }} />
+        <Block position={{ x: 240, y: 450 }} />
       </PinballGame>
       <div>Score: {score}</div>
       {gameOver && <div>Game Over</div>}
@@ -135,3 +142,5 @@ function Pinball() {
 }
 
 export default Pinball;
+
+
