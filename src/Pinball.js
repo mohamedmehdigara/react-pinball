@@ -10,28 +10,22 @@ const Container = styled.div`
 `;
 
 const PinballGame = styled.div`
+  position: relative;
   width: 800px;
   height: 600px;
   background-color: #444;
-  position: relative;
-`;
-
-const FlipperContainer = styled.div`
-  display: flex;
-  justify-content: space-between;
-  position: absolute;
-  bottom: 20px;
-  left: 0;
-  right: 0;
 `;
 
 const Flipper = styled.div`
   width: 120px;
   height: 20px;
   background-color: #777;
-  position: relative;
-  transform-origin: bottom ${(props) => (props.right ? 'right' : 'left')};
-  transform: ${(props) => (props.up ? 'rotate(-45deg)' : 'none')};
+  position: absolute;
+  bottom: 20px;
+  left: ${(props) => (props.right ? 'calc(100% - 120px)' : '0')};
+  transform: ${(props) => (props.up ? 'rotate(45deg)' : 'rotate(0)')};
+  transform-origin: ${(props) => (props.right ? '100% 100%' : '0% 100%')};
+  transition: transform 0.2s ease;
 `;
 
 const Ball = styled.div`
@@ -42,14 +36,13 @@ const Ball = styled.div`
   position: absolute;
   top: ${(props) => props.position.y}px;
   left: ${(props) => props.position.x}px;
-  transition: top 0.3s ease;
+  transition: top 0.2s ease;
 `;
 
 function Pinball() {
   const [leftFlipperUp, setLeftFlipperUp] = useState(false);
   const [rightFlipperUp, setRightFlipperUp] = useState(false);
-  const [ballPosition, setBallPosition] = useState({ x: 390, y: 580 });
-  const [ballDirection, setBallDirection] = useState(-1);
+  const [ballPosition, setBallPosition] = useState({ x: 400, y: 580 });
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowLeft') {
@@ -80,11 +73,21 @@ function Pinball() {
     const handleGameLoop = () => {
       setBallPosition((prevPosition) => ({
         x: prevPosition.x,
-        y: prevPosition.y + ballDirection * 2,
+        y: leftFlipperUp || rightFlipperUp ? prevPosition.y - 5 : prevPosition.y + 5,
       }));
 
-      if (ballPosition.y <= 10 || ballPosition.y >= 570) {
-        setBallDirection(-ballDirection);
+      const leftFlipperArea = leftFlipperUp ? [0, 380] : [-100, 0];
+      const rightFlipperArea = rightFlipperUp ? [400, 800] : [800, 900];
+
+      if (
+        ballPosition.y >= 540 &&
+        ((ballPosition.x >= leftFlipperArea[0] && ballPosition.x <= leftFlipperArea[1]) ||
+          (ballPosition.x >= rightFlipperArea[0] && ballPosition.x <= rightFlipperArea[1]))
+      ) {
+        setBallPosition((prevPosition) => ({
+          x: prevPosition.x,
+          y: prevPosition.y - 10,
+        }));
       }
     };
 
@@ -92,32 +95,13 @@ function Pinball() {
     return () => {
       clearInterval(interval);
     };
-  }, [ballPosition, ballDirection]);
-
-  useEffect(() => {
-    const checkCollision = () => {
-      const leftFlipperPosition = leftFlipperUp ? 330 : 210;
-      const rightFlipperPosition = rightFlipperUp ? 470 : 590;
-
-      if (
-        ballPosition.y >= 530 &&
-        ballPosition.x >= leftFlipperPosition &&
-        ballPosition.x <= rightFlipperPosition
-      ) {
-        setBallDirection(-1);
-      }
-    };
-
-    checkCollision();
   }, [ballPosition, leftFlipperUp, rightFlipperUp]);
 
   return (
     <Container>
       <PinballGame>
-        <FlipperContainer>
-          <Flipper up={leftFlipperUp} />
-          <Flipper up={rightFlipperUp} right />
-        </FlipperContainer>
+        <Flipper up={leftFlipperUp} />
+        <Flipper up={rightFlipperUp} right />
         <Ball position={ballPosition} />
       </PinballGame>
     </Container>
