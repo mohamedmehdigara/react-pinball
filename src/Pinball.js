@@ -43,6 +43,7 @@ function Pinball() {
   const [leftFlipperUp, setLeftFlipperUp] = useState(false);
   const [rightFlipperUp, setRightFlipperUp] = useState(false);
   const [ballPosition, setBallPosition] = useState({ x: 400, y: 580 });
+  const [gameOver, setGameOver] = useState(false);
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowLeft') {
@@ -71,31 +72,23 @@ function Pinball() {
 
   useEffect(() => {
     const handleGameLoop = () => {
-      setBallPosition((prevPosition) => ({
-        x: prevPosition.x,
-        y: leftFlipperUp || rightFlipperUp ? prevPosition.y - 5 : prevPosition.y + 5,
-      }));
+      if (gameOver) return;
 
-      const leftFlipperArea = leftFlipperUp ? [0, 380] : [-100, 0];
-      const rightFlipperArea = rightFlipperUp ? [400, 800] : [800, 900];
+      const newPosition = { x: ballPosition.x, y: ballPosition.y + (leftFlipperUp || rightFlipperUp ? -5 : 5) };
 
-      if (
-        ballPosition.y >= 540 &&
-        ((ballPosition.x >= leftFlipperArea[0] && ballPosition.x <= leftFlipperArea[1]) ||
-          (ballPosition.x >= rightFlipperArea[0] && ballPosition.x <= rightFlipperArea[1]))
-      ) {
-        setBallPosition((prevPosition) => ({
-          x: prevPosition.x,
-          y: prevPosition.y - 10,
-        }));
+      if (newPosition.y > 580) {
+        setGameOver(true);
+        return;
       }
+
+      setBallPosition(newPosition);
     };
 
     const interval = setInterval(handleGameLoop, 16);
     return () => {
       clearInterval(interval);
     };
-  }, [ballPosition, leftFlipperUp, rightFlipperUp]);
+  }, [ballPosition, leftFlipperUp, rightFlipperUp, gameOver]);
 
   return (
     <Container>
@@ -103,6 +96,7 @@ function Pinball() {
         <Flipper up={leftFlipperUp} />
         <Flipper up={rightFlipperUp} right />
         <Ball position={ballPosition} />
+        {gameOver && <h1>Game Over</h1>}
       </PinballGame>
     </Container>
   );
