@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 
 const Container = styled.div`
   display: flex;
@@ -16,16 +16,45 @@ const PinballGame = styled.div`
   background-color: #444;
 `;
 
+const SideWall = styled.div`
+  width: 10px;
+  height: 600px;
+  background-color: #333;
+  position: absolute;
+  top: 0;
+  left: ${(props) => (props.right ? 'calc(100% - 10px)' : '0')};
+`;
+
+const FlipperContainer = styled.div`
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+`;
+
+const bounceAnimation = keyframes`
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+`;
+
 const Flipper = styled.div`
   width: 120px;
   height: 20px;
   background-color: #777;
   position: absolute;
-  bottom: 20px;
+  bottom: 0;
   left: ${(props) => (props.right ? 'calc(100% - 120px)' : '0')};
   transform: ${(props) => (props.up ? 'rotate(-45deg)' : 'rotate(0)')};
   transform-origin: ${(props) => (props.right ? '100% 100%' : '0% 100%')};
   transition: transform 0.2s ease;
+  animation: ${(props) => props.up && bounceAnimation} 0.2s;
 `;
 
 const Ball = styled.div`
@@ -39,40 +68,23 @@ const Ball = styled.div`
   transition: top 0.2s ease;
 `;
 
+const Bumper = styled.div`
+  width: 40px;
+  height: 40px;
+  background-color: #555;
+  border-radius: 50%;
+  position: absolute;
+  top: ${(props) => props.position.y}px;
+  left: ${(props) => props.position.x}px;
+`;
+
 const Wall = styled.div`
   width: 30px;
-  height: 300px;
+  height: 200px;
   background-color: #999;
   position: absolute;
-  top: 150px;
-  left: ${(props) => (props.right ? 'calc(100% - 30px)' : '0')};
-`;
-
-const SideWall = styled.div`
-  width: 10px;
-  height: 600px;
-  background-color: #333;
-  position: absolute;
-  top: 0;
-  left: ${(props) => (props.right ? 'calc(100% - 10px)' : '0')};
-`;
-
-const CenterBumper = styled.div`
-  width: 100px;
-  height: 20px;
-  background-color: #555;
-  position: absolute;
-  top: 250px;
-  left: calc(50% - 50px);
-`;
-
-const Tube = styled.div`
-  width: 100px;
-  height: 200px;
-  background-color: #777;
-  position: absolute;
-  top: 100px;
-  left: ${(props) => (props.right ? 'calc(100% - 100px)' : '0')};
+  top: ${(props) => props.position.y}px;
+  left: ${(props) => props.position.x}px;
 `;
 
 function Pinball() {
@@ -121,12 +133,16 @@ function Pinball() {
       // Check for collision with flippers
       if (newPosition.y >= 570 && newPosition.x >= 200 && newPosition.x <= 600) {
         newPosition.y = 570;
+        newPosition.x += leftFlipperUp ? -10 : 10;
       }
 
-      // Check for collision with center bumper
-      if (newPosition.y >= 230 && newPosition.y <= 270 && newPosition.x >= 350 && newPosition.x <= 450) {
-        setScore(score + 100);
-        newPosition.y = 230;
+      // Check for collision with bumpers
+      if (
+        (newPosition.y >= 100 && newPosition.y <= 140 && newPosition.x >= 100 && newPosition.x <= 140) ||
+        (newPosition.y >= 100 && newPosition.y <= 140 && newPosition.x >= 660 && newPosition.x <= 700) ||
+        (newPosition.y >= 250 && newPosition.y <= 290 && newPosition.x >= 380 && newPosition.x <= 420)
+      ) {
+        setScore(score + 50);
       }
 
       // Check for game over
@@ -157,15 +173,17 @@ function Pinball() {
   return (
     <Container>
       <PinballGame>
-        <Flipper up={leftFlipperUp} />
-        <Flipper up={rightFlipperUp} right />
-        <Wall />
-        <Wall right />
+        <FlipperContainer>
+          <Flipper up={leftFlipperUp} />
+          <Flipper up={rightFlipperUp} right />
+        </FlipperContainer>
         <SideWall />
         <SideWall right />
-        <CenterBumper />
-        <Tube />
-        <Tube right />
+        <Bumper position={{ x: 120, y: 120 }} />
+        <Bumper position={{ x: 680, y: 120 }} />
+        <Bumper position={{ x: 400, y: 270 }} />
+        <Wall position={{ x: 200, y: 350 }} />
+        <Wall position={{ x: 600, y: 350 }} />
         <Ball position={ballPosition} />
         {gameOver && <h1>Game Over</h1>}
         <h2>Score: {score}</h2>
