@@ -8,12 +8,54 @@ const Container = styled.div`
   height: 100vh;
   background-color: #222;
 `;
+const Blocks = styled.div`
+  width: 200px;
+  height: 50px;
+  background-color: #777;
+  position: absolute;
+  top: 200px;
+  right: 200px;
+`;
+const FlipperBase = styled.div`
+  width: 160px;
+  height: 20px;
+  background-color: #777;
+  position: absolute;
+  bottom: 0;
+`;
 
 const PinballGame = styled.div`
   position: relative;
   width: 800px;
   height: 600px;
   background-color: #444;
+`;
+
+const GameOverMessage = styled.div`
+  font-size: 48px;
+  color: white;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+`;
+
+const LeftFlipper = styled(FlipperBase)`
+  transform-origin: right center;
+  transform: rotate(${(props) => (props.up ? '-30deg' : '0deg')});
+`;
+
+const RightFlipper = styled(FlipperBase)`
+  transform-origin: left center;
+  transform: rotate(${(props) => (props.up ? '30deg' : '0deg')});
+`;
+
+const Score = styled.div`
+  font-size: 24px;
+  color: white;
+  position: absolute;
+  top: 20px;
+  left: 20px;
 `;
 
 const SideWall = styled.div`
@@ -87,10 +129,28 @@ const Wall = styled.div`
   left: ${(props) => props.position.x}px;
 `;
 
+const Tube = styled.div`
+  width: 60px;
+  height: 60px;
+  background-color: #777;
+  position: absolute;
+  top: 100px;
+  left: 740px;
+  border-radius: 50%;
+`;
+const Hitter = styled.div`
+  width: 20px;
+  height: 20px;
+  background-color: #fff;
+  position: absolute;
+  bottom: 20px;
+  right: 50px;
+`;
+
 function Pinball() {
   const [leftFlipperUp, setLeftFlipperUp] = useState(false);
   const [rightFlipperUp, setRightFlipperUp] = useState(false);
-  const [ballPosition, setBallPosition] = useState({ x: 400, y: 580 });
+  const [ballPosition, setBallPosition] = useState({ x: 780, y: 50 });
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
 
@@ -145,6 +205,19 @@ function Pinball() {
         setScore(score + 50);
       }
 
+      // Check for collision with tube
+      if (
+        newPosition.x >= 740 &&
+        newPosition.x <= 800 &&
+        newPosition.y >= 100 &&
+        newPosition.y <= 160 &&
+        newPosition.y >= 340 &&
+        newPosition.y <= 400
+      ) {
+        newPosition.y = 170;
+        newPosition.x = 740;
+      }
+
       // Check for game over
       if (newPosition.y > 580) {
         setGameOver(true);
@@ -164,7 +237,7 @@ function Pinball() {
     if (gameOver) {
       setTimeout(() => {
         setGameOver(false);
-        setBallPosition({ x: 400, y: 580 });
+        setBallPosition({ x: 780, y: 50 });
         setScore(0);
       }, 3000); // 3 seconds delay before resetting the game
     }
@@ -173,23 +246,30 @@ function Pinball() {
   return (
     <Container>
       <PinballGame>
-        <FlipperContainer>
-          <Flipper up={leftFlipperUp} />
-          <Flipper up={rightFlipperUp} right />
-        </FlipperContainer>
-        <SideWall />
-        <SideWall right />
-        <Bumper position={{ x: 120, y: 120 }} />
-        <Bumper position={{ x: 680, y: 120 }} />
-        <Bumper position={{ x: 400, y: 270 }} />
-        <Wall position={{ x: 200, y: 350 }} />
-        <Wall position={{ x: 600, y: 350 }} />
+        {/* Flippers */}
+        <LeftFlipper up={leftFlipperUp} />
+        <RightFlipper up={rightFlipperUp} />
+
+        {/* Ball */}
         <Ball position={ballPosition} />
-        {gameOver && <h1>Game Over</h1>}
-        <h2>Score: {score}</h2>
+
+        {/* Hitter */}
+        <Hitter />
+
+        {/* Tube */}
+        <Tube />
+
+        {/* Blocks */}
+        <Blocks />
+
+        {/* Score */}
+        <Score>Score: {score}</Score>
+
+        {/* Game Over Message */}
+        {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
       </PinballGame>
     </Container>
   );
-}
+};
 
 export default Pinball;
