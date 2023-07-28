@@ -95,12 +95,60 @@ const Score = styled.div`
   top: 20px;
   left: 20px;
 `;
-function Pinball() {
+
+const Pinball = () => {
   const [leftFlipperUp, setLeftFlipperUp] = useState(false);
   const [rightFlipperUp, setRightFlipperUp] = useState(false);
-  const [ballPosition, setBallPosition] = useState({ x: 780, y: 50 });
-  const [gameOver, setGameOver] = useState(false);
+  const [ballPosition, setBallPosition] = useState({ x: 390, y: 550 });
+  const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
   const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+
+  // Adjust the ball's movement to create bouncing effect
+  useEffect(() => {
+    const handleGameLoop = () => {
+      if (gameOver) return;
+
+      // Adjust ball's speed and position based on current state
+      const newBallSpeed = { ...ballSpeed };
+      const newBallPosition = { ...ballPosition };
+
+      // Apply gravity effect
+      newBallSpeed.y += 0.1;
+
+      // Update ball's position
+      newBallPosition.x += newBallSpeed.x;
+      newBallPosition.y += newBallSpeed.y;
+
+      // Check for collisions with walls
+      if (newBallPosition.x < 10 || newBallPosition.x > 770) {
+        newBallSpeed.x = -newBallSpeed.x;
+      }
+
+      // Check for collisions with flippers
+      if (
+        newBallPosition.y > 540 &&
+        newBallPosition.y < 560 &&
+        ((newBallPosition.x > 50 && newBallPosition.x < 210) || (newBallPosition.x > 590 && newBallPosition.x < 750))
+      ) {
+        newBallSpeed.y = -7; // Ball bounces up when hitting the flippers
+      }
+
+      // Check for collisions with tubes and blocks
+      // (Add collision logic here based on your game design)
+
+      // Check for game over condition
+      if (newBallPosition.y > 590) {
+        setGameOver(true);
+      }
+
+      setBallSpeed(newBallSpeed);
+      setBallPosition(newBallPosition);
+    };
+
+    const interval = setInterval(handleGameLoop, 16);
+    return () => clearInterval(interval);
+  }, [ballPosition, ballSpeed, gameOver]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowLeft') {
@@ -126,70 +174,6 @@ function Pinball() {
       document.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
-
-  useEffect(() => {
-    const handleGameLoop = () => {
-      if (gameOver) return;
-
-      const newPosition = { x: ballPosition.x, y: ballPosition.y + (leftFlipperUp || rightFlipperUp ? -5 : 5) };
-
-      // Check for collision with walls
-      if (newPosition.x <= 30 || newPosition.x >= 770) {
-        newPosition.x = ballPosition.x; // Prevent moving outside the game area
-      }
-
-      // Check for collision with flippers
-      if (newPosition.y >= 570 && newPosition.x >= 200 && newPosition.x <= 600) {
-        newPosition.y = 570;
-        newPosition.x += leftFlipperUp ? -10 : 10;
-      }
-
-      // Check for collision with bumpers
-      if (
-        (newPosition.y >= 100 && newPosition.y <= 140 && newPosition.x >= 100 && newPosition.x <= 140) ||
-        (newPosition.y >= 100 && newPosition.y <= 140 && newPosition.x >= 660 && newPosition.x <= 700) ||
-        (newPosition.y >= 250 && newPosition.y <= 290 && newPosition.x >= 380 && newPosition.x <= 420)
-      ) {
-        setScore(score + 50);
-      }
-
-      // Check for collision with tube
-      if (
-        newPosition.x >= 740 &&
-        newPosition.x <= 800 &&
-        newPosition.y >= 100 &&
-        newPosition.y <= 160 &&
-        newPosition.y >= 340 &&
-        newPosition.y <= 400
-      ) {
-        newPosition.y = 170;
-        newPosition.x = 740;
-      }
-
-      // Check for game over
-      if (newPosition.y > 580) {
-        setGameOver(true);
-        return;
-      }
-
-      setBallPosition(newPosition);
-    };
-
-    const interval = setInterval(handleGameLoop, 16);
-    return () => {
-      clearInterval(interval);
-    };
-  }, [ballPosition, leftFlipperUp, rightFlipperUp, gameOver, score]);
-
-  useEffect(() => {
-    if (gameOver) {
-      setTimeout(() => {
-        setGameOver(false);
-        setBallPosition({ x: 780, y: 50 });
-        setScore(0);
-      }, 3000); // 3 seconds delay before resetting the game
-    }
-  }, [gameOver]);
 
   return (
     <Container>
