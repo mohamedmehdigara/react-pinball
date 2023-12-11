@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 
+const ScoreMultiplier = 2;
+
 const Container = styled.div`
   display: flex;
   justify-content: center;
@@ -79,6 +81,53 @@ const Blocks = styled.div`
   left: 100px;
 `;
 
+const Bumper = styled.div`
+  width: 30px;
+  height: 30px;
+  background-color: #ff0; /* Yellow color for bumpers */
+  position: absolute;
+  border-radius: 50%;
+`;
+
+const LeftBumper = styled(Bumper)`
+  top: 100px;
+  left: 200px;
+`;
+
+const RightBumper = styled(Bumper)`
+  top: 300px;
+  left: 500px;
+`;
+
+const Spinner = styled.div`
+  width: 60px;
+  height: 60px;
+  border: 2px solid #0f0; /* Green color for spinner */
+  position: absolute;
+  border-radius: 50%;
+`;
+
+const SpinnerCenter = styled.div`
+  width: 10px;
+  height: 10px;
+  background-color: #0f0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+`;
+
+const LeftSpinner = styled(Spinner)`
+  top: 450px;
+  left: 100px;
+`;
+
+const RightSpinner = styled(Spinner)`
+  top: 150px;
+  left: 700px;
+`;
+
 const GameOverMessage = styled.div`
   font-size: 48px;
   color: white;
@@ -104,51 +153,80 @@ const Pinball = () => {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
 
-  // Adjust the ball's movement to create bouncing effect
-  useEffect(() => {
-    const handleGameLoop = () => {
-      if (gameOver) return;
+  const handleGameLoop = () => {
+    if (gameOver) return;
 
-      // Adjust ball's speed and position based on current state
-      const newBallSpeed = { ...ballSpeed };
-      const newBallPosition = { ...ballPosition };
+    rotateSpinner(LeftSpinner, 2);
+    rotateSpinner(RightSpinner, -2);
 
-      // Apply gravity effect
-      newBallSpeed.y += 0.1;
+    const newBallSpeed = { ...ballSpeed };
+    const newBallPosition = { ...ballPosition };
 
-      // Update ball's position
-      newBallPosition.x += newBallSpeed.x;
-      newBallPosition.y += newBallSpeed.y;
+    newBallSpeed.y += 0.1;
 
-      // Check for collisions with walls
-      if (newBallPosition.x < 10 || newBallPosition.x > 770) {
-        newBallSpeed.x = -newBallSpeed.x;
-      }
+    newBallPosition.x += newBallSpeed.x;
+    newBallPosition.y += newBallSpeed.y;
 
-      // Check for collisions with flippers
-      if (
-        newBallPosition.y > 540 &&
-        newBallPosition.y < 560 &&
-        ((newBallPosition.x > 50 && newBallPosition.x < 210) || (newBallPosition.x > 590 && newBallPosition.x < 750))
-      ) {
-        newBallSpeed.y = -7; // Ball bounces up when hitting the flippers
-      }
+    if (newBallPosition.x < 10 || newBallPosition.x > 770) {
+      newBallSpeed.x = -newBallSpeed.x;
+    }
 
-      // Check for collisions with tubes and blocks
-      // (Add collision logic here based on your game design)
+    if (
+      newBallPosition.y > 540 &&
+      newBallPosition.y < 560 &&
+      ((newBallPosition.x > 50 && newBallPosition.x < 210) ||
+        (newBallPosition.x > 590 && newBallPosition.x < 750))
+    ) {
+      newBallSpeed.y = -7;
+    }
 
-      // Check for game over condition
-      if (newBallPosition.y > 590) {
-        setGameOver(true);
-      }
+    checkCollisionWithTube(newBallPosition, TopTube, 50);
+    checkCollisionWithTube(newBallPosition, MiddleTube, 50);
+    checkCollisionWithTube(newBallPosition, BottomTube, 50);
+    checkCollisionWithBlocks(newBallPosition, Blocks, 50);
 
-      setBallSpeed(newBallSpeed);
-      setBallPosition(newBallPosition);
-    };
+    checkCollisionWithSpinner(newBallPosition, LeftSpinner, 30);
+    checkCollisionWithSpinner(newBallPosition, RightSpinner, 30);
 
-    const interval = setInterval(handleGameLoop, 16);
-    return () => clearInterval(interval);
-  }, [ballPosition, ballSpeed, gameOver]);
+    setBallSpeed(newBallSpeed);
+    setBallPosition(newBallPosition);
+  };
+
+  const checkCollisionWithTube = (ballPos, tube, radius) => {
+    const tubeCenterX = tube.left + tube.width / 2;
+    const tubeCenterY = tube.top + tube.height / 2;
+
+    const distance = Math.sqrt((tubeCenterX - ballPos.x) ** 2 + (tubeCenterY - ballPos.y) ** 2);
+
+    if (distance < radius + 10) {
+      setScore(score + ScoreMultiplier);
+      setBallSpeed({ x: -ballSpeed.x, y: -ballSpeed.y });
+    }
+  };
+
+  const checkCollisionWithBlocks = (ballPos, blocks, radius) => {
+    const blocksCenterX = blocks.left + blocks.width / 2;
+    const blocksCenterY = blocks.top + blocks.height / 2;
+
+    const distance = Math.sqrt((blocksCenterX - ballPos.x) ** 2 + (blocksCenterY - ballPos.y) ** 2);
+
+    if (distance < radius + 10) {
+      setScore(score + ScoreMultiplier);
+      setBallSpeed({ x: -ballSpeed.x, y: -ballSpeed.y });
+    }
+  };
+
+  const checkCollisionWithSpinner = (ballPos, spinner, radius) => {
+    const spinnerCenterX = spinner.left + spinner.width / 2;
+    const spinnerCenterY = spinner.top + spinner.height / 2;
+
+    const distance = Math.sqrt((spinnerCenterX - ballPos.x) ** 2 + (spinnerCenterY - ballPos.y) ** 2);
+
+    if (distance < radius + 10) {
+      setScore(score + ScoreMultiplier);
+      setBallSpeed({ x: -ballSpeed.x, y: -ballSpeed.y });
+    }
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowLeft') {
@@ -175,6 +253,24 @@ const Pinball = () => {
     };
   }, []);
 
+  const rotateSpinner = (spinner, speed) => {
+    const newRotation = (spinner.rotation || 0) + speed;
+
+    if (newRotation >= 360) {
+      spinner.rotation = newRotation - 360;
+    } else if (newRotation < 0) {
+      spinner.rotation = newRotation + 360;
+    } else {
+      spinner.rotation = newRotation;
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(handleGameLoop, 16);
+    return () => clearInterval(interval);
+  }, [ballPosition, ballSpeed, gameOver, score]);
+  
+
   return (
     <Container>
       <PinballGame>
@@ -192,6 +288,18 @@ const Pinball = () => {
 
         {/* Blocks */}
         <Blocks />
+
+        {/* Bumpers */}
+        <LeftBumper />
+        <RightBumper />
+
+        {/* Spinners */}
+        <LeftSpinner>
+          <SpinnerCenter />
+        </LeftSpinner>
+        <RightSpinner>
+          <SpinnerCenter />
+        </RightSpinner>
 
         {/* Score */}
         <Score>Score: {score}</Score>
