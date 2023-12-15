@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import styled, { keyframes } from 'styled-components';
+import styled from 'styled-components';
+import LeftFlipper from './components/LeftFlipper';
+import RightFlipper from './components/RightFlipper';
+import Ball from './components/Ball';
+import Tube from './components/Tube';
+import Blocks from './components/Blocks';
+import Spinner from './components/Spinner';
+import GameOverMessage from './components/GameOverMessage';
+import ScoreDisplay from './components/ScoreDisplay';
+
 
 const ScoreMultiplier = 2;
 
@@ -27,35 +36,13 @@ const FlipperBase = styled.div`
   bottom: 0;
 `;
 
-const LeftFlipper = styled(FlipperBase)`
-  transform-origin: left center;
-  transform: rotate(${(props) => (props.up ? '-30deg' : '0deg')});
-  left: 50px;
-`;
 
-const RightFlipper = styled(FlipperBase)`
-  transform-origin: right center;
-  transform: rotate(${(props) => (props.up ? '30deg' : '0deg')});
-  right: 50px;
-`;
 
-const Ball = styled.div`
-  width: 20px;
-  height: 20px;
-  background-color: #f00;
-  border-radius: 50%;
-  position: absolute;
-  top: ${(props) => props.position.y}px;
-  left: ${(props) => props.position.x}px;
-`;
 
-const Tube = styled.div`
-  width: 100px;
-  height: 100px;
-  background-color: #777;
-  position: absolute;
-  border-radius: 50%;
-`;
+
+
+
+
 
 const TopTube = styled(Tube)`
   top: 50px;
@@ -72,14 +59,6 @@ const BottomTube = styled(Tube)`
   left: 300px;
 `;
 
-const Blocks = styled.div`
-  width: 200px;
-  height: 50px;
-  background-color: #777;
-  position: absolute;
-  top: 300px;
-  left: 100px;
-`;
 
 const Bumper = styled.div`
   width: 30px;
@@ -99,13 +78,6 @@ const RightBumper = styled(Bumper)`
   left: 500px;
 `;
 
-const Spinner = styled.div`
-  width: 60px;
-  height: 60px;
-  border: 2px solid #0f0; /* Green color for spinner */
-  position: absolute;
-  border-radius: 50%;
-`;
 
 const SpinnerCenter = styled.div`
   width: 10px;
@@ -128,14 +100,6 @@ const RightSpinner = styled(Spinner)`
   left: 700px;
 `;
 
-const GameOverMessage = styled.div`
-  font-size: 48px;
-  color: white;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-`;
 
 const Score = styled.div`
   font-size: 24px;
@@ -145,6 +109,7 @@ const Score = styled.div`
   left: 20px;
 `;
 
+
 const Pinball = () => {
   const [leftFlipperUp, setLeftFlipperUp] = useState(false);
   const [rightFlipperUp, setRightFlipperUp] = useState(false);
@@ -152,6 +117,7 @@ const Pinball = () => {
   const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+
 
   const handleGameLoop = () => {
     if (gameOver) return;
@@ -270,7 +236,6 @@ const Pinball = () => {
     return () => clearInterval(interval);
   }, [ballPosition, ballSpeed, gameOver, score]);
   
-
   return (
     <Container>
       <PinballGame>
@@ -282,27 +247,19 @@ const Pinball = () => {
         <Ball position={ballPosition} />
 
         {/* Tubes */}
-        <TopTube />
-        <MiddleTube />
-        <BottomTube />
+        <Tube type="top" />
+        <Tube type="middle" />
+        <Tube type="bottom" />
 
         {/* Blocks */}
         <Blocks />
 
-        {/* Bumpers */}
-        <LeftBumper />
-        <RightBumper />
-
         {/* Spinners */}
-        <LeftSpinner>
-          <SpinnerCenter />
-        </LeftSpinner>
-        <RightSpinner>
-          <SpinnerCenter />
-        </RightSpinner>
+        <Spinner type="left" />
+        <Spinner type="right" />
 
-        {/* Score */}
-        <Score>Score: {score}</Score>
+        {/* Score Display */}
+        <ScoreDisplay score={score} />
 
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
