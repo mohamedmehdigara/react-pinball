@@ -275,7 +275,7 @@ const Pinball = () => {
         <Tube type="bottom" />
 
         {/* Blocks */}
-        <Blocks />
+        <Blocks initialTop={300} initialLeft={100} />
 
         {/* Spinners */}
         <Spinner type="left" />
