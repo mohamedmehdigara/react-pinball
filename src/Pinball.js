@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
-import Ball from './components/Ball';
+import BallComponent from './components/Ball';
 import Tube from './components/Tube';
 import Blocks from './components/Blocks';
 import Spinner from './components/Spinner';
@@ -235,6 +235,22 @@ const Pinball = () => {
     const interval = setInterval(handleGameLoop, 16);
     return () => clearInterval(interval);
   }, [ballPosition, ballSpeed, gameOver, score]);
+
+  const handleBallCollision = () => {
+    // Logic for ball collision
+    setScore(score + 10); // Increase the score when the ball collides
+
+    // You can add more specific logic based on the collision
+    // For example, play a sound, trigger an animation, etc.
+  };
+
+  const handleBallOutOfBounds = () => {
+    // Logic for when the ball goes out of bounds
+    setGameOver(true); // Set the game over state
+
+    // You can add more specific logic here
+    // For example, play a game over sound, display a game over animation, etc.
+  };
   
   return (
     <Container>
@@ -244,7 +260,14 @@ const Pinball = () => {
         <RightFlipper up={rightFlipperUp} />
 
         {/* Ball */}
-        <Ball position={ballPosition} />
+        {ballPosition && (
+        <BallComponent
+            position={ballPosition}
+            speed={ballSpeed}
+            onCollision={handleBallCollision}
+            onOutOfBounds={handleBallOutOfBounds}
+          />
+        )}
 
         {/* Tubes */}
         <Tube type="top" />
