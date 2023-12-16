@@ -210,6 +210,11 @@ const Pinball = () => {
     }
   };
 
+  const handleBlockCollision = () => {
+    // Logic for handling block collision
+    setScore(score + 10); // Update the score, adjust as needed
+  };
+
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
@@ -275,7 +280,7 @@ const Pinball = () => {
         <Tube type="bottom" />
 
         {/* Blocks */}
-        <Blocks initialTop={300} initialLeft={100} />
+        <Blocks initialTop={300} initialLeft={100} onCollision={() => handleBlockCollision()} />
 
         {/* Spinners */}
         <Spinner type="left" />

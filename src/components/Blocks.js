@@ -8,9 +8,10 @@ const BlocksContainer = styled.div`
   position: absolute;
   top: ${(props) => `${props.top}px`};
   left: ${(props) => `${props.left}px`};
+  cursor: pointer;
 `;
 
-const Blocks = ({ initialTop, initialLeft }) => {
+const Blocks = ({ initialTop, initialLeft, onCollision }) => {
   const [top, setTop] = useState(initialTop);
   const [left, setLeft] = useState(initialLeft);
 
@@ -22,6 +23,9 @@ const Blocks = ({ initialTop, initialLeft }) => {
 
     setTop(newTop);
     setLeft(newLeft);
+
+    // Notify the parent component about the collision
+    onCollision();
   };
 
   return <BlocksContainer top={top} left={left} onClick={handleCollision} />;
