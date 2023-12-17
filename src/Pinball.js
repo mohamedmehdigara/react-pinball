@@ -113,7 +113,8 @@ const Score = styled.div`
 const Pinball = () => {
   const [leftFlipperUp, setLeftFlipperUp] = useState(false);
   const [rightFlipperUp, setRightFlipperUp] = useState(false);
-  const [ballPosition, setBallPosition] = useState({ x: 390, y: 550 });
+  const [ballPosition, setBallPosition] = useState({ x: 0, y: 0 });
+
   const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
@@ -280,7 +281,7 @@ const Pinball = () => {
         <Tube type="bottom" />
 
         {/* Blocks */}
-        <Blocks initialTop={300} initialLeft={100} onCollision={() => handleBlockCollision()} />
+        <Blocks initialTop={300} initialLeft={100} ballPosition={ballPosition} onCollision={() => handleBlockCollision()} />
 
         {/* Spinners */}
         <Spinner type="left" />
