@@ -8,6 +8,7 @@ import Blocks from './components/Blocks';
 import Spinner from './components/Spinner';
 import GameOverMessage from './components/GameOverMessage';
 import ScoreDisplay from './components/ScoreDisplay';
+import BallLauncher from './components/BallLauncher';
 
 
 const ScoreMultiplier = 2;
@@ -119,6 +120,11 @@ const Pinball = () => {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
 
+
+  const handleLaunch = () => {
+    // Logic to launch the ball
+    console.log('Ball launched!');
+  };
 
   const handleGameLoop = () => {
     if (gameOver) return;
@@ -286,6 +292,8 @@ const Pinball = () => {
         {/* Spinners */}
         <Spinner type="left" />
         <Spinner type="right" />
+        <BallLauncher onLaunch={handleLaunch} />
+
 
         {/* Score Display */}
         <ScoreDisplay score={score} />
