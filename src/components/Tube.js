@@ -1,5 +1,12 @@
 import React from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
+
+// Define a pulse animation
+const pulse = keyframes`
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+`;
 
 const Tube = styled.div`
   width: 100px;
@@ -7,6 +14,7 @@ const Tube = styled.div`
   background-color: #777;
   position: absolute;
   border-radius: 50%;
+  cursor: pointer;
   ${(props) => {
     switch (props.type) {
       case 'top':
@@ -19,6 +27,12 @@ const Tube = styled.div`
         return '';
     }
   }}
+  transition: background-color 0.3s ease; /* Smooth color transition */
+
+  &:hover {
+    background-color: #888; /* Change color on hover */
+    animation: ${pulse} 0.5s ease infinite; /* Apply the pulse animation on hover */
+  }
 `;
 
 export default Tube;
