@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 
+// Styled components for Blocks
 const BlockContainer = styled.div`
   position: absolute;
 `;
@@ -8,7 +9,7 @@ const BlockContainer = styled.div`
 const Block = styled.div`
   width: ${(props) => props.size || '50px'};
   height: ${(props) => props.size || '50px'};
-  background-color: ${(props) => props.hit ? '#ff0000' : props.color || '#777'};
+  background-color: ${(props) => (props.hit ? '#ff0000' : props.color || '#777')};
   position: absolute;
   top: ${(props) => `${props.top}px` || '0'};
   left: ${(props) => `${props.left}px` || '0'};
@@ -28,34 +29,37 @@ const Blocks = ({ id, initialTop, initialLeft, size, color, onClick, ballPositio
   useEffect(() => {
     // Check if the ball hits the block
     const isHit =
-    ballPosition?.x > left &&
-    ballPosition?.x < left + (size || 50) &&
-    ballPosition?.y > top &&
-    ballPosition?.y < top + (size || 50);
-  
+      ballPosition?.x > left &&
+      ballPosition?.x < left + (size || 50) &&
+      ballPosition?.y > top &&
+      ballPosition?.y < top + (size || 50);
+
     if (isHit) {
       // Change block color when hit
       setHit(true);
+
       // Reset the block color after a delay (simulating the effect)
       setTimeout(() => setHit(false), 500);
+
+      // Additional logic when the block is hit, e.g., scoring, removing the block, etc.
+      // You can call a callback function to handle these actions
+      onClick && onClick(id);
     }
-  }, [ballPosition, left, top, size]);
+  }, [ballPosition, left, top, size, id, onClick]);
 
   const handleClick = () => {
-    // You can add more logic here, e.g., scoring, removing the block, etc.
+    // Additional logic when the block is clicked, e.g., scoring, removing the block, etc.
+    // You can call a callback function to handle these actions
     onClick && onClick(id);
   };
 
   return (
     <BlockContainer>
-      <Block
-        size={size}
-        color={color}
-        top={top}
-        left={left}
-        hit={hit}
-        onClick={handleClick}
-      />
+      {/* Pass down size, color, top, left, hit, and onClick props */}
+      <Block size={size} color={color} top={top} left={left} hit={hit} onClick={handleClick}>
+        {/* Additional content within the block if needed */}
+        <span>{id}</span>
+      </Block>
     </BlockContainer>
   );
 };

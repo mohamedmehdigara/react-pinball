@@ -33,17 +33,29 @@ const BallLauncher = ({ onLaunch }) => {
         right: '10px', // Adjust the distance from the right side
         transform: 'translateY(-50%)',
         cursor: 'pointer',
+        zIndex: '999', // Ensure the launcher is on top
       }}
     >
       <div
         style={{
           width: '50px',
           height: '50px',
-          backgroundColor: isCharged ? 'green' : 'red',
+          backgroundColor: isCharged ? '#4CAF50' : '#FF5733', // Green when charged, red when not
           borderRadius: '50%',
           border: '2px solid #333',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          fontSize: '18px',
+          color: '#fff',
+          fontWeight: 'bold',
+          userSelect: 'none', // Prevent text selection
+          boxShadow: '0 0 10px rgba(0, 0, 0, 0.3)', // Add a subtle shadow
+          transition: 'background-color 0.3s ease', // Smooth color transition
         }}
-      ></div>
+      >
+        {isCharged ? 'READY' : 'CHARGE'}
+      </div>
     </div>
   );
 };
