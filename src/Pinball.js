@@ -9,7 +9,7 @@ import Spinner from './components/Spinner';
 import GameOverMessage from './components/GameOverMessage';
 import ScoreDisplay from './components/ScoreDisplay';
 import BallLauncher from './components/BallLauncher';
-
+import Bumper from './components/Bumper';
 
 const ScoreMultiplier = 2;
 
@@ -61,13 +61,7 @@ const BottomTube = styled(Tube)`
 `;
 
 
-const Bumper = styled.div`
-  width: 30px;
-  height: 30px;
-  background-color: #ff0; /* Yellow color for bumpers */
-  position: absolute;
-  border-radius: 50%;
-`;
+
 
 const LeftBumper = styled(Bumper)`
   top: 100px;
@@ -263,7 +257,20 @@ const Pinball = () => {
     // You can add more specific logic here
     // For example, play a game over sound, display a game over animation, etc.
   };
-  
+
+  const handleBumperHit = (id) => {
+    // Logic when a bumper is hit, e.g., increase score
+    console.log(`Bumper ${id} hit!`);
+  };
+
+  const Bumper = styled.div`
+  width: 30px;
+  height: 30px;
+  background-color: #ff0; /* Yellow color for bumpers */
+  position: absolute;
+  border-radius: 50%;
+`;
+
   return (
     <Container>
       <PinballGame>
@@ -297,6 +304,9 @@ const Pinball = () => {
 
         {/* Score Display */}
         <ScoreDisplay score={score} />
+        <Bumper id={1} size="30px" color="#ffcc00" top={100} left={200} onClick={handleBumperHit} />
+<Bumper id={2} size="30px" color="#ffcc00" top={300} left={500} onClick={handleBumperHit} />
+
 
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
