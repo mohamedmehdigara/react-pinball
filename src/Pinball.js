@@ -14,6 +14,7 @@ import LaneGuide from './components/LaneGuide';
 import Kickback from './components/Kickback';
 import Rollover from './components/Rollover';
 import DropTarget from './components/DropTarget';
+import KickoutHole from './components/KickoutHole';
 
 const ScoreMultiplier = 2;
 
@@ -286,6 +287,11 @@ const Pinball = () => {
     console.log(`DropTarget ${id} hit!`);
   };
 
+  const handleKickout = (id) => {
+    // Logic when a KickoutHole is triggered, e.g., shooting the ball back into play
+    console.log(`KickoutHole ${id} triggered!`);
+  };
+
   const Bumper = styled.div`
   width: 30px;
   height: 30px;
@@ -338,6 +344,8 @@ const Pinball = () => {
 <Rollover id={2} width="30px" height="30px" top={300} left={400} onRoll={handleRolloverRoll} />
 <DropTarget id={1} width="50px" height="30px" top={150} left={300} onHit={handleDropTargetHit} />
 <DropTarget id={2} width="50px" height="30px" top={350} left={500} onHit={handleDropTargetHit} />
+<KickoutHole id={1} diameter="40px" top={50} left={100} onKick={handleKickout} />
+<KickoutHole id={2} diameter="40px" top={200} left={500} onKick={handleKickout} />
 
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
