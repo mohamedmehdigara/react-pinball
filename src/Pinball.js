@@ -11,6 +11,7 @@ import ScoreDisplay from './components/ScoreDisplay';
 import BallLauncher from './components/BallLauncher';
 import Bumper from './components/Bumper';
 import LaneGuide from './components/LaneGuide';
+import Kickback from './components/Kickback';
 
 const ScoreMultiplier = 2;
 
@@ -268,7 +269,10 @@ const Pinball = () => {
     // Logic when a lane guide is hit, e.g., redirect the ball
     console.log(`Lane Guide ${id} hit!`);
   };
-  
+  const handleKickbackActivate = (id) => {
+    // Logic when a kickback is activated, e.g., save the ball from falling
+    console.log(`Kickback ${id} activated!`);
+  };
 
   const Bumper = styled.div`
   width: 30px;
@@ -316,6 +320,8 @@ const Pinball = () => {
 
 <LaneGuide id={1} width="20px" height="80px" color="#00ff00" top={100} left={200} onHit={handleLaneGuideHit} />
 <LaneGuide id={2} width="20px" height="80px" color="#00ff00" top={300} left={500} onHit={handleLaneGuideHit} />
+<Kickback id={1} width="20px" height="100px" top={50} left={10} onActivate={handleKickbackActivate} />
+<Kickback id={2} width="20px" height="100px" top={50} left={770} onActivate={handleKickbackActivate} />
 
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
