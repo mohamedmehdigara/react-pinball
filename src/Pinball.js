@@ -10,6 +10,7 @@ import GameOverMessage from './components/GameOverMessage';
 import ScoreDisplay from './components/ScoreDisplay';
 import BallLauncher from './components/BallLauncher';
 import Bumper from './components/Bumper';
+import LaneGuide from './components/LaneGuide';
 
 const ScoreMultiplier = 2;
 
@@ -263,6 +264,12 @@ const Pinball = () => {
     console.log(`Bumper ${id} hit!`);
   };
 
+  const handleLaneGuideHit = (id) => {
+    // Logic when a lane guide is hit, e.g., redirect the ball
+    console.log(`Lane Guide ${id} hit!`);
+  };
+  
+
   const Bumper = styled.div`
   width: 30px;
   height: 30px;
@@ -307,6 +314,8 @@ const Pinball = () => {
         <Bumper id={1} size="30px" color="#ffcc00" top={100} left={200} onClick={handleBumperHit} />
 <Bumper id={2} size="30px" color="#ffcc00" top={300} left={500} onClick={handleBumperHit} />
 
+<LaneGuide id={1} width="20px" height="80px" color="#00ff00" top={100} left={200} onHit={handleLaneGuideHit} />
+<LaneGuide id={2} width="20px" height="80px" color="#00ff00" top={300} left={500} onHit={handleLaneGuideHit} />
 
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
