@@ -13,6 +13,7 @@ import Bumper from './components/Bumper';
 import LaneGuide from './components/LaneGuide';
 import Kickback from './components/Kickback';
 import Rollover from './components/Rollover';
+import DropTarget from './components/DropTarget';
 
 const ScoreMultiplier = 2;
 
@@ -280,6 +281,11 @@ const Pinball = () => {
     console.log(`Rollover ${id} triggered!`);
   };
 
+  const handleDropTargetHit = (id) => {
+    // Logic when a DropTarget is hit, e.g., revealing new paths or bonuses
+    console.log(`DropTarget ${id} hit!`);
+  };
+
   const Bumper = styled.div`
   width: 30px;
   height: 30px;
@@ -330,6 +336,8 @@ const Pinball = () => {
 <Kickback id={2} width="20px" height="100px" top={50} left={770} onActivate={handleKickbackActivate} />
 <Rollover id={1} width="30px" height="30px" top={100} left={200} onRoll={handleRolloverRoll} />
 <Rollover id={2} width="30px" height="30px" top={300} left={400} onRoll={handleRolloverRoll} />
+<DropTarget id={1} width="50px" height="30px" top={150} left={300} onHit={handleDropTargetHit} />
+<DropTarget id={2} width="50px" height="30px" top={350} left={500} onHit={handleDropTargetHit} />
 
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
