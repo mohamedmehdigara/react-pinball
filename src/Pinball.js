@@ -15,6 +15,7 @@ import Kickback from './components/Kickback';
 import Rollover from './components/Rollover';
 import DropTarget from './components/DropTarget';
 import KickoutHole from './components/KickoutHole';
+import Magnet from './components/Magnet';
 
 const ScoreMultiplier = 2;
 
@@ -292,6 +293,11 @@ const Pinball = () => {
     console.log(`KickoutHole ${id} triggered!`);
   };
 
+  const handleMagnetize = (id, magneticForce) => {
+    // Logic when a Magnet is triggered, e.g., attract or repel the ball
+    console.log(`Magnet ${id} magnetized with force ${magneticForce}!`);
+  };
+
   const Bumper = styled.div`
   width: 30px;
   height: 30px;
@@ -346,6 +352,8 @@ const Pinball = () => {
 <DropTarget id={2} width="50px" height="30px" top={350} left={500} onHit={handleDropTargetHit} />
 <KickoutHole id={1} diameter="40px" top={50} left={100} onKick={handleKickout} />
 <KickoutHole id={2} diameter="40px" top={200} left={500} onKick={handleKickout} />
+<Magnet id={1} size="30px" top={100} left={200} magneticForce={10} onMagnetize={handleMagnetize} />
+<Magnet id={2} size="30px" top={300} left={500} magneticForce={-10} onMagnetize={handleMagnetize} />
 
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
