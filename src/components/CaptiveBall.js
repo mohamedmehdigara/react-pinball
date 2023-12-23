@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import styled, { keyframes } from 'styled-components';
+import styled, { css, keyframes } from 'styled-components';
 
 // Define a bounce animation
 const bounce = keyframes`
@@ -21,35 +21,41 @@ const CaptiveBallContainer = styled.div`
 const CaptiveBallStyled = styled.div`
   width: ${(props) => props.size || '20px'};
   height: ${(props) => props.size || '20px'};
-  background-color: #FFD700; /* Gold color for the captive ball */
+  background-color: ${(props) => (props.released ? '#D3D3D3' : '#FFD700')};
   border-radius: 50%;
   position: absolute;
   top: ${(props) => `${props.top}px` || '0'};
   left: ${(props) => `${props.left}px` || '0'};
-  cursor: pointer;
-  animation: ${bounce} 1s ease infinite; /* Apply the bounce animation */
+  cursor: ${(props) => (props.released ? 'not-allowed' : 'pointer')};
+  animation: ${(props) => (props.released ? 'none' : css`${bounce} 1s ease infinite`)};
+  opacity: ${(props) => (props.released ? 0.5 : 1)};
+  transition: background-color 0.3s ease, opacity 0.3s ease;
 `;
 
-const CaptiveBall = ({ id, size, top, left, isReleased, onRelease }) => {
+const CaptiveBall = ({ id, size, top, left, isReleased, onRelease, onCaptiveClick }) => {
   const [released, setReleased] = useState(false);
 
   useEffect(() => {
     if (isReleased) {
-      // Logic to release the captive ball
       setReleased(true);
       onRelease && onRelease(id);
     }
   }, [isReleased, id, onRelease]);
 
   const handleClick = () => {
-    // Logic when the captive ball is clicked, e.g., scoring, etc.
-    console.log(`Captive Ball ${id} clicked!`);
+    onCaptiveClick && onCaptiveClick(id);
   };
 
   return (
     <CaptiveBallContainer>
       {!released && (
-        <CaptiveBallStyled size={size} top={top} left={left} onClick={handleClick} />
+        <CaptiveBallStyled
+          size={size}
+          top={top}
+          left={left}
+          released={released}
+          onClick={handleClick}
+        />
       )}
     </CaptiveBallContainer>
   );

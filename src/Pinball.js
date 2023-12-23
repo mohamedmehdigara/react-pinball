@@ -17,6 +17,7 @@ import DropTarget from './components/DropTarget';
 import KickoutHole from './components/KickoutHole';
 import Magnet from './components/Magnet';
 import CaptiveBall from './components/CaptiveBall';
+import Hole from './components/Hole';
 
 
 const ScoreMultiplier = 2;
@@ -305,6 +306,11 @@ const Pinball = () => {
     console.log(`Captive Ball ${id} released!`);
   };
 
+  const handleEnterHole = (id) => {
+    // Logic when the ball enters the hole, e.g., teleport the ball
+    console.log(`Ball entered hole ${id}`);
+  };
+
   const Bumper = styled.div`
   width: 30px;
   height: 30px;
@@ -363,6 +369,8 @@ const Pinball = () => {
 <Magnet id={2} size="30px" top={300} left={500} magneticForce={-10} onMagnetize={handleMagnetize} />
 <CaptiveBall id={1} size="20px" top={100} left={200} isReleased={false} onRelease={handleRelease} />
 <CaptiveBall id={2} size="20px" top={300} left={500} isReleased={false} onRelease={handleRelease} />
+<Hole id={1} size="30px" top={100} left={200} onEnter={handleEnterHole} />
+<Hole id={2} size="30px" top={300} left={500} onEnter={handleEnterHole} />
 
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
