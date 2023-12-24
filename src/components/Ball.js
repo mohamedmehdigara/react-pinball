@@ -29,7 +29,7 @@ const Ball = ({ position, onCollision, onOutOfBounds }) => {
     }
 
     // You can add more collision logic based on your game design
-    onCollision(position.x, position.y);
+    onCollision && onCollision(position.x, position.y);
   }, [position, onCollision, onOutOfBounds]);
 
   return <BallStyled style={{ top: position.y, left: position.x }} />;
