@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
-import BallComponent from './components/Ball';
+import Ball from './components/Ball';
 import Tube from './components/Tube';
 import Blocks from './components/Blocks';
 import Spinner from './components/Spinner';
@@ -18,6 +18,7 @@ import KickoutHole from './components/KickoutHole';
 import Magnet from './components/Magnet';
 import CaptiveBall from './components/CaptiveBall';
 import Hole from './components/Hole';
+import Multiball from './components/Multiball';
 
 
 const ScoreMultiplier = 2;
@@ -251,15 +252,9 @@ const Pinball = () => {
     return () => clearInterval(interval);
   }, [ballPosition, ballSpeed, gameOver, score]);
 
-  const handleBallCollision = () => {
-    // Logic for ball collision
-    setScore(score + 10); // Increase the score when the ball collides
+  
 
-    // You can add more specific logic based on the collision
-    // For example, play a sound, trigger an animation, etc.
-  };
-
-  const handleBallOutOfBounds = () => {
+  const handleOutOfBounds = () => {
     // Logic for when the ball goes out of bounds
     setGameOver(true); // Set the game over state
 
@@ -311,6 +306,20 @@ const Pinball = () => {
     console.log(`Ball entered hole ${id}`);
   };
 
+  const handleBallLost = () => {
+    // Logic for when a ball is lost
+    console.log('Ball Lost!');
+  };
+
+  const handleScore = (points) => {
+    // Logic for updating the score
+    console.log(`Scored ${points} points!`);
+  };
+  const handleCollision = () => {
+    console.log('Ball collided!');
+    // Your collision logic goes here
+  };
+
   const Bumper = styled.div`
   width: 30px;
   height: 30px;
@@ -328,11 +337,11 @@ const Pinball = () => {
 
         {/* Ball */}
         {ballPosition && (
-        <BallComponent
+        <Ball
             position={ballPosition}
             speed={ballSpeed}
-            onCollision={handleBallCollision}
-            onOutOfBounds={handleBallOutOfBounds}
+            onCollision={handleCollision}
+            onOutOfBounds={handleOutOfBounds}
           />
         )}
 
@@ -371,7 +380,11 @@ const Pinball = () => {
 <CaptiveBall id={2} size="20px" top={300} left={500} isReleased={false} onRelease={handleRelease} />
 <Hole id={1} size="30px" top={100} left={200} onEnter={handleEnterHole} />
 <Hole id={2} size="30px" top={300} left={500} onEnter={handleEnterHole} />
-
+<Multiball
+        initialBallsCount={3}  // Adjust the number of initial balls as needed
+        onBallLost={handleBallLost}
+        onScore={handleScore}
+      />
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
       </PinballGame>

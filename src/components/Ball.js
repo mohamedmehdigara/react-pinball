@@ -1,9 +1,17 @@
 import React, { useEffect } from 'react';
 import styled from 'styled-components';
 
+const BallStyled = styled.div`
+  width: 20px;
+  height: 20px;
+  background-color: #f00;
+  border-radius: 50%;
+  position: absolute;
 
-const Ball = ({ position, speed, onCollision, onOutOfBounds }) => {
+  transition: top 0.1s, left 0.1s; /* Add smooth transition */
+`;
 
+const Ball = ({ position, onCollision, onOutOfBounds }) => {
   useEffect(() => {
     const handleAnimation = () => {
       // Handle ball animation logic
@@ -12,7 +20,7 @@ const Ball = ({ position, speed, onCollision, onOutOfBounds }) => {
 
     const interval = setInterval(handleAnimation, 16);
     return () => clearInterval(interval);
-  }, [position, speed]);
+  }, [position]);
 
   useEffect(() => {
     // Check for collisions or out-of-bounds
@@ -23,21 +31,8 @@ const Ball = ({ position, speed, onCollision, onOutOfBounds }) => {
     // You can add more collision logic based on your game design
     onCollision(position.x, position.y);
   }, [position, onCollision, onOutOfBounds]);
-  const Ball = styled.div`
-  width: 20px;
-  height: 20px;
-  background-color: #f00;
-  border-radius: 50%;
-  position: absolute;
-  
-  transition: top 0.1s, left 0.1s; /* Add smooth transition */
-`;
 
-  return <Ball style={{ top: position.y, left: position.x }} />;
+  return <BallStyled style={{ top: position.y, left: position.x }} />;
+};
 
-
-
-  
-
-}
 export default Ball;
