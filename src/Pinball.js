@@ -19,6 +19,7 @@ import Magnet from './components/Magnet';
 import CaptiveBall from './components/CaptiveBall';
 import Hole from './components/Hole';
 import Multiball from './components/Multiball';
+import SkillShot from './components/SkillShot';
 
 
 const ScoreMultiplier = 2;
@@ -320,6 +321,12 @@ const Pinball = () => {
     // Your collision logic goes here
   };
 
+  const handleSkillShot = () => {
+    // Handle the logic when the player successfully hits the skill shot
+    console.log('Skill Shot successful!');
+    // You can add scoring logic or any other actions here
+  };
+
   const Bumper = styled.div`
   width: 30px;
   height: 30px;
@@ -385,6 +392,9 @@ const Pinball = () => {
         onBallLost={handleBallLost}
         onScore={handleScore}
       />
+
+<SkillShot onSkillShot={handleSkillShot} />
+
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
       </PinballGame>
