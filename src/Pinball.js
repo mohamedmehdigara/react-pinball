@@ -20,7 +20,7 @@ import CaptiveBall from './components/CaptiveBall';
 import Hole from './components/Hole';
 import Multiball from './components/Multiball';
 import SkillShot from './components/SkillShot';
-
+import DynamicObstacle from './components/DynamicObstacle';
 
 const ScoreMultiplier = 2;
 
@@ -319,6 +319,8 @@ const Pinball = () => {
   const handleCollision = () => {
     console.log('Ball collided!');
     // Your collision logic goes here
+    console.log('Ball collided with dynamic obstacle!');
+
   };
 
   const handleSkillShot = () => {
@@ -394,6 +396,8 @@ const Pinball = () => {
       />
 
 <SkillShot onSkillShot={handleSkillShot} />
+<DynamicObstacle onCollision={handleCollision} />
+
 
         {/* Game Over Message */}
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
