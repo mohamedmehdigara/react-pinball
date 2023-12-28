@@ -21,6 +21,7 @@ import Hole from './components/Hole';
 import Multiball from './components/Multiball';
 import SkillShot from './components/SkillShot';
 import DynamicObstacle from './components/DynamicObstacle';
+import MysteryTarget from './components/MysteryTarget';
 
 const ScoreMultiplier = 2;
 
@@ -329,6 +330,11 @@ const Pinball = () => {
     // You can add scoring logic or any other actions here
   };
 
+  const handleMysteryHit = (mysteryId) => {
+    console.log(`Mystery target ${mysteryId} hit!`);
+    // Add your logic for what happens when a mystery target is hit
+  };
+
   const Bumper = styled.div`
   width: 30px;
   height: 30px;
@@ -397,6 +403,7 @@ const Pinball = () => {
 
 <SkillShot onSkillShot={handleSkillShot} />
 <DynamicObstacle onCollision={handleCollision} />
+<MysteryTarget id={1} top={100} left={200} onHit={handleMysteryHit} />
 
 
         {/* Game Over Message */}
