@@ -6,9 +6,9 @@ const KickbackContainer = styled.div`
 `;
 
 const KickbackStyled = styled.div`
-  width: ${(props) => props.width || '20px'};
+  width: ${(props) => props.width || '30px'}; /* Adjust the width for better visibility */
   height: ${(props) => props.height || '100px'};
-  background-color: ${(props) => (props.active ? '#ffcc00' : '#996633')};
+  background-color: ${(props) => (props.active ? '#FFD700' : '#A52A2A')}; /* Adjust colors */
   position: absolute;
   top: ${(props) => `${props.top}px` || '0'};
   left: ${(props) => `${props.left}px` || '0'};
@@ -16,7 +16,7 @@ const KickbackStyled = styled.div`
   transition: background-color 0.5s ease;
 
   &:hover {
-    background-color: #cc9900; /* Change color on hover */
+    background-color: ${(props) => (props.active ? '#FFD700' : '#B22222')}; /* Adjust hover color */
   }
 `;
 
@@ -37,12 +37,10 @@ const Kickback = ({ id, width, height, top, left, onActivate }) => {
   };
 
   return (
-    <KickbackContainer>
+    <KickbackContainer style={{ top: top, left: left }}> {/* Adjust position */}
       <KickbackStyled
         width={width}
         height={height}
-        top={top}
-        left={left}
         active={active}
         onClick={handleClick}
       />
