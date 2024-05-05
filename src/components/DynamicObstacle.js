@@ -12,12 +12,12 @@ const moveBackAndForth = keyframes`
 `;
 
 const Obstacle = styled.div`
-  width: 50px;
-  height: 20px;
-  background-color: #333;
+  width: 80px; /* Adjust the width for better visibility */
+  height: 30px; /* Adjust the height for better visibility */
+  background-color: #888; /* Adjust the color to match the theme */
   position: absolute;
-  top: 200px; // Adjust the vertical position
-  animation: ${moveBackAndForth} 2s linear infinite; // Adjust the duration
+  top: 150px; /* Adjust the vertical position */
+  animation: ${moveBackAndForth} 2s linear infinite; // Adjust the duration and easing
 `;
 
 const DynamicObstacle = ({ onCollision }) => {
