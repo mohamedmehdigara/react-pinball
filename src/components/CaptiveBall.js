@@ -19,8 +19,8 @@ const CaptiveBallContainer = styled.div`
 `;
 
 const CaptiveBallStyled = styled.div`
-  width: ${(props) => props.size || '20px'};
-  height: ${(props) => props.size || '20px'};
+  width: ${(props) => props.size || '30px'}; /* Adjust size for better visibility */
+  height: ${(props) => props.size || '30px'}; /* Adjust size for better visibility */
   background-color: ${(props) => (props.released ? '#D3D3D3' : '#FFD700')};
   border-radius: 50%;
   position: absolute;
@@ -30,6 +30,7 @@ const CaptiveBallStyled = styled.div`
   animation: ${(props) => (props.released ? 'none' : css`${bounce} 1s ease infinite`)};
   opacity: ${(props) => (props.released ? 0.5 : 1)};
   transition: background-color 0.3s ease, opacity 0.3s ease;
+  z-index: 1; /* Ensure the captive ball is above other elements */
 `;
 
 const CaptiveBall = ({ id, size, top, left, isReleased, onRelease, onCaptiveClick }) => {

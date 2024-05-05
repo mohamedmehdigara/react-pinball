@@ -6,8 +6,8 @@ const DropTargetContainer = styled.div`
 `;
 
 const DropTargetStyled = styled.div`
-  width: ${(props) => props.width || '50px'};
-  height: ${(props) => props.height || '30px'};
+  width: ${(props) => props.width || '60px'}; /* Adjust width for better visibility */
+  height: ${(props) => props.height || '40px'}; /* Adjust height for better visibility */
   background-color: ${(props) => (props.active ? '#ff0000' : '#990000')};
   position: absolute;
   top: ${(props) => `${props.top}px` || '0'};

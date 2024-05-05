@@ -1,4 +1,3 @@
-// BallLauncher.js
 import React, { useState, useEffect } from 'react';
 
 const BallLauncher = ({ onLaunch }) => {
@@ -29,7 +28,7 @@ const BallLauncher = ({ onLaunch }) => {
     <div
       style={{
         position: 'absolute',
-        top: '50%',
+        top: 'calc(100% - 80px)', // Adjust the distance from the bottom
         right: '10px', // Adjust the distance from the right side
         transform: 'translateY(-50%)',
         cursor: 'pointer',
@@ -50,8 +49,8 @@ const BallLauncher = ({ onLaunch }) => {
           color: '#fff',
           fontWeight: 'bold',
           userSelect: 'none', // Prevent text selection
-          boxShadow: '0 0 10px rgba(0, 0, 0, 0.3)', // Add a subtle shadow
-          transition: 'background-color 0.3s ease', // Smooth color transition
+          boxShadow: '0 5px 15px rgba(0, 0, 0, 0.3)', // Add a subtle shadow
+          transition: 'background-color 0.3s ease, transform 0.3s ease', // Smooth transitions for color and scale
         }}
       >
         {isCharged ? 'READY' : 'CHARGE'}

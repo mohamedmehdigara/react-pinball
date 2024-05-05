@@ -15,10 +15,14 @@ const Block = styled.div`
   left: ${(props) => `${props.left}px` || '0'};
   cursor: pointer;
   transition: transform 0.2s ease, background-color 0.5s ease;
-
-  &:hover {
-    transform: scale(1.1);
-  }
+  border-radius: 8px; /* Add rounded corners for a more realistic appearance */
+  border: 2px solid #000; /* Add a border for better visibility */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
 `;
 
 const Blocks = ({ id, initialTop, initialLeft, size, color, onClick, ballPosition }) => {

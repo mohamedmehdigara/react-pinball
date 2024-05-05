@@ -13,8 +13,8 @@ const BumperContainer = styled.div`
 `;
 
 const BumperStyled = styled.div`
-  width: ${(props) => props.size || '30px'};
-  height: ${(props) => props.size || '30px'};
+  width: ${(props) => props.size || '60px'}; /* Increase size for better visibility */
+  height: ${(props) => props.size || '60px'}; /* Increase size for better visibility */
   background-color: ${(props) => props.color || '#ffcc00'};
   border-radius: 50%;
   position: absolute;
