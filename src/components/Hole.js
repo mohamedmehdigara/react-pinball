@@ -6,8 +6,8 @@ const HoleContainer = styled.div`
 `;
 
 const HoleStyled = styled.div`
-  width: ${(props) => props.size || '30px'};
-  height: ${(props) => props.size || '30px'};
+  width: ${(props) => props.size || '50px'}; /* Adjust the size for better visibility */
+  height: ${(props) => props.size || '50px'}; /* Adjust the size for better visibility */
   background-color: #000;
   border-radius: 50%;
   position: absolute;
@@ -33,7 +33,12 @@ const Hole = ({ id, size, top, left, onEnter }) => {
   return (
     <HoleContainer>
       {!entered && (
-        <HoleStyled size={size} top={top} left={left} onClick={handleEnter} />
+        <HoleStyled
+          size={size}
+          top={top}
+          left={left}
+          onClick={handleEnter}
+        />
       )}
     </HoleContainer>
   );
