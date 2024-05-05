@@ -8,7 +8,7 @@ const KickoutHoleContainer = styled.div`
 const KickoutHoleStyled = styled.div`
   width: ${(props) => props.diameter || '40px'};
   height: ${(props) => props.diameter || '40px'};
-  background-color: #333;
+  background-color: #000;
   border-radius: 50%;
   position: absolute;
   top: ${(props) => `${props.top}px` || '0'};
@@ -26,11 +26,9 @@ const KickoutHole = ({ id, diameter, top, left, onKick }) => {
   };
 
   return active ? (
-    <KickoutHoleContainer>
+    <KickoutHoleContainer style={{ top: top, left: left }}> {/* Adjust position */}
       <KickoutHoleStyled
         diameter={diameter}
-        top={top}
-        left={left}
         onClick={handleKick}
       />
     </KickoutHoleContainer>
