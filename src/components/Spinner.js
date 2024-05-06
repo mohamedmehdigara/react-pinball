@@ -10,23 +10,40 @@ const rotate = keyframes`
 const SpinnerBase = styled.div`
   width: 30px;
   height: 30px;
-  background-color: #555;
+  background-color: #777; /* Darker color for the spinner */
   position: absolute;
-  ${(props) => (props.type === 'left' ? 'left: 100px;' : 'right: 100px;')}
+  ${(props) => (props.type === 'left' ? 'left: 50px;' : 'right: 50px;')} /* Adjusted position */
+  top: 50px; /* Adjusted position */
+  border-radius: 50%;
   animation: ${rotate} 2s linear infinite; /* Apply the rotation animation */
 `;
 
 const Spinner = ({ type }) => {
   useEffect(() => {
-    // You can add spinner rotation logic here
-    // For example, you might want to adjust the rotation speed based on some condition
-    // or trigger a different animation when the component mounts
-
-    // Cleanup logic if needed
+    let rotationInterval;
+    let rotationSpeed = 100; // Default rotation speed in milliseconds
+    let rotationDirection = 1; // Default rotation direction (clockwise)
+  
+    const handleRotation = () => {
+      // Implement rotation logic here
+      // You can use CSS animations or JavaScript to rotate the spinner
+      const spinner = document.getElementById('spinner'); // Assuming you have an element with id 'spinner'
+      if (spinner) {
+        const currentRotation = spinner.style.transform ? parseInt(spinner.style.transform.replace('rotate(', '').replace('deg)', '')) : 0;
+        spinner.style.transform = `rotate(${currentRotation + rotationDirection}deg)`;
+      }
+    };
+  
+    // Start the rotation when the component mounts
+    rotationInterval = setInterval(handleRotation, rotationSpeed);
+  
+    // Cleanup logic
     return () => {
-      // Cleanup logic if needed
+      // Clear the rotation interval when the component unmounts
+      clearInterval(rotationInterval);
     };
   }, []);
+   
 
   return <SpinnerBase type={type} />;
 };

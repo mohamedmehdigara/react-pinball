@@ -30,14 +30,15 @@ const SkillShot = ({ onSkillShot }) => {
   };
 
   const SkillShotTarget = styled.div`
-    width: 50px;
-    height: 50px;
-    background-color: ${isActive ? '#00ff00' : '#ff0000'};
+    width: 40px; /* Adjusted size */
+    height: 40px; /* Adjusted size */
+    background-color: ${isActive ? '#FFFF00' : '#FF0000'}; /* Bright yellow for active, red for inactive */
     border: 2px solid #000;
     border-radius: 50%;
     position: absolute;
-    top: 50px;
-    left: 50px;
+    top: 80px; /* Adjusted position */
+    left: 50%; /* Centered horizontally */
+    transform: translateX(-50%); /* Centered horizontally */
     cursor: pointer;
     transition: background-color 0.3s ease;
   `;

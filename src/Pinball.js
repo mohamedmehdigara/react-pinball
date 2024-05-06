@@ -22,6 +22,7 @@ import Multiball from './components/Multiball';
 import SkillShot from './components/SkillShot';
 import DynamicObstacle from './components/DynamicObstacle';
 import MysteryTarget from './components/MysteryTarget';
+import ComboMeter from './components/ComboMeter';
 
 const ScoreMultiplier = 2;
 
@@ -404,6 +405,8 @@ const Pinball = () => {
 <SkillShot onSkillShot={handleSkillShot} />
 <DynamicObstacle onCollision={handleCollision} />
 <MysteryTarget id={1} top={100} left={200} onHit={handleMysteryHit} />
+<ComboMeter /> {/* Render the ComboMeter component */}
+
 
 
         {/* Game Over Message */}
