@@ -13,6 +13,10 @@ const MagnetStyled = styled.div`
   top: ${(props) => `${props.top}px` || '0'};
   left: ${(props) => `${props.left}px` || '0'};
   cursor: pointer;
+  border-radius: 50%; /* Rounded shape for magnet */
+
+  /* Add box shadow to create depth */
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
 `;
 
 const Magnet = ({ id, size, top, left, magneticForce, onMagnetize }) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 
 const LaneGuideContainer = styled.div`
@@ -23,28 +23,18 @@ const LaneGuideStyled = styled.div`
 const LaneGuide = ({ id, width, height, color, top, left, onHit }) => {
   const [hit, setHit] = useState(false);
 
-  useEffect(() => {
-    // Additional logic when the lane guide is hit, e.g., redirect the ball
-    if (hit) {
-      onHit && onHit(id);
-    }
-  }, [hit, id, onHit]);
-
   const handleClick = () => {
-    // Additional logic when the lane guide is clicked, e.g., scoring, sound effects, etc.
     setHit(true);
     setTimeout(() => setHit(false), 500); // Reset hit state after a delay
     onHit && onHit(id);
   };
 
   return (
-    <LaneGuideContainer>
+    <LaneGuideContainer style={{ top: top, left: left }}> {/* Adjust position */}
       <LaneGuideStyled
         width={width}
         height={height}
         color={color}
-        top={top}
-        left={left}
         hit={hit}
         onClick={handleClick}
       />
