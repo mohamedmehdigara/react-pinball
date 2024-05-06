@@ -21,6 +21,7 @@ const MysteryTargetStyled = styled.div`
   left: ${(props) => `${props.left}px` || '0'};
   cursor: pointer;
   animation: ${rotate} 2s linear infinite; /* Apply rotation animation */
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3); /* Add a subtle shadow */
 `;
 
 const MysteryTarget = ({ id, top, left, onHit }) => {
