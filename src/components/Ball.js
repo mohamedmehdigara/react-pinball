@@ -20,19 +20,22 @@ const Ball = ({ position, onCollision, onOutOfBounds }) => {
 
     const interval = setInterval(handleAnimation, 16);
     return () => clearInterval(interval);
-  }, [position]);
+  }, []);
 
   useEffect(() => {
-    // Check for collisions or out-of-bounds
-    if (position.y > window.innerHeight) {
-      onOutOfBounds(); // Call a function when the ball goes out of bounds
-    }
+    // Check if position is defined before accessing its properties
+    if (position && typeof position === 'object') {
+      // Check for collisions or out-of-bounds
+      if (position.y > window.innerHeight) {
+        onOutOfBounds(); // Call a function when the ball goes out of bounds
+      }
 
-    // You can add more collision logic based on your game design
-    onCollision && onCollision(position.x, position.y);
+      // You can add more collision logic based on your game design
+      onCollision && onCollision(position.x, position.y);
+    }
   }, [position, onCollision, onOutOfBounds]);
 
-  return <BallStyled style={{ top: position.y, left: position.x }} />;
+  return position ? <BallStyled style={{ top: position.y, left: position.x }} /> : null;
 };
 
 export default Ball;
