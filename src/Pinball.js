@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
@@ -24,6 +24,8 @@ import DynamicObstacle from './components/DynamicObstacle';
 import MysteryTarget from './components/MysteryTarget';
 import ComboMeter from './components/ComboMeter';
 
+const ScoreMultiplier = 2;
+
 const Container = styled.div`
   display: flex;
   justify-content: center;
@@ -40,51 +42,45 @@ const PinballGame = styled.div`
   border: 2px solid #222;
 `;
 
-const BottomRightWrapper = styled.div`
+const Score = styled.div`
+  font-size: 24px;
+  color: white;
   position: absolute;
-  bottom: 0;
-  right: 0;
-`;
-
-const TopLeftWrapper = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
+  top: 20px;
+  left: 20px;
 `;
 
 const Pinball = () => {
+  const [ballPosition, setBallPosition] = useState({ x: 0, y: 0 });
+  const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
+  const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+
+  // Add your event handlers here
+
+  useEffect(() => {
+    // Add your useEffect hooks here
+  }, []);
+
+  useEffect(() => {
+    // Add your game loop logic here
+  }, [ballPosition, ballSpeed, gameOver, score]);
+
   return (
     <Container>
       <PinballGame>
-        {/* Top Left Components */}
-        <TopLeftWrapper>
-          {/* Score Display */}
-          <ScoreDisplay />
-          {/* Game Over Message */}
-          <GameOverMessage>Game Over</GameOverMessage>
-        </TopLeftWrapper>
-
-        {/* Flippers */}
+        {/* Add your components here */}
         <LeftFlipper />
         <RightFlipper />
-
-        {/* Ball */}
         <Ball />
-
-        {/* Tubes */}
         <Tube type="top" />
         <Tube type="middle" />
         <Tube type="bottom" />
-
-        {/* Blocks */}
         <Blocks />
-
-        {/* Spinners */}
         <Spinner type="left" />
         <Spinner type="right" />
-
-        {/* Other Components */}
         <BallLauncher />
+        <ScoreDisplay score={score} />
         <Bumper />
         <LaneGuide />
         <Kickback />
@@ -94,15 +90,12 @@ const Pinball = () => {
         <Magnet />
         <CaptiveBall />
         <Hole />
-        <Multiball />
+        <Multiball initialBallsCount={3} onBallLost={() => {}} onScore={() => {}} />
         <SkillShot />
         <DynamicObstacle />
         <MysteryTarget />
-
-        {/* Bottom Right Components */}
-        <BottomRightWrapper>
-          <ComboMeter />
-        </BottomRightWrapper>
+        <ComboMeter />
+        {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
       </PinballGame>
     </Container>
   );
