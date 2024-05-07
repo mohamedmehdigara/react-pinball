@@ -1,4 +1,4 @@
-import React, {useState, useEffect } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
@@ -24,8 +24,6 @@ import DynamicObstacle from './components/DynamicObstacle';
 import MysteryTarget from './components/MysteryTarget';
 import ComboMeter from './components/ComboMeter';
 
-const ScoreMultiplier = 2;
-
 const Container = styled.div`
   display: flex;
   justify-content: center;
@@ -42,53 +40,36 @@ const PinballGame = styled.div`
   border: 2px solid #222;
 `;
 
-const BottomRightCorner = styled.div`
+const BottomRightWrapper = styled.div`
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  bottom: 0;
+  right: 0;
+`;
+
+const TopLeftWrapper = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
 `;
 
 const Pinball = () => {
-  // Add your state and event handler functions here...
-
-
-  const [leftFlipperUp, setLeftFlipperUp] = useState(false);
-const [rightFlipperUp, setRightFlipperUp] = useState(false);
-const [ballPosition, setBallPosition] = useState({ x: 0, y: 0 });
-const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
-const [score, setScore] = useState(0);
-const [gameOver, setGameOver] = useState(false);
-
-const handleCollision = (x, y) => {
-  // Handle collision logic
-};
-
-const handleOutOfBounds = () => {
-  // Handle out-of-bounds logic
-};
-
-const handleBlockCollision = () => {
-  // Handle block collision logic
-};
-
-const handleLaunch = () => {
-  // Handle ball launch logic
-};
-
-const handleBumperHit = () => {
-  // Handle bumper hit logic
-};
-
-
   return (
     <Container>
       <PinballGame>
+        {/* Top Left Components */}
+        <TopLeftWrapper>
+          {/* Score Display */}
+          <ScoreDisplay />
+          {/* Game Over Message */}
+          <GameOverMessage>Game Over</GameOverMessage>
+        </TopLeftWrapper>
+
         {/* Flippers */}
-        <LeftFlipper up={leftFlipperUp} />
-        <RightFlipper up={rightFlipperUp} />
+        <LeftFlipper />
+        <RightFlipper />
 
         {/* Ball */}
-        {ballPosition && <Ball position={ballPosition} speed={ballSpeed} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />}
+        <Ball />
 
         {/* Tubes */}
         <Tube type="top" />
@@ -96,27 +77,32 @@ const handleBumperHit = () => {
         <Tube type="bottom" />
 
         {/* Blocks */}
-        <Blocks initialTop={300} initialLeft={100} ballPosition={ballPosition} onCollision={handleBlockCollision} />
+        <Blocks />
 
         {/* Spinners */}
         <Spinner type="left" />
         <Spinner type="right" />
-        <BallLauncher onLaunch={handleLaunch} />
 
-        {/* Score Display */}
-        <ScoreDisplay score={score} />
+        {/* Other Components */}
+        <BallLauncher />
+        <Bumper />
+        <LaneGuide />
+        <Kickback />
+        <Rollover />
+        <DropTarget />
+        <KickoutHole />
+        <Magnet />
+        <CaptiveBall />
+        <Hole />
+        <Multiball />
+        <SkillShot />
+        <DynamicObstacle />
+        <MysteryTarget />
 
-        {/* Other components */}
-        <BottomRightCorner>
-          {/* Add all other components here */}
-          {/* Example: */}
-          <Bumper id={1} size="30px" color="#ffcc00" top={100} left={200} onClick={handleBumperHit} />
-          <Bumper id={2} size="30px" color="#ffcc00" top={300} left={500} onClick={handleBumperHit} />
-          {/* Add more components as needed */}
-        </BottomRightCorner>
-
-        {/* Game Over Message */}
-        {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
+        {/* Bottom Right Components */}
+        <BottomRightWrapper>
+          <ComboMeter />
+        </BottomRightWrapper>
       </PinballGame>
     </Container>
   );
