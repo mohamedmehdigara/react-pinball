@@ -50,6 +50,15 @@ const Score = styled.div`
   left: 20px;
 `;
 
+const BottomRight = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+`;
+
 const Pinball = () => {
   const [ballPosition, setBallPosition] = useState({ x: 0, y: 0 });
   const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
@@ -79,8 +88,6 @@ const Pinball = () => {
         <Blocks />
         <Spinner type="left" />
         <Spinner type="right" />
-        <BallLauncher />
-        <ScoreDisplay score={score} />
         <Bumper />
         <LaneGuide />
         <Kickback />
@@ -94,8 +101,11 @@ const Pinball = () => {
         <SkillShot />
         <DynamicObstacle />
         <MysteryTarget />
-        <ComboMeter />
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
+        <BottomRight>
+          <BallLauncher />
+          <ComboMeter />
+        </BottomRight>
       </PinballGame>
     </Container>
   );
