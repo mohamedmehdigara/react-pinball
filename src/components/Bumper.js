@@ -4,24 +4,23 @@ import styled, { keyframes } from 'styled-components';
 // Define a bounce animation
 const bounce = keyframes`
   0% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  50% { transform: translateY(-5px); }
   100% { transform: translateY(0); }
 `;
 
 const BumperContainer = styled.div`
   position: absolute;
+  transform: translate(-50%, -50%);
 `;
 
 const BumperStyled = styled.div`
-  width: ${(props) => props.size || '60px'}; /* Increase size for better visibility */
-  height: ${(props) => props.size || '60px'}; /* Increase size for better visibility */
+  width: ${(props) => props.size || '50px'};
+  height: ${(props) => props.size || '50px'};
   background-color: ${(props) => props.color || '#ffcc00'};
   border-radius: 50%;
   position: absolute;
-  top: ${(props) => `${props.top}px` || '0'};
-  left: ${(props) => `${props.left}px` || '0'};
   cursor: pointer;
-  transition: background-color 0.5s ease;
+  transition: background-color 0.3s ease;
   animation: ${bounce} 1s ease infinite; /* Apply the bounce animation */
 
   &:hover {
@@ -44,17 +43,15 @@ const Bumper = ({ id, size, color, top, left, onClick }) => {
     // Additional logic when the bumper is clicked, e.g., scoring, sound effects, etc.
     // You can call a callback function to handle these actions
     setHit(true);
-    setTimeout(() => setHit(false), 500); // Reset hit state after a delay
+    setTimeout(() => setHit(false), 300); // Reset hit state after a delay
     onClick && onClick(id);
   };
 
   return (
-    <BumperContainer>
+    <BumperContainer style={{ top: `${top}px`, left: `${left}px` }}>
       <BumperStyled
         size={size}
         color={color}
-        top={top}
-        left={left}
         hit={hit}
         onClick={handleClick}
       />
