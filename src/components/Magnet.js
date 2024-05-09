@@ -10,8 +10,8 @@ const MagnetStyled = styled.div`
   height: ${(props) => props.size || '30px'};
   background-color: #8B0000; /* Dark red color for the magnet */
   position: absolute;
-  top: ${(props) => `${props.top}px` || '0'};
-  left: ${(props) => `${props.left}px` || '0'};
+  top: calc(${(props) => props.top}px - 15px); /* Adjust position to center the magnet */
+  left: calc(${(props) => props.left}px - 15px); /* Adjust position to center the magnet */
   cursor: pointer;
   border-radius: 50%; /* Rounded shape for magnet */
 
