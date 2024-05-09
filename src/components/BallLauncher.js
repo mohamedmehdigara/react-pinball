@@ -28,9 +28,9 @@ const BallLauncher = ({ onLaunch }) => {
     <div
       style={{
         position: 'absolute',
-        top: 'calc(100% - 80px)', // Adjust the distance from the bottom
+        bottom: '10px', // Adjust the distance from the bottom
         right: '10px', // Adjust the distance from the right side
-        transform: 'translateY(-50%)',
+        transform: 'translateY(50%)', // Adjust to center vertically
         cursor: 'pointer',
         zIndex: '999', // Ensure the launcher is on top
       }}
