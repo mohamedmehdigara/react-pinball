@@ -51,9 +51,6 @@ const Score = styled.div`
 `;
 
 const BottomRight = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
   position: absolute;
   bottom: 10px;
   right: 10px;
@@ -81,14 +78,16 @@ const Pinball = () => {
         {/* Add your components here */}
         <LeftFlipper />
         <RightFlipper />
-        <Ball />
         <Tube type="top" />
         <Tube type="middle" />
         <Tube type="bottom" />
-        <Blocks />
         <Spinner type="left" />
         <Spinner type="right" />
-        <Bumper />
+        
+        <DynamicObstacle />
+        <MysteryTarget />
+        {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
+        <BottomRight>
         <LaneGuide />
         <Kickback />
         <Rollover />
@@ -99,12 +98,11 @@ const Pinball = () => {
         <Hole />
         <Multiball initialBallsCount={3} onBallLost={() => {}} onScore={() => {}} />
         <SkillShot />
-        <DynamicObstacle />
-        <MysteryTarget />
-        {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
-        <BottomRight>
           <BallLauncher />
           <ComboMeter />
+          <Ball />
+          <Blocks />
+          <Bumper />
         </BottomRight>
       </PinballGame>
     </Container>
