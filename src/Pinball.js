@@ -64,6 +64,16 @@ const Pinball = () => {
 
   // Add your event handlers here
 
+  const handleCollision = (x, y) => {
+    // Your collision logic here
+  };
+
+  // Handle out of bounds logic
+  const handleOutOfBounds = () => {
+    // Your out of bounds logic here
+  };
+
+
   useEffect(() => {
     // Add your useEffect hooks here
   }, []);
@@ -100,7 +110,7 @@ const Pinball = () => {
         <SkillShot />
           <BallLauncher />
           <ComboMeter />
-          <Ball />
+          <Ball position={ballPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
           <Blocks />
           <Bumper />
         </BottomRight>

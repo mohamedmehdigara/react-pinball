@@ -7,8 +7,8 @@ const BallStyled = styled.div`
   background-color: #f00;
   border-radius: 50%;
   position: absolute;
-
-  transition: top 0.1s, left 0.1s; /* Add smooth transition */
+  $top: ${(props) => props.position.y}px;
+  $left: ${(props) => props.position.x}px;
 `;
 
 const Ball = ({ position, onCollision, onOutOfBounds }) => {
@@ -23,19 +23,17 @@ const Ball = ({ position, onCollision, onOutOfBounds }) => {
   }, []);
 
   useEffect(() => {
-    // Check if position is defined before accessing its properties
-    if (position && typeof position === 'object') {
-      // Check for collisions or out-of-bounds
-      if (position.y > window.innerHeight) {
-        onOutOfBounds(); // Call a function when the ball goes out of bounds
-      }
-
-      // You can add more collision logic based on your game design
-      onCollision && onCollision(position.x, position.y);
+    // Check for collisions or out-of-bounds
+    if (position.y > window.innerHeight) {
+      onOutOfBounds(); // Call a function when the ball goes out of bounds
     }
+
+    // You can add more collision logic based on your game design
+    onCollision && onCollision(position.x, position.y);
   }, [position, onCollision, onOutOfBounds]);
 
-  return position ? <BallStyled style={{ top: position.y, left: position.x }} /> : null;
+  return <BallStyled position={position} />;
 };
 
 export default Ball;
+
