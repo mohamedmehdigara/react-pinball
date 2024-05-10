@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 
-// Styled components for Blocks
 const BlockContainer = styled.div`
   position: absolute;
 `;
