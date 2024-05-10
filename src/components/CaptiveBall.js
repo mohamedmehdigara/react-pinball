@@ -1,35 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import styled, { css, keyframes } from 'styled-components';
-
-// Define a bounce animation
-const bounce = keyframes`
-  0%, 20%, 50%, 80%, 100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-5px);
-  }
-  60% {
-    transform: translateY(-2px);
-  }
-`;
+import styled, { css } from 'styled-components';
 
 const CaptiveBallContainer = styled.div`
   position: absolute;
-  transform: translate(-50%, -50%);
 `;
 
 const CaptiveBallStyled = styled.div`
-  width: ${(props) => props.size || '30px'};
-  height: ${(props) => props.size || '30px'};
+  width: ${(props) => props.size || '30px'}; /* Adjust size for better visibility */
+  height: ${(props) => props.size || '30px'}; /* Adjust size for better visibility */
   background-color: ${(props) => (props.released ? '#D3D3D3' : '#FFD700')};
   border-radius: 50%;
   position: absolute;
+  top: ${(props) => `${props.top}px` || '0'};
+  left: ${(props) => `${props.left}px` || '0'};
   cursor: ${(props) => (props.released ? 'not-allowed' : 'pointer')};
-  animation: ${(props) => (props.released ? 'none' : css`${bounce} 1s ease infinite`)};
   opacity: ${(props) => (props.released ? 0.5 : 1)};
   transition: background-color 0.3s ease, opacity 0.3s ease;
-  z-index: 1;
+  z-index: 1; /* Ensure the captive ball is above other elements */
 `;
 
 const CaptiveBall = ({ id, size, top, left, isReleased, onRelease, onCaptiveClick }) => {
@@ -47,10 +34,12 @@ const CaptiveBall = ({ id, size, top, left, isReleased, onRelease, onCaptiveClic
   };
 
   return (
-    <CaptiveBallContainer style={{ top: `${top}px`, left: `${left}px` }}>
+    <CaptiveBallContainer>
       {!released && (
         <CaptiveBallStyled
           size={size}
+          top={top}
+          left={left}
           released={released}
           onClick={handleClick}
         />
