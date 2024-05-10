@@ -1,35 +1,44 @@
-import React, { useState } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 
-const ComboMeterContainer = styled.div`
-  width: 200px;
+const Container = styled.div`
+  position: absolute;
+  bottom: 20px; /* Adjust the distance from the bottom */
+  right: 20px; /* Adjust the distance from the right side */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+`;
+
+const Label = styled.div`
+  font-size: 18px;
+  color: white;
+  margin-bottom: 5px;
+`;
+
+const MeterContainer = styled.div`
+  width: 100px;
   height: 20px;
-  border: 1px solid #ccc;
+  background-color: #333;
+  border-radius: 10px;
+  overflow: hidden;
 `;
 
-const ComboMeterFill = styled.div`
+const MeterFill = styled.div`
+  width: ${(props) => props.fillPercentage}%;
   height: 100%;
-  background-color: #00cc00; /* Green color */
-  transition: width 0.3s ease;
+  background-color: #00ff00; /* Green color for filled portion */
+  transition: width 0.5s ease; /* Smooth transition for filling animation */
 `;
 
-const ComboMeter = () => {
-  const [comboProgress, setComboProgress] = useState(0);
-
-  // Function to simulate combo progress
-  const incrementComboProgress = () => {
-    setComboProgress((prevProgress) => Math.min(prevProgress + 10, 100)); // Increment combo progress by 10%
-  };
-
-  // Reset combo progress
-  const resetComboProgress = () => {
-    setComboProgress(0);
-  };
-
+const ComboMeter = ({ label, fillPercentage }) => {
   return (
-    <ComboMeterContainer>
-      <ComboMeterFill style={{ width: `${comboProgress}%` }} />
-    </ComboMeterContainer>
+    <Container>
+      <Label>{label}</Label>
+      <MeterContainer>
+        <MeterFill fillPercentage={fillPercentage} />
+      </MeterContainer>
+    </Container>
   );
 };
 
