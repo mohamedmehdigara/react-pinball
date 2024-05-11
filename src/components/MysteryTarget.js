@@ -1,43 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 
-const rotate = keyframes`
-  0% { transform: rotate(0deg); }
-  50% { transform: rotate(180deg); }
-  100% { transform: rotate(360deg); }
-`;
-
+// Styled components for the MysteryTarget
 const MysteryTargetContainer = styled.div`
   position: absolute;
 `;
 
 const MysteryTargetStyled = styled.div`
-  width: 50px;
-  height: 50px;
-  background-color: #9932CC; /* Purple color for the mystery target */
+  width: ${(props) => props.size || '30px'};
+  height: ${(props) => props.size || '30px'};
+  background-color: ${(props) => (props.hit ? '#ff0000' : '#777')};
   border-radius: 50%;
   position: absolute;
   top: ${(props) => `${props.top}px` || '0'};
   left: ${(props) => `${props.left}px` || '0'};
   cursor: pointer;
-  animation: ${rotate} 2s linear infinite; /* Apply rotation animation */
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3); /* Add a subtle shadow */
+  transition: transform 0.2s ease, background-color 0.5s ease;
 `;
 
-const MysteryTarget = ({ id, top, left, onHit }) => {
-  const [isVisible, setIsVisible] = useState(true);
+const bounceAnimation = keyframes`
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0); }
+`;
+
+const MysteryTarget = ({ size, top, left, onClick }) => {
+  const [hit, setHit] = useState(false);
+
+  useEffect(() => {
+    // Additional logic when the mystery target is hit
+    // You can add scoring or other effects here
+    if (hit) {
+      // Trigger any action when the target is hit
+      onClick && onClick();
+    }
+  }, [hit, onClick]);
 
   const handleClick = () => {
-    setIsVisible(false);
-    onHit && onHit(id);
-
-    // Trigger your random event or bonus logic here
-    console.log('Mystery target hit! Triggering a random event or bonus...');
+    // Additional logic when the mystery target is clicked
+    setHit(true); // Set hit to true when the target is clicked
   };
 
   return (
     <MysteryTargetContainer>
-      {isVisible && <MysteryTargetStyled top={top} left={left} onClick={handleClick} />}
+      <MysteryTargetStyled
+        size={size}
+        top={top}
+        left={left}
+        hit={hit}
+        onClick={handleClick}
+      />
     </MysteryTargetContainer>
   );
 };
