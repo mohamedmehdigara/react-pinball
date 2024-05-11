@@ -1,47 +1,58 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 
-// Define a back and forth animation
-const moveBackAndForth = keyframes`
-  0%, 100% {
-    transform: translateX(0);
+// Define animation for obstacle movement
+const moveAnimation = keyframes`
+  0% {
+    transform: translateY(0);
   }
   50% {
-    transform: translateX(100px); // Adjust the distance of the movement
+    transform: translateY(-10px);
   }
+  100% {
+    transform: translateY(0);
+  }
+`;
+
+const ObstacleContainer = styled.div`
+  position: absolute;
 `;
 
 const Obstacle = styled.div`
-  width: 80px; /* Adjust the width for better visibility */
-  height: 30px; /* Adjust the height for better visibility */
-  background-color: #888; /* Adjust the color to match the theme */
+  width: 50px;
+  height: 20px;
+  background-color: #964B00; /* Brown color for the obstacle */
   position: absolute;
-  top: 150px; /* Adjust the vertical position */
-  animation: ${moveBackAndForth} 2s linear infinite; // Adjust the duration and easing
+  top: ${(props) => `${props.top}px` || '0'};
+  left: ${(props) => `${props.left}px` || '0'};
+  animation: ${moveAnimation} 2s ease-in-out infinite; /* Apply the movement animation */
 `;
 
-const DynamicObstacle = ({ onCollision }) => {
-  // Use state to manage the position of the obstacle
-  const [position, setPosition] = useState(0);
+const DynamicObstacle = ({ initialTop, initialLeft }) => {
+  const [top, setTop] = useState(initialTop || 0);
+  const [left, setLeft] = useState(initialLeft || 0);
 
   useEffect(() => {
-    const handleAnimation = () => {
-      // Update the position state to trigger a re-render
-      setPosition((prevPosition) => (prevPosition === 0 ? 100 : 0));
-    };
-
-    // Set up the interval for the back and forth movement
-    const interval = setInterval(handleAnimation, 2000); // Adjust the interval as needed
-
+    // Add logic here to update top and left positions if needed
+    const interval = setInterval(() => {
+      // Calculate new top and left positions based on some conditions or game state
+      const newTop = Math.random() * (window.innerHeight - 100); // Example: Randomize top position within the window height
+      const newLeft = Math.random() * (window.innerWidth - 100); // Example: Randomize left position within the window width
+  
+      // Update the state with the new positions
+      setTop(newTop);
+      setLeft(newLeft);
+    }, 3000); // Update positions every 3 seconds (adjust this interval as needed)
+  
+    // Clean up the interval to prevent memory leaks
     return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    // Check for collisions
-    onCollision && onCollision();
-  }, [position, onCollision]);
-
-  return <Obstacle style={{ transform: `translateX(${position}px)` }} />;
+  }, []); // Add dependencies as needed
+  
+  return (
+    <ObstacleContainer>
+      <Obstacle top={top} left={left} />
+    </ObstacleContainer>
+  );
 };
 
 export default DynamicObstacle;
