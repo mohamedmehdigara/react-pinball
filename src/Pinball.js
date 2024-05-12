@@ -23,6 +23,7 @@ import SkillShot from './components/SkillShot';
 import DynamicObstacle from './components/DynamicObstacle';
 import MysteryTarget from './components/MysteryTarget';
 import ComboMeter from './components/ComboMeter';
+import PinballTarget from './components/PinballTarget';
 
 const ScoreMultiplier = 2;
 
@@ -93,6 +94,20 @@ const Pinball = () => {
         <Tube type="bottom" />
         <Spinner type="left" />
         <Spinner type="right" />
+        <PinballTarget
+          id="target1"
+          size={50}
+          initialTop={200}
+          initialLeft={100}
+          onClick={(id) => console.log(`Target ${id} clicked!`)}
+        />
+        <PinballTarget
+          id="target2"
+          size={40}
+          initialTop={300}
+          initialLeft={400}
+          onClick={(id) => console.log(`Target ${id} clicked!`)}
+        />
         
         <DynamicObstacle />
         <MysteryTarget />
