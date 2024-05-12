@@ -98,6 +98,29 @@ const Pinball = () => {
         <Tube type="bottom" />
         <Spinner type="left" />
         <Spinner type="right" />
+        <Ramp width={200} height={50} top={300} left={100} angle={30} />
+        <Slingshot top={500} left={100} armLength={100} angle={45} />
+        <LoopShot size="50px" top="200px" left="200px" speed="4s" />
+        <SpinnerTarget size="60px" top="200px" left="200px" speed="1s" />
+        <DynamicObstacle />
+        <MysteryTarget />
+        <BottomRight>
+          <LaneGuide />
+          <Kickback />
+          <Rollover />
+          <DropTarget />
+          <KickoutHole />
+          <Magnet />
+          <CaptiveBall />
+          <Hole />
+          <Multiball initialBallsCount={3} onBallLost={() => {}} onScore={() => {}} />
+          <SkillShot />
+          <BallLauncher />
+          <ComboMeter />
+          <Ball position={ballPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
+          <Blocks />
+          <Bumper />
+        </BottomRight>
         <PinballTarget
           id="target1"
           size={50}
@@ -112,35 +135,6 @@ const Pinball = () => {
           initialLeft={400}
           onClick={(id) => console.log(`Target ${id} clicked!`)}
         />
-
-<Ramp width={200} height={50} top={300} left={100} angle={30} />
-
-<Slingshot top={500} left={100} armLength={100} angle={45} />
-<LoopShot size="50px" top="200px" left="200px" speed="4s" />
-<SpinnerTarget size="60px" top="200px" left="200px" speed="1s" />
-
-
-
-        <DynamicObstacle />
-        <MysteryTarget />
-        {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
-        <BottomRight>
-        <LaneGuide />
-        <Kickback />
-        <Rollover />
-        <DropTarget />
-        <KickoutHole />
-        <Magnet />
-        <CaptiveBall />
-        <Hole />
-        <Multiball initialBallsCount={3} onBallLost={() => {}} onScore={() => {}} />
-        <SkillShot />
-          <BallLauncher />
-          <ComboMeter />
-          <Ball position={ballPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
-          <Blocks />
-          <Bumper />
-        </BottomRight>
       </PinballGame>
     </Container>
   );
