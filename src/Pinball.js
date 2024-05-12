@@ -24,6 +24,7 @@ import DynamicObstacle from './components/DynamicObstacle';
 import MysteryTarget from './components/MysteryTarget';
 import ComboMeter from './components/ComboMeter';
 import PinballTarget from './components/PinballTarget';
+import Ramp from './components/Ramp';
 
 const ScoreMultiplier = 2;
 
@@ -108,6 +109,9 @@ const Pinball = () => {
           initialLeft={400}
           onClick={(id) => console.log(`Target ${id} clicked!`)}
         />
+
+<Ramp width={200} height={50} top={300} left={100} angle={30} />
+
         
         <DynamicObstacle />
         <MysteryTarget />
