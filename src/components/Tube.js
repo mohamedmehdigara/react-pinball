@@ -1,38 +1,29 @@
 import React from 'react';
-import styled, { keyframes } from 'styled-components';
+import styled from 'styled-components';
 
-// Define a pulse animation
-const pulse = keyframes`
-  0% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-  100% { transform: scale(1); }
+// Styled components for the Tube
+const TubeContainer = styled.div`
+  position: absolute;
 `;
 
-const TubeContainer = styled.div`
-  width: 30px;
-  height: 120px; /* Adjusted height to resemble a tube */
-  background-color: #ccc; /* Light gray color for the tube */
+const TubeStyled = styled.div`
+  width: ${(props) => (props.type === 'top' ? '120px' : props.type === 'bottom' ? '60px' : '80px')};
+  height: ${(props) => (props.type === 'top' || props.type === 'bottom' ? '20px' : '120px')};
+  background-color: #808080; /* Gray color for the tube */
+  border: 2px solid #000; /* Black border for better visibility */
+  border-radius: ${(props) =>
+    props.type === 'top' || props.type === 'bottom' ? '0 0 8px 8px' : '8px'}; /* Rounded corners for top and bottom tubes */
   position: absolute;
-  cursor: pointer;
-  ${(props) => {
-    switch (props.type) {
-      case 'vertical':
-        return 'top: 50px; left: 50px;'; // Adjusted position to resemble a real tube
-      default:
-        return '';
-    }
-  }}
-  transition: background-color 0.3s ease, transform 0.3s ease;
-
-  &:hover {
-    background-color: #888; /* Darker color on hover */
-    transform: scale(1.1);
-    animation: ${pulse} 0.5s ease infinite; /* Apply the pulse animation on hover */
-  }
+  top: ${(props) => (props.type === 'top' ? '0' : props.type === 'middle' ? '50px' : '580px')};
+  left: ${(props) => (props.type === 'top' ? '340px' : props.type === 'middle' ? '280px' : '360px')};
 `;
 
 const Tube = ({ type }) => {
-  return <TubeContainer type={type} />;
+  return (
+    <TubeContainer>
+      <TubeStyled type={type} />
+    </TubeContainer>
+  );
 };
 
 export default Tube;
