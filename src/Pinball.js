@@ -25,6 +25,7 @@ import MysteryTarget from './components/MysteryTarget';
 import ComboMeter from './components/ComboMeter';
 import PinballTarget from './components/PinballTarget';
 import Ramp from './components/Ramp';
+import Slingshot from './components/Slingshot';
 
 const ScoreMultiplier = 2;
 
@@ -112,7 +113,8 @@ const Pinball = () => {
 
 <Ramp width={200} height={50} top={300} left={100} angle={30} />
 
-        
+<Slingshot top={500} left={100} armLength={100} angle={45} />
+
         <DynamicObstacle />
         <MysteryTarget />
         {gameOver && <GameOverMessage>Game Over</GameOverMessage>}
