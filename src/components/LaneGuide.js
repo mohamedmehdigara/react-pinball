@@ -4,6 +4,9 @@ import styled from 'styled-components';
 // Styled component for the lane guide
 const LaneGuideContainer = styled.div`
   position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
 `;
 
 const LaneGuideStyled = styled.div`

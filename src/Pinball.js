@@ -28,6 +28,7 @@ import Ramp from './components/Ramp';
 import Slingshot from './components/Slingshot';
 import LoopShot from './components/LoopShot';
 import SpinnerTarget from './components/SpinnerTarget';
+import LaneChange from './components/LaneChange';
 
 const ScoreMultiplier = 2;
 
@@ -77,6 +78,11 @@ const Pinball = () => {
   const handleOutOfBounds = () => {
     // Your out of bounds logic here
   };
+
+  const handleLaneChange = () => {
+    // Add your logic to handle the lane change here
+  };
+  
 
 
   useEffect(() => {
@@ -135,6 +141,8 @@ const Pinball = () => {
           initialLeft={400}
           onClick={(id) => console.log(`Target ${id} clicked!`)}
         />
+                <LaneChange onClick={handleLaneChange} />
+
       </PinballGame>
     </Container>
   );
