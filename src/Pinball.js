@@ -187,6 +187,12 @@ const Pinball = () => {
     // Add your game loop logic here
   }, [ballPosition, ballSpeed, gameOver, score]);
 
+  const launchBall = () => {
+    // Set initial position of the ball and any other necessary properties
+    setBallPosition({ x: 400, y: 550 });
+  };
+
+
   return (
     <Container>
       <PinballGame>
@@ -215,7 +221,7 @@ const Pinball = () => {
           <Hole />
           <Multiball initialBallsCount={3} onBallLost={() => {}} onScore={() => {}} />
           <SkillShot />
-          <BallLauncher />
+          <BallLauncher onLaunch={launchBall} />
           <ComboMeter />
           <Ball position={ballPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
           <Blocks />

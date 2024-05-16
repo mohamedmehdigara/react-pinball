@@ -1,39 +1,27 @@
-import React, { useEffect } from 'react';
-import styled from 'styled-components';
+import React from 'react';
+import PropTypes from 'prop-types';
 
-const BallStyled = styled.div`
-  width: 20px;
-  height: 20px;
-  background-color: #f00;
-  border-radius: 50%;
-  position: absolute;
-  $top: ${(props) => props.position.y}px;
-  $left: ${(props) => props.position.x}px;
-`;
+const Ball = ({ position }) => {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: position.x,
+        top: position.y,
+        width: '20px',
+        height: '20px',
+        backgroundColor: 'red',
+        borderRadius: '50%',
+      }}
+    />
+  );
+};
 
-const Ball = ({ position, onCollision, onOutOfBounds }) => {
-  useEffect(() => {
-    const handleAnimation = () => {
-      // Handle ball animation logic
-      // You can add bounce, gravity, or other effects here
-    };
-
-    const interval = setInterval(handleAnimation, 16);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    // Check for collisions or out-of-bounds
-    if (position.y > window.innerHeight) {
-      onOutOfBounds(); // Call a function when the ball goes out of bounds
-    }
-
-    // You can add more collision logic based on your game design
-    onCollision && onCollision(position.x, position.y);
-  }, [position, onCollision, onOutOfBounds]);
-
-  return <BallStyled position={position} />;
+Ball.propTypes = {
+  position: PropTypes.shape({
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+  }).isRequired,
 };
 
 export default Ball;
-
