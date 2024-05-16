@@ -82,6 +82,8 @@ const Pinball = () => {
   const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+  const [ballLaunched, setBallLaunched] = useState(false);
+
 
   // Add your event handlers here
 
@@ -191,6 +193,10 @@ const Pinball = () => {
     // Set initial position of the ball and any other necessary properties
     setBallPosition({ x: 400, y: 550 });
   };
+  const handleLaunchBall = () => {
+    // Logic to launch the ball
+    setBallLaunched(true);
+  };
 
 
   return (
@@ -202,6 +208,7 @@ const Pinball = () => {
         <Tube type="top" />
         <Tube type="middle" />
         <Tube type="bottom" />
+        {ballLaunched && <Tube />}
         <Spinner type="left" />
         <Spinner type="right" />
         <Ramp width={200} height={50} top={300} left={100} angle={30} />
@@ -221,8 +228,8 @@ const Pinball = () => {
           <Hole />
           <Multiball initialBallsCount={3} onBallLost={() => {}} onScore={() => {}} />
           <SkillShot />
-          <BallLauncher onLaunch={launchBall} />
-          <ComboMeter />
+          {!ballLaunched && <BallLauncher onClick={handleLaunchBall} />}
+                    <ComboMeter />
           <Ball position={ballPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
           <Blocks />
           <Bumper />
