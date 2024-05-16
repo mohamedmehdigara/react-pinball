@@ -31,6 +31,21 @@ import SpinnerTarget from './components/SpinnerTarget';
 import LaneChange from './components/LaneChange';
 
 const ScoreMultiplier = 2;
+// Constants
+const BALL_RADIUS = 10; // Adjust the radius according to your ball size
+const BUMPER_SCORE = 100; // Score awarded when hitting a bumper
+const TARGET_SCORE = 200; // Score awarded when hitting a target
+const PLAY_AREA_WIDTH = 800; // Width of the play area
+const PLAY_AREA_HEIGHT = 600; // Height of the play area
+const INITIAL_BALL_X = PLAY_AREA_WIDTH / 2; // Initial x-coordinate of the ball
+const INITIAL_BALL_Y = PLAY_AREA_HEIGHT - 100; // Initial y-coordinate of the ball
+const LANE_CHANGE_DISTANCE = 50; // Distance to move the ball during lane change
+const LANE_CHANGE_COOLDOWN = 1000; // Cooldown period for lane changes (in milliseconds)
+
+// Variables
+let playerLives = 3; // Number of lives remaining for the player
+let isLaneChangeAllowed = true; // Flag to prevent rapid lane changes
+
 
 const Container = styled.div`
   display: flex;
@@ -70,17 +85,90 @@ const Pinball = () => {
 
   // Add your event handlers here
 
-  const handleCollision = (x, y) => {
-    // Your collision logic here
+  const handleCollision = (ballPosition, gameElements) => {
+    // Loop through all game elements
+    for (const element of gameElements) {
+      // Calculate element's boundaries
+      const elementBounds = {
+        top: element.position.y,
+        bottom: element.position.y + element.height,
+        left: element.position.x,
+        right: element.position.x + element.width,
+      };
+  
+      // Calculate ball's boundaries
+      const ballBounds = {
+        top: ballPosition.y - BALL_RADIUS,
+        bottom: ballPosition.y + BALL_RADIUS,
+        left: ballPosition.x - BALL_RADIUS,
+        right: ballPosition.x + BALL_RADIUS,
+      };
+  
+      // Check for collision between ball and element
+      if (
+        ballBounds.right > elementBounds.left &&
+        ballBounds.left < elementBounds.right &&
+        ballBounds.bottom > elementBounds.top &&
+        ballBounds.top < elementBounds.bottom
+      ) {
+        // Handle collision based on element type
+        switch (element.type) {
+          case 'bumper':
+            score += BUMPER_SCORE;
+            break;
+          case 'target':
+            score += TARGET_SCORE;
+            break;
+          // Add more cases for other element types
+          default:
+            break;
+        }
+      }
+    }
   };
-
+  
   // Handle out of bounds logic
-  const handleOutOfBounds = () => {
-    // Your out of bounds logic here
+  const handleOutOfBounds = (ballPosition) => {
+    // Check if the ball is out of bounds
+    if (
+      ballPosition.x < 0 || ballPosition.x > PLAY_AREA_WIDTH ||
+      ballPosition.y < 0 || ballPosition.y > PLAY_AREA_HEIGHT
+    ) {
+      // Reset ball position
+      ballPosition.x = INITIAL_BALL_X;
+      ballPosition.y = INITIAL_BALL_Y;
+      
+      // Deduct player lives or trigger other events
+      playerLives--;
+      if (playerLives <= 0) {
+        gameOver = true;
+      }
+    }
   };
-
-  const handleLaneChange = () => {
-    // Add your logic to handle the lane change here
+  
+  const handleLaneChange = (direction) => {
+    // Check if lane change is allowed
+    if (!isLaneChangeAllowed) {
+      return;
+    }
+  
+    // Adjust ball's position based on lane change direction
+    switch (direction) {
+      case 'left':
+        ballPosition.x -= LANE_CHANGE_DISTANCE;
+        break;
+      case 'right':
+        ballPosition.x += LANE_CHANGE_DISTANCE;
+        break;
+      default:
+        break;
+    }
+  
+    // Prevent multiple lane changes in quick succession
+    isLaneChangeAllowed = false;
+    setTimeout(() => {
+      isLaneChangeAllowed = true;
+    }, LANE_CHANGE_COOLDOWN);
   };
   
 
