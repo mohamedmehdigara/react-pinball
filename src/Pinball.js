@@ -29,6 +29,7 @@ import Slingshot from './components/Slingshot';
 import LoopShot from './components/LoopShot';
 import SpinnerTarget from './components/SpinnerTarget';
 import LaneChange from './components/LaneChange';
+import PopBumper from './components/PopBumper';
 
 const ScoreMultiplier = 2;
 // Constants
@@ -233,6 +234,8 @@ const Pinball = () => {
           <Ball position={ballPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
           <Blocks />
           <Bumper />
+          <PopBumper />
+
         </BottomRight>
         <PinballTarget
           id="target1"
