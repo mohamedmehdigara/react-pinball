@@ -86,6 +86,12 @@ const Pinball = () => {
   // Add your event handlers here
 
   const handleCollision = (ballPosition, gameElements) => {
+    // Ensure gameElements is iterable
+    if (!gameElements || typeof gameElements[Symbol.iterator] !== 'function') {
+      console.error('gameElements is not iterable');
+      return;
+    }
+  
     // Loop through all game elements
     for (const element of gameElements) {
       // Calculate element's boundaries
@@ -126,7 +132,7 @@ const Pinball = () => {
       }
     }
   };
-  
+   
   // Handle out of bounds logic
   const handleOutOfBounds = (ballPosition) => {
     // Check if the ball is out of bounds
@@ -229,7 +235,7 @@ const Pinball = () => {
           initialLeft={400}
           onClick={(id) => console.log(`Target ${id} clicked!`)}
         />
-                <LaneChange onClick={handleLaneChange} />
+<LaneChange onClick={handleLaneChange} />
 
       </PinballGame>
     </Container>

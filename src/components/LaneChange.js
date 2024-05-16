@@ -1,29 +1,31 @@
 import React from 'react';
 import styled from 'styled-components';
 
-// Styled component for the lane change mechanism
-const LaneChangeContainer = styled.div`
+const Button = styled.button`
   position: absolute;
-  bottom: 10px; /* Adjust the distance from the bottom */
-  left: 50%; /* Position it horizontally in the middle */
-  transform: translateX(-50%); /* Center it horizontally */
-`;
-
-const LaneChangeButton = styled.button`
-  width: 40px;
-  height: 40px;
-  background-color: #00FF00; /* Green color for the button */
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  background-color: #ccc;
   border: none;
-  border-radius: 50%; /* Rounded shape for the button */
-  outline: none;
+  border-radius: 5px;
   cursor: pointer;
 `;
 
 const LaneChange = ({ onClick }) => {
+  const handleLeftLaneChange = () => {
+    onClick('left');
+  };
+
+  const handleRightLaneChange = () => {
+    onClick('right');
+  };
+
   return (
-    <LaneChangeContainer>
-      <LaneChangeButton onClick={onClick}>LC</LaneChangeButton>
-    </LaneChangeContainer>
+    <>
+      <Button onClick={handleLeftLaneChange}>Move Left</Button>
+      <Button onClick={handleRightLaneChange}>Move Right</Button>
+    </>
   );
 };
 
