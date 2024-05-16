@@ -30,6 +30,8 @@ import LoopShot from './components/LoopShot';
 import SpinnerTarget from './components/SpinnerTarget';
 import LaneChange from './components/LaneChange';
 import PopBumper from './components/PopBumper';
+import MultiballLock from './components/MultiballLock';
+import SkillShotLane from './components/SkillShotLane';
 
 const ScoreMultiplier = 2;
 // Constants
@@ -204,7 +206,7 @@ const Pinball = () => {
     <Container>
       <PinballGame>
         {/* Add your components here */}
-        <LeftFlipper />
+        <LeftFlipper width="120px" height="30px" angle={45} activated={true}/>
         <RightFlipper />
         <Tube type="top" />
         <Tube type="middle" />
@@ -235,6 +237,10 @@ const Pinball = () => {
           <Blocks />
           <Bumper />
           <PopBumper />
+          <MultiballLock />
+          <SkillShotLane />
+
+
 
         </BottomRight>
         <PinballTarget
