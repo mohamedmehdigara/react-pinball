@@ -32,6 +32,7 @@ import LaneChange from './components/LaneChange';
 import PopBumper from './components/PopBumper';
 import MultiballLock from './components/MultiballLock';
 import SkillShotLane from './components/SkillShotLane';
+import Outlane from './components/Outlane';
 
 const ScoreMultiplier = 2;
 // Constants
@@ -201,6 +202,11 @@ const Pinball = () => {
     setBallLaunched(true);
   };
 
+  const handleBallDrain = () => {
+    // Decrement lives, check for game over, reset ball, etc.
+  };
+  
+
 
   return (
     <Container>
@@ -239,6 +245,8 @@ const Pinball = () => {
       <PinballTarget id="target1" size={50} initialTop={200} initialLeft={100} onClick={(id) => console.log(`Target ${id} clicked!`)} />
       <PinballTarget id="target2" size={40} initialTop={300} initialLeft={400} onClick={(id) => console.log(`Target ${id} clicked!`)} />
       <LaneChange onClick={handleLaneChange} />
+      <Outlane onDrain={() => handleBallDrain()} />
+
       <PopBumper top={150} left={300} />
       <MultiballLock top={100} left={500} />
       <SkillShotLane top={50} left={600} />
