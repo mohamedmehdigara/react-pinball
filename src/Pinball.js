@@ -204,63 +204,48 @@ const Pinball = () => {
 
   return (
     <Container>
-      <PinballGame>
-        {/* Add your components here */}
-        <LeftFlipper width="120px" height="30px" angle={45} activated={true}/>
-        <RightFlipper />
-        <Tube type="top" />
-        <Tube type="middle" />
-        <Tube type="bottom" />
-        {ballLaunched && <Tube />}
-        <Spinner type="left" />
-        <Spinner type="right" />
-        <Ramp width={200} height={50} top={300} left={100} angle={30} />
-        <Slingshot top={500} left={100} armLength={100} angle={45} />
-        <LoopShot size="50px" top="200px" left="200px" speed="4s" />
-        <SpinnerTarget size="60px" top="200px" left="200px" speed="1s" />
-        <DynamicObstacle />
-        <MysteryTarget />
-        <BottomRight>
-          <LaneGuide />
-          <Kickback />
-          <Rollover />
-          <DropTarget />
-          <KickoutHole />
-          <Magnet />
-          <CaptiveBall />
-          <Hole />
-          <Multiball initialBallsCount={3} onBallLost={() => {}} onScore={() => {}} />
-          <SkillShot />
-          {!ballLaunched && <BallLauncher onClick={handleLaunchBall} />}
-                    <ComboMeter />
-          <Ball position={ballPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
-          <Blocks />
-          <Bumper />
-          <PopBumper />
-          <MultiballLock />
-          <SkillShotLane />
+    <PinballGame>
+      {/* Add your components here */}
+      <LeftFlipper top={500} left={200} />
+      <RightFlipper top={500} left={400} />
+      <Tube type="top" />
+      <Tube type="middle" />
+      <Tube type="bottom" />
+      <Spinner type="left" />
+      <Spinner type="right" />
+      <Ramp width={200} height={50} top={300} left={100} angle={30} />
+      <Slingshot top={500} left={100} armLength={100} angle={45} />
+      <LoopShot size="50px" top="200px" left="200px" speed="4s" />
+      <SpinnerTarget size="60px" top="200px" left="200px" speed="1s" />
+      <DynamicObstacle />
+      <MysteryTarget />
+      <BottomRight>
+        <LaneGuide />
+        <Kickback />
+        <Rollover />
+        <DropTarget />
+        <KickoutHole />
+        <Magnet />
+        <CaptiveBall />
+        <Hole />
+        <Multiball initialBallsCount={3} onBallLost={() => {}} onScore={() => {}} />
+        <SkillShot />
+        <BallLauncher />
+        <ComboMeter />
+        <Ball position={ballPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
+        <Blocks />
+        <Bumper />
+      </BottomRight>
+      <PinballTarget id="target1" size={50} initialTop={200} initialLeft={100} onClick={(id) => console.log(`Target ${id} clicked!`)} />
+      <PinballTarget id="target2" size={40} initialTop={300} initialLeft={400} onClick={(id) => console.log(`Target ${id} clicked!`)} />
+      <LaneChange onClick={handleLaneChange} />
+      <PopBumper top={150} left={300} />
+      <MultiballLock top={100} left={500} />
+      <SkillShotLane top={50} left={600} />
+    </PinballGame>
+  </Container>
 
 
-
-        </BottomRight>
-        <PinballTarget
-          id="target1"
-          size={50}
-          initialTop={200}
-          initialLeft={100}
-          onClick={(id) => console.log(`Target ${id} clicked!`)}
-        />
-        <PinballTarget
-          id="target2"
-          size={40}
-          initialTop={300}
-          initialLeft={400}
-          onClick={(id) => console.log(`Target ${id} clicked!`)}
-        />
-<LaneChange onClick={handleLaneChange} />
-
-      </PinballGame>
-    </Container>
   );
 };
 
