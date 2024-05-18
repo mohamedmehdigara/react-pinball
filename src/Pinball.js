@@ -36,6 +36,7 @@ import Outlane from './components/Outlane';
 import Scoreboard from './components/Scoreboard';
 import BonusDisplay from './components/BonusDisplay';
 import ExtraBallIndicator from './components/ExtraBallIndicator';
+import LaunchPlunger from './components/LaunchPlunger';
 
 const ScoreMultiplier = 2;
 // Constants
@@ -85,7 +86,10 @@ const BottomRight = styled.div`
 `;
 
 const Pinball = () => {
-  const [ballPosition, setBallPosition] = useState({ x: 0, y: 0 });
+  const [currentBallPosition, setBallPosition] = useState({ x: 0, y: 0 }); // Initial position
+
+// Code using currentBallPosition can go here (after the definition)
+
   const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
@@ -94,6 +98,9 @@ const Pinball = () => {
 const [remainingLives, setRemainingLives] = useState(3);
 const [activeBonus, setActiveBonus] = useState(0);
 const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
+const [launchDirection, setLaunchDirection] = useState({ x: 1, y: -0.5 }); // Example launch direction vector
+const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initial velocity (can be 0)
+
 
 
 
@@ -175,10 +182,10 @@ const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
     // Adjust ball's position based on lane change direction
     switch (direction) {
       case 'left':
-        ballPosition.x -= LANE_CHANGE_DISTANCE;
+        currentBallPosition.x -= LANE_CHANGE_DISTANCE;
         break;
       case 'right':
-        ballPosition.x += LANE_CHANGE_DISTANCE;
+      currentBallPosition.x += LANE_CHANGE_DISTANCE;
         break;
       default:
         break;
@@ -199,7 +206,7 @@ const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
 
   useEffect(() => {
     // Add your game loop logic here
-  }, [ballPosition, ballSpeed, gameOver, score]);
+  }, [currentBallPosition, ballSpeed, gameOver, score]);
 
   const launchBall = () => {
     // Set initial position of the ball and any other necessary properties
@@ -214,6 +221,23 @@ const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
     // Decrement lives, check for game over, reset ball, etc.
   };
   
+  const handleBallLaunch = (launchPower) => {
+    // Apply force to the ball based on launch power
+    const launchForce = launchPower * maxBallForce; // Scale launch power
+
+    setBallVelocity({
+      x: launchForce * launchDirection.x,
+      y: launchForce * launchDirection.y,
+    });
+  
+    // Update ball's position and velocity based on the launch force
+    setBallPosition(currentBallPosition + launchForce * launchDirection);
+    setBallVelocity(launchForce * launchDirection);
+    
+  };
+
+  const maxBallForce = 10; // Adjust this value for desired ball speed
+
 
 
   return (
@@ -246,7 +270,7 @@ const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
         <SkillShot />
         <BallLauncher />
         <ComboMeter />
-        <Ball position={ballPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
+        <Ball position={currentBallPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
         <Blocks />
         <Bumper />
       </BottomRight>
@@ -264,6 +288,11 @@ const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
   <BonusDisplay bonus={activeBonus} duration={3000} /> // Display bonus for 3 seconds
 )}
 <ExtraBallIndicator earnedExtraBalls={earnedExtraBalls} />
+<LaunchPlunger
+  onLaunch={(launchPower) => handleBallLaunch(launchPower)}
+  maxPull={75} // Adjust max pull distance if desired
+/>
+
 
 
     </PinballGame>
