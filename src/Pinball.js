@@ -270,7 +270,11 @@ const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initial vel
         <SkillShot />
         <BallLauncher />
         <ComboMeter />
-        <Ball position={currentBallPosition} onCollision={handleCollision} onOutOfBounds={handleOutOfBounds} />
+        <Ball
+  position={currentBallPosition}
+  velocity={{ x: 1, y: -2 }} // Example velocity
+  updateBallPosition={setBallPosition}
+/>
         <Blocks />
         <Bumper />
       </BottomRight>
