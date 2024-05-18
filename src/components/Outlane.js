@@ -7,7 +7,6 @@ const OutlaneContainer = styled.div`
   left: 0;
   width: 100%;
   height: 100%; /* Adjust height to cover the desired outlane area */
-  background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
   z-index: 1; /* Ensure the outlane is behind other elements */
 `;
 

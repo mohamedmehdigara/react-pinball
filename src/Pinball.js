@@ -33,6 +33,7 @@ import PopBumper from './components/PopBumper';
 import MultiballLock from './components/MultiballLock';
 import SkillShotLane from './components/SkillShotLane';
 import Outlane from './components/Outlane';
+import Scoreboard from './components/Scoreboard';
 
 const ScoreMultiplier = 2;
 // Constants
@@ -87,6 +88,11 @@ const Pinball = () => {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [ballLaunched, setBallLaunched] = useState(false);
+  const [currentScore, setCurrentScore] = useState(0);
+const [remainingLives, setRemainingLives] = useState(3);
+const [activeBonus, setActiveBonus] = useState(0);
+const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
+
 
 
   // Add your event handlers here
@@ -250,6 +256,8 @@ const Pinball = () => {
       <PopBumper top={150} left={300} />
       <MultiballLock top={100} left={500} />
       <SkillShotLane top={50} left={600} />
+      <Scoreboard score={currentScore} lives={remainingLives} bonus={activeBonus} extraBalls={earnedExtraBalls} />
+<ScoreDisplay/>
     </PinballGame>
   </Container>
 
