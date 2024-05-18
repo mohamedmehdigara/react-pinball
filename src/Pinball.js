@@ -34,6 +34,7 @@ import MultiballLock from './components/MultiballLock';
 import SkillShotLane from './components/SkillShotLane';
 import Outlane from './components/Outlane';
 import Scoreboard from './components/Scoreboard';
+import BonusDisplay from './components/BonusDisplay';
 
 const ScoreMultiplier = 2;
 // Constants
@@ -258,6 +259,10 @@ const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
       <SkillShotLane top={50} left={600} />
       <Scoreboard score={currentScore} lives={remainingLives} bonus={activeBonus} extraBalls={earnedExtraBalls} />
 <ScoreDisplay/>
+{activeBonus > 1 && (
+  <BonusDisplay bonus={activeBonus} duration={3000} /> // Display bonus for 3 seconds
+)}
+
     </PinballGame>
   </Container>
 
