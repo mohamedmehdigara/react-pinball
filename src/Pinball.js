@@ -101,7 +101,9 @@ const [activeBonus, setActiveBonus] = useState(0);
 const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
 const [launchDirection, setLaunchDirection] = useState({ x: 1, y: -0.5 }); // Example launch direction vector
 const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initial velocity (can be 0)
-
+const [flipper1Position, setFlipper1Position] = useState({ x: 100, y: 200 }); // Flipper 1 position
+const [flipper2Position, setFlipper2Position] = useState({ x: 300, y: 200 }); // Flipper 2 position
+const canvasHeight = 400;
 
 
 
@@ -299,7 +301,7 @@ const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initial vel
 />
 
 <FlipperCollisionDetector
-  ballPosition={ballPosition}
+  ballPosition={currentBallPosition}
   ballVelocity={ballVelocity}
   flipperPositions={[flipper1Position, flipper2Position]}
   onCollision={() => {
@@ -310,7 +312,7 @@ const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initial vel
       let newYVelocity = -prevVelocity.y; // Invert y-velocity for initial upward bounce
   
       // Example logic for adjusting y-velocity based on collision location (replace with your implementation):
-      const collisionY = ballPosition.y; // Get ball's y position on collision
+      const collisionY = currentBallPosition.y; // Get ball's y position on collision
       const flipperCenterY = (flipper1Position.y + flipper2Position.y) / 2; // Center of both flippers
   
       // Adjust y-velocity based on collision height relative to flipper center
