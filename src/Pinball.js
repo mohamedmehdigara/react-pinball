@@ -307,21 +307,15 @@ const canvasHeight = 400;
   onCollision={() => {
     // Update ball velocity based on flipper hit
     setBallVelocity((prevVelocity) => {
-      // Adjust velocity based on collision location and desired deflection angle
-      const newXVelocity = prevVelocity.x; // Maintain x-velocity (optional, adjust for sideways deflection)
-      let newYVelocity = -prevVelocity.y; // Invert y-velocity for initial upward bounce
+      const newXVelocity = Math.min(Math.max(-1, prevVelocity.x * 0.8), 1); // Adjust x-velocity with a small deflection
+      const newYVelocity = -prevVelocity.y; // Invert y-velocity for upward bounce
   
-      // Example logic for adjusting y-velocity based on collision location (replace with your implementation):
-      const collisionY = currentBallPosition.y; // Get ball's y position on collision
-      const flipperCenterY = (flipper1Position.y + flipper2Position.y) / 2; // Center of both flippers
-  
-      // Adjust y-velocity based on collision height relative to flipper center
-      const deflectionFactor = Math.abs(collisionY - flipperCenterY) / (canvasHeight / 2); // Adjust based on your canvas size
-      newYVelocity *= (1 + deflectionFactor); // Increase y-velocity based on deflection factor
+      // ... (Optional: Further y-velocity adjustment based on collision location)
   
       return { x: newXVelocity, y: newYVelocity };
     });
-  }}/>
+  
+   }}/>
 
     </PinballGame>
   </Container>
