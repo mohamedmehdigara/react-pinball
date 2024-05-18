@@ -37,6 +37,7 @@ import Scoreboard from './components/Scoreboard';
 import BonusDisplay from './components/BonusDisplay';
 import ExtraBallIndicator from './components/ExtraBallIndicator';
 import LaunchPlunger from './components/LaunchPlunger';
+import FlipperCollisionDetector from './components/FlipperCollisionDetector';
 
 const ScoreMultiplier = 2;
 // Constants
@@ -297,7 +298,28 @@ const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initial vel
   maxPull={75} // Adjust max pull distance if desired
 />
 
-
+<FlipperCollisionDetector
+  ballPosition={ballPosition}
+  ballVelocity={ballVelocity}
+  flipperPositions={[flipper1Position, flipper2Position]}
+  onCollision={() => {
+    // Update ball velocity based on flipper hit
+    setBallVelocity((prevVelocity) => {
+      // Adjust velocity based on collision location and desired deflection angle
+      const newXVelocity = prevVelocity.x; // Maintain x-velocity (optional, adjust for sideways deflection)
+      let newYVelocity = -prevVelocity.y; // Invert y-velocity for initial upward bounce
+  
+      // Example logic for adjusting y-velocity based on collision location (replace with your implementation):
+      const collisionY = ballPosition.y; // Get ball's y position on collision
+      const flipperCenterY = (flipper1Position.y + flipper2Position.y) / 2; // Center of both flippers
+  
+      // Adjust y-velocity based on collision height relative to flipper center
+      const deflectionFactor = Math.abs(collisionY - flipperCenterY) / (canvasHeight / 2); // Adjust based on your canvas size
+      newYVelocity *= (1 + deflectionFactor); // Increase y-velocity based on deflection factor
+  
+      return { x: newXVelocity, y: newYVelocity };
+    });
+  }}/>
 
     </PinballGame>
   </Container>
