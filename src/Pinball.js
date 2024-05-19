@@ -153,7 +153,7 @@ const canvasHeight = 400;
             // Update ball velocity on flipper collision
             setBallVelocity((prevVelocity) => {
               const newXVelocity = Math.min(Math.max(-1, prevVelocity.x), 1); // Adjust x-velocity slightly
-              const newYVelocity = prevVelocity.y * -2; // Invert and increase y-velocity for stronger upward bounce
+              const newYVelocity = prevVelocity.y * -10; // Invert and increase y-velocity for stronger upward bounce
               return { x: newXVelocity, y: newYVelocity };
             });
             break;
@@ -218,10 +218,20 @@ const canvasHeight = 400;
     // Add your game loop logic here
   }, [currentBallPosition, ballSpeed, gameOver, score]);
 
-  const launchBall = () => {
-    // Set initial position of the ball and any other necessary properties
-    setBallPosition({ x: 400, y: 550 });
+  const launchBall = (launchPower) => {
+    // Set initial position of the ball
+    setBallPosition({ x: 400, y: -550 });
+  
+    // Apply launch force to the ball based on launch power (optional)
+    const launchForce = launchPower * maxBallForce; // Replace maxBallForce with your actual value
+  
+    // Set initial velocity with negative y-value for upward movement
+    setBallVelocity({
+      x: 0, // Set x-velocity to 0 to prevent rightward movement
+      y: -launchForce, // Invert launch force for stronger upward movement (optional)
+    });
   };
+  
   const handleLaunchBall = () => {
     // Logic to launch the ball
     setBallLaunched(true);
@@ -232,18 +242,18 @@ const canvasHeight = 400;
   };
   
   const handleBallLaunch = (launchPower) => {
-    // Apply force to the ball based on launch power
-    const launchForce = launchPower * maxBallForce; // Scale launch power
+    // Set initial position (optional, depending on your implementation)
+    // You might not need this if the position is already set elsewhere
+    // setBallPosition({ x: 400, y: 550 });
   
-    // Update ball velocity with upward direction and adjusted launch force
+    // Apply launch force to the ball based on launch power (optional)
+    const launchForce = launchPower * maxBallForce; // Replace maxBallForce with your actual value
+  
+    // Set initial velocity with negative y-value for upward movement
     setBallVelocity({
-      x: 0, // Set x-velocity to 0 to prevent initial rightward movement
-      y: -launchForce, // Invert launch force for upward movement
+      x: 0, // Set x-velocity to 0 to prevent rightward movement
+      y: -launchForce, // Invert launch force for stronger upward movement (optional)
     });
-  
-    // Update ball's position (optional, depending on your implementation)
-    // You might not need to update the position here if it's handled elsewhere.
-    // setBallPosition(currentBallPosition + launchForce * launchDirection);
   };
   
   const maxBallForce = 10; // Adjust this value for desired ball speed
