@@ -32,9 +32,9 @@ const Ball = ({ position, velocity, updateBallPosition, onCollision }) => {
       // Update position
       updateBallPosition(newPosition);
 
-      // Optional collision callback
+      // Optional collision callback (replace with your actual logic)
       if (onCollision) {
-        onCollision(newPosition); // Call the provided collision callback
+        onCollision(newPosition);
       }
     }
   }, [position, velocity]); // Re-run on position, velocity, or updateBallPosition change
@@ -57,10 +57,10 @@ const Ball = ({ position, velocity, updateBallPosition, onCollision }) => {
 };
 
 Ball.defaultProps = {
-  position: { x: 0, y: 0 },
-  velocity: { x: 0, y: 0 },
-  updateBallPosition: () => {}, // Empty function for optional updates
-  onCollision: null, // Optional collision callback
+  position: { x: 0, y: 0 }, // Starting position (adjust x and y as needed)
+  velocity: { x: 0, y: -2 }, // Initial velocity with negative y for upward movement
+  updateBallPosition: () => {},
+  onCollision: null, // Replace with your actual collision handling logic (e.g., call FlipperCollisionDetector)
 };
 
 Ball.propTypes = {

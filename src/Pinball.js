@@ -100,7 +100,7 @@ const [remainingLives, setRemainingLives] = useState(3);
 const [activeBonus, setActiveBonus] = useState(0);
 const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
 const [launchDirection, setLaunchDirection] = useState({ x: 1, y: -0.5 }); // Example launch direction vector
-const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initial velocity (can be 0)
+const [ballVelocity, setBallVelocity] = useState({ x: 0, y: -2 }); // Initial velocity (can be 0)
 const [flipper1Position, setFlipper1Position] = useState({ x: 100, y: 200 }); // Flipper 1 position
 const [flipper2Position, setFlipper2Position] = useState({ x: 300, y: 200 }); // Flipper 2 position
 const canvasHeight = 400;
@@ -149,7 +149,14 @@ const canvasHeight = 400;
           case 'target':
             score += TARGET_SCORE;
             break;
-          // Add more cases for other element types
+          case 'flipper':
+            // Update ball velocity on flipper collision
+            setBallVelocity((prevVelocity) => {
+              const newXVelocity = Math.min(Math.max(-1, prevVelocity.x), 1); // Adjust x-velocity slightly
+              const newYVelocity = prevVelocity.y * -2; // Invert and increase y-velocity for stronger upward bounce
+              return { x: newXVelocity, y: newYVelocity };
+            });
+            break;
           default:
             break;
         }
@@ -227,18 +234,18 @@ const canvasHeight = 400;
   const handleBallLaunch = (launchPower) => {
     // Apply force to the ball based on launch power
     const launchForce = launchPower * maxBallForce; // Scale launch power
-
+  
+    // Update ball velocity with upward direction and adjusted launch force
     setBallVelocity({
-      x: launchForce * launchDirection.x,
-      y: launchForce * launchDirection.y,
+      x: 0, // Set x-velocity to 0 to prevent initial rightward movement
+      y: -launchForce, // Invert launch force for upward movement
     });
   
-    // Update ball's position and velocity based on the launch force
-    setBallPosition(currentBallPosition + launchForce * launchDirection);
-    setBallVelocity(launchForce * launchDirection);
-    
+    // Update ball's position (optional, depending on your implementation)
+    // You might not need to update the position here if it's handled elsewhere.
+    // setBallPosition(currentBallPosition + launchForce * launchDirection);
   };
-
+  
   const maxBallForce = 10; // Adjust this value for desired ball speed
 
 
