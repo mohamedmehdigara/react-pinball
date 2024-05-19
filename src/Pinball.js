@@ -38,6 +38,7 @@ import BonusDisplay from './components/BonusDisplay';
 import ExtraBallIndicator from './components/ExtraBallIndicator';
 import LaunchPlunger from './components/LaunchPlunger';
 import FlipperCollisionDetector from './components/FlipperCollisionDetector';
+import VerticalBallLauncher from './components/VerticalBallLauncher';
 
 const ScoreMultiplier = 2;
 // Constants
@@ -258,7 +259,9 @@ const canvasHeight = 400;
   
   const maxBallForce = 10; // Adjust this value for desired ball speed
 
-
+  const handleLaunch = () => {
+    console.log('Ball launched!');
+  };
 
   return (
     <Container>
@@ -333,6 +336,7 @@ const canvasHeight = 400;
     });
   
    }}/>
+<VerticalBallLauncher onLaunch={handleLaunch} />
 
     </PinballGame>
   </Container>
