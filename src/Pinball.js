@@ -295,7 +295,7 @@ const canvasHeight = 400;
         <ComboMeter />
         <Ball
   position={currentBallPosition}
-  velocity={{ x: 1, y: -2 }} // Example velocity
+  velocity={ballVelocity} // Example velocity
   updateBallPosition={setBallPosition}
 />
         <Blocks />

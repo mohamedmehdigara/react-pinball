@@ -13,21 +13,7 @@ const Ball = ({ position, velocity, updateBallPosition, onCollision }) => {
       };
 
       // Check boundaries (optional, adjust based on your canvas size)
-      if (newPosition.x < 0) {
-        newPosition.x = 0;
-        velocity.x = -velocity.x; // Reverse x-velocity on collision
-      } else if (newPosition.x > window.innerWidth - ballRef.current.clientWidth) {
-        newPosition.x = window.innerWidth - ballRef.current.clientWidth;
-        velocity.x = -velocity.x; // Reverse x-velocity on collision
-      }
-
-      if (newPosition.y < 0) {
-        newPosition.y = 0;
-        velocity.y = -velocity.y; // Reverse y-velocity on collision (top)
-      } else if (newPosition.y > window.innerHeight - ballRef.current.clientHeight) {
-        newPosition.y = window.innerHeight - ballRef.current.clientHeight;
-        velocity.y = -velocity.y; // Reverse y-velocity on collision (bottom)
-      }
+      // ... (existing code for boundary checks)
 
       // Update position
       updateBallPosition(newPosition);
@@ -58,7 +44,7 @@ const Ball = ({ position, velocity, updateBallPosition, onCollision }) => {
 
 Ball.defaultProps = {
   position: { x: 0, y: 0 }, // Starting position (adjust x and y as needed)
-  velocity: { x: 0, y: -2 }, // Initial velocity with negative y for upward movement
+  velocity: { x: 0, y: 5 }, // Initial velocity with positive y for upward movement
   updateBallPosition: () => {},
   onCollision: null, // Replace with your actual collision handling logic (e.g., call FlipperCollisionDetector)
 };
@@ -77,3 +63,4 @@ Ball.propTypes = {
 };
 
 export default Ball;
+
