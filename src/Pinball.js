@@ -275,6 +275,11 @@ const canvasHeight = 400;
     // ... (data for other tunnels)
   ];
 
+  const handleObstacleCollision = (ballPosition, obstaclePosition) => {
+    // Implement logic for ball-obstacle collision (e.g., deflect ball, lose points)
+    console.log('Ball collided with obstacle!');
+  };
+
   return (
     <Container>
     <PinballGame>
@@ -292,8 +297,14 @@ const canvasHeight = 400;
       <SpinnerTarget size="60px" top="200px" left="200px" speed="1s" />
       <Tunnels tunnels={tunnelData} />
 
-      <DynamicObstacle />
-      <MysteryTarget />
+      <DynamicObstacle
+        width={40} // Adjust width and height as needed
+        height={40}
+        animationDuration={3} // Adjust animation duration
+        movementDistance={70} // Adjust movement distance
+        onCollision={handleObstacleCollision}
+      />
+            <MysteryTarget />
       <BottomRight>
         <LaneGuide />
         <Kickback />
