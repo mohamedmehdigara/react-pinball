@@ -39,6 +39,7 @@ import ExtraBallIndicator from './components/ExtraBallIndicator';
 import LaunchPlunger from './components/LaunchPlunger';
 import FlipperCollisionDetector from './components/FlipperCollisionDetector';
 import VerticalBallLauncher from './components/VerticalBallLauncher';
+import Tunnels from './components/Tunnels';
 
 const ScoreMultiplier = 2;
 // Constants
@@ -263,6 +264,17 @@ const canvasHeight = 400;
     console.log('Ball launched!');
   };
 
+  const tunnelData = [
+    {
+      id: 'tunnel1',
+      width: 50,
+      height: 100,
+      top: 200,
+      left: 300,
+    },
+    // ... (data for other tunnels)
+  ];
+
   return (
     <Container>
     <PinballGame>
@@ -278,6 +290,8 @@ const canvasHeight = 400;
       <Slingshot top={500} left={100} armLength={100} angle={45} />
       <LoopShot size="50px" top="200px" left="200px" speed="4s" />
       <SpinnerTarget size="60px" top="200px" left="200px" speed="1s" />
+      <Tunnels tunnels={tunnelData} />
+
       <DynamicObstacle />
       <MysteryTarget />
       <BottomRight>
