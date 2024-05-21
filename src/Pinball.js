@@ -102,7 +102,14 @@ const [remainingLives, setRemainingLives] = useState(3);
 const [activeBonus, setActiveBonus] = useState(0);
 const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
 const [launchDirection, setLaunchDirection] = useState({ x: 1, y: -0.5 }); // Example launch direction vector
-const [ballVelocity, setBallVelocity] = useState({ x: 0, y: -2 }); // Initial velocity (can be 0)
+const [ballPosition] = useState({ x: 0, y: 0 });
+const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 });
+let ballIsInTube = false; // Can be a state variable too (optional)
+const [tubeEntranceX, setTubeEntranceX] = useState( /* initial X position */ );
+const [tubeEntranceY, setTubeEntranceY] = useState( /* initial Y position */ );
+const [tubeWidth, setTubeWidth] = useState( /* width of the tube */ );
+const [tubeHeight, setTubeHeight] = useState( /* height of the tube */ );
+const [tubeExitY, setTubeExitY] = useState(tubeEntranceY + tubeHeight); // Calculate exit based on entrance and height
 const [flipper1Position, setFlipper1Position] = useState({ x: 100, y: 200 }); // Flipper 1 position
 const [flipper2Position, setFlipper2Position] = useState({ x: 300, y: 200 }); // Flipper 2 position
 const canvasHeight = 400;
@@ -280,6 +287,35 @@ const canvasHeight = 400;
     console.log('Ball collided with obstacle!');
   };
 
+// Inside Pinball.js
+
+const handleBallMovement = (/* other ball movement logic */) => {
+  // ... (existing ball movement code)
+
+  // Check if ball collides with tube entrance
+  if (ballPosition.x >= tubeEntranceX &&
+      ballPosition.x <= tubeEntranceX + tubeWidth &&
+      ballPosition.y >= tubeEntranceY &&
+      ballPosition.y <= tubeEntranceY + tubeHeight) {
+    // Ball enters the tube
+    ballIsInTube = true;
+    ballVelocity.y = -ballSpeed; // Move ball upwards into the tube
+  } else if (ballIsInTube) {
+    // Ball inside the tube
+    ballPosition.y += ballVelocity.y;
+
+    // Check if ball exits the tube
+    if (ballPosition.y <= tubeExitY) {
+      ballIsInTube = false;
+      ballVelocity.y = ballSpeed; // Change direction to fall down
+    }
+  } else {
+    // Ball outside the tube (existing movement logic applies)
+    // ... (existing ball movement code)
+  }
+};
+
+
   return (
     <Container>
     <PinballGame>
@@ -296,7 +332,9 @@ const canvasHeight = 400;
       <LoopShot size="50px" top="200px" left="200px" speed="4s" />
       <SpinnerTarget size="60px" top="200px" left="200px" speed="1s" />
       <Tunnels tunnels={tunnelData} />
-
+      <Tube width={50} height={200} // Adjust tube dimensions
+             style={{ top: 100, left: 300 }} // Adjust tube position
+      />
       <DynamicObstacle
         width={40} // Adjust width and height as needed
         height={40}

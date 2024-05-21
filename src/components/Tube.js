@@ -1,19 +1,12 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const TubeContainer = styled.div`
+const Tube = styled.div`
   position: absolute;
-  top: 50px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100px;
-  height: 300px;
-  background-color: #444;
-  border: 2px solid #222;
+  width: ${props => props.width}px;
+  height: ${props => props.height}px;
+  background-color: #333; // Adjust color as needed
+  border-radius: 5px;
 `;
-
-const Tube = () => {
-  return <TubeContainer />;
-};
 
 export default Tube;
