@@ -12,15 +12,21 @@ const Ball = ({ position, velocity, updateBallPosition, onCollision }) => {
         y: position.y + velocity.y,
       };
 
-      // Check boundaries (optional, adjust based on your canvas size)
-      // ... (existing code for boundary checks)
+      // Check for boundaries (adjust based on your canvas size)
+      if (newPosition.y <= 0 || newPosition.y >= window.innerHeight) { // Assuming full window height for playfield
+        // Reverse vertical velocity for bouncing off walls
+        velocity.y *= -1;
+      }
 
-      // Update position
+      // Optional additional boundary checks for walls and sides (adjust as needed)
+      // ... (check for left and right boundaries and adjust velocity.x)
+
+      // Update position in parent component (Pinball.js)
       updateBallPosition(newPosition);
 
       // Optional collision callback (replace with your actual logic)
       if (onCollision) {
-        onCollision(newPosition);
+        onCollision(newPosition); // Pass the new position for collision detection
       }
     }
   }, [position, velocity]); // Re-run on position, velocity, or updateBallPosition change

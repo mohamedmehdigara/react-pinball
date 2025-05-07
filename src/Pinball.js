@@ -41,6 +41,7 @@ import FlipperCollisionDetector from './components/FlipperCollisionDetector';
 import VerticalBallLauncher from './components/VerticalBallLauncher';
 import Tunnels from './components/Tunnels';
 
+
 const ScoreMultiplier = 2;
 // Constants
 const BALL_RADIUS = 10; // Adjust the radius according to your ball size
@@ -90,7 +91,7 @@ const BottomRight = styled.div`
 
 const Pinball = () => {
   const [currentBallPosition, setBallPosition] = useState({ x: 0, y: 0 }); // Initial position
-
+const [ballPosition] = useState();
 // Code using currentBallPosition can go here (after the definition)
 
   const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
@@ -102,7 +103,6 @@ const [remainingLives, setRemainingLives] = useState(3);
 const [activeBonus, setActiveBonus] = useState(0);
 const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
 const [launchDirection, setLaunchDirection] = useState({ x: 1, y: -0.5 }); // Example launch direction vector
-const [ballPosition] = useState({ x: 0, y: 0 });
 const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 });
 let ballIsInTube = false; // Can be a state variable too (optional)
 const [tubeEntranceX, setTubeEntranceX] = useState( /* initial X position */ );
@@ -316,6 +316,11 @@ const handleBallMovement = (/* other ball movement logic */) => {
 };
 
 
+// Define other launch-related variables
+
+
+
+
   return (
     <Container>
     <PinballGame>
@@ -354,7 +359,7 @@ const handleBallMovement = (/* other ball movement logic */) => {
         <Hole />
         <Multiball initialBallsCount={3} onBallLost={() => {}} onScore={() => {}} />
         <SkillShot />
-        <BallLauncher />
+        <BallLauncher  />
         <ComboMeter />
         <Ball
   position={currentBallPosition}
@@ -403,7 +408,6 @@ const handleBallMovement = (/* other ball movement logic */) => {
 
     </PinballGame>
   </Container>
-
 
   );
 };

@@ -13,7 +13,7 @@ const LauncherButton = styled.button`
   font-size: 16px;
   cursor: pointer;
   width: 50px; // Set a width for the button
-  height: 100px
+  height: 100px;
 `;
 
 const BallLauncher = ({ onClick }) => {
