@@ -40,6 +40,7 @@ import LaunchPlunger from './components/LaunchPlunger';
 import FlipperCollisionDetector from './components/FlipperCollisionDetector';
 import VerticalBallLauncher from './components/VerticalBallLauncher';
 import Tunnels from './components/Tunnels';
+import ScoreManager from './components/ScoreManager';
 
 
 const ScoreMultiplier = 2;
@@ -113,6 +114,8 @@ const [tubeExitY, setTubeExitY] = useState(tubeEntranceY + tubeHeight); // Calcu
 const [flipper1Position, setFlipper1Position] = useState({ x: 100, y: 200 }); // Flipper 1 position
 const [flipper2Position, setFlipper2Position] = useState({ x: 300, y: 200 }); // Flipper 2 position
 const canvasHeight = 400;
+const scoreManager = ScoreManager();
+
 
 
 
