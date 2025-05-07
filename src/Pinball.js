@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useGame } from 'react';
 import styled from 'styled-components';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
@@ -96,7 +96,7 @@ const [ballPosition] = useState();
 // Code using currentBallPosition can go here (after the definition)
 
   const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
-  const [score, setScore] = useState(0);
+  const [ setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [ballLaunched, setBallLaunched] = useState(false);
   const [currentScore, setCurrentScore] = useState(0);
@@ -114,6 +114,8 @@ const [tubeExitY, setTubeExitY] = useState(tubeEntranceY + tubeHeight); // Calcu
 const [flipper1Position, setFlipper1Position] = useState({ x: 100, y: 200 }); // Flipper 1 position
 const [flipper2Position, setFlipper2Position] = useState({ x: 300, y: 200 }); // Flipper 2 position
 const canvasHeight = 400;
+const { score, lives, isGameOver, updateScore, decreaseLives } = useGame();
+
 const scoreManager = ScoreManager();
 
 
@@ -408,6 +410,7 @@ const handleBallMovement = (/* other ball movement logic */) => {
   
    }}/>
 <VerticalBallLauncher onLaunch={handleLaunch} />
+<ScoreManager/>
 
     </PinballGame>
   </Container>
