@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useGame } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
@@ -41,6 +41,7 @@ import FlipperCollisionDetector from './components/FlipperCollisionDetector';
 import VerticalBallLauncher from './components/VerticalBallLauncher';
 import Tunnels from './components/Tunnels';
 import ScoreManager from './components/ScoreManager';
+import {useGame} from './components/GameManager'
 
 
 const ScoreMultiplier = 2;
@@ -124,50 +125,43 @@ const scoreManager = ScoreManager();
   // Add your event handlers here
 
   const handleCollision = (ballPosition, gameElements) => {
-    // Ensure gameElements is iterable
     if (!gameElements || typeof gameElements[Symbol.iterator] !== 'function') {
       console.error('gameElements is not iterable');
       return;
     }
-  
-    // Loop through all game elements
+
     for (const element of gameElements) {
-      // Calculate element's boundaries
       const elementBounds = {
         top: element.position.y,
         bottom: element.position.y + element.height,
         left: element.position.x,
         right: element.position.x + element.width,
       };
-  
-      // Calculate ball's boundaries
+
       const ballBounds = {
         top: ballPosition.y - BALL_RADIUS,
         bottom: ballPosition.y + BALL_RADIUS,
         left: ballPosition.x - BALL_RADIUS,
         right: ballPosition.x + BALL_RADIUS,
       };
-  
-      // Check for collision between ball and element
+
       if (
         ballBounds.right > elementBounds.left &&
         ballBounds.left < elementBounds.right &&
         ballBounds.bottom > elementBounds.top &&
         ballBounds.top < elementBounds.bottom
       ) {
-        // Handle collision based on element type
         switch (element.type) {
           case 'bumper':
-            score += BUMPER_SCORE;
+            scoreManager.awardPoints('bumperHit'); // Use the scoreManager instance
             break;
           case 'target':
-            score += TARGET_SCORE;
+            scoreManager.awardPoints('targetHit'); // Use the scoreManager instance
             break;
           case 'flipper':
-            // Update ball velocity on flipper collision
             setBallVelocity((prevVelocity) => {
-              const newXVelocity = Math.min(Math.max(-1, prevVelocity.x), 1); // Adjust x-velocity slightly
-              const newYVelocity = prevVelocity.y * -10; // Invert and increase y-velocity for stronger upward bounce
+              const newXVelocity = Math.min(Math.max(-1, prevVelocity.x), 1);
+              const newYVelocity = prevVelocity.y * -10;
               return { x: newXVelocity, y: newYVelocity };
             });
             break;
@@ -177,52 +171,43 @@ const scoreManager = ScoreManager();
       }
     }
   };
-   
-  // Handle out of bounds logic
+
   const handleOutOfBounds = (ballPosition) => {
-    // Check if the ball is out of bounds
     if (
       ballPosition.x < 0 || ballPosition.x > PLAY_AREA_WIDTH ||
       ballPosition.y < 0 || ballPosition.y > PLAY_AREA_HEIGHT
     ) {
-      // Reset ball position
       ballPosition.x = INITIAL_BALL_X;
       ballPosition.y = INITIAL_BALL_Y;
-      
-      // Deduct player lives or trigger other events
+
       playerLives--;
       if (playerLives <= 0) {
         gameOver = true;
       }
     }
   };
-  
+
   const handleLaneChange = (direction) => {
-    // Check if lane change is allowed
     if (!isLaneChangeAllowed) {
       return;
     }
-  
-    // Adjust ball's position based on lane change direction
+
     switch (direction) {
       case 'left':
         currentBallPosition.x -= LANE_CHANGE_DISTANCE;
         break;
       case 'right':
-      currentBallPosition.x += LANE_CHANGE_DISTANCE;
+        currentBallPosition.x += LANE_CHANGE_DISTANCE;
         break;
       default:
         break;
     }
-  
-    // Prevent multiple lane changes in quick succession
+
     isLaneChangeAllowed = false;
     setTimeout(() => {
       isLaneChangeAllowed = true;
     }, LANE_CHANGE_COOLDOWN);
   };
-  
-
 
   useEffect(() => {
     // Add your useEffect hooks here
@@ -230,47 +215,35 @@ const scoreManager = ScoreManager();
 
   useEffect(() => {
     // Add your game loop logic here
-  }, [currentBallPosition, ballSpeed, gameOver, score]);
+  }, [currentBallPosition, ballSpeed, gameOver, score]); // Use the score from context
 
   const launchBall = (launchPower) => {
-    // Set initial position of the ball
     setBallPosition({ x: 400, y: -550 });
-  
-    // Apply launch force to the ball based on launch power (optional)
-    const launchForce = launchPower * maxBallForce; // Replace maxBallForce with your actual value
-  
-    // Set initial velocity with negative y-value for upward movement
+    const launchForce = launchPower * maxBallForce;
     setBallVelocity({
-      x: 0, // Set x-velocity to 0 to prevent rightward movement
-      y: -launchForce, // Invert launch force for stronger upward movement (optional)
+      x: 0,
+      y: -launchForce,
     });
   };
-  
+
   const handleLaunchBall = () => {
-    // Logic to launch the ball
     setBallLaunched(true);
   };
 
   const handleBallDrain = () => {
-    // Decrement lives, check for game over, reset ball, etc.
+    decreaseLives(); // Use the decreaseLives function from context
+    // Reset ball position, etc.
   };
-  
+
   const handleBallLaunch = (launchPower) => {
-    // Set initial position (optional, depending on your implementation)
-    // You might not need this if the position is already set elsewhere
-    // setBallPosition({ x: 400, y: 550 });
-  
-    // Apply launch force to the ball based on launch power (optional)
-    const launchForce = launchPower * maxBallForce; // Replace maxBallForce with your actual value
-  
-    // Set initial velocity with negative y-value for upward movement
+    const launchForce = launchPower * maxBallForce;
     setBallVelocity({
-      x: 0, // Set x-velocity to 0 to prevent rightward movement
-      y: -launchForce, // Invert launch force for stronger upward movement (optional)
+      x: 0,
+      y: -launchForce,
     });
   };
-  
-  const maxBallForce = 10; // Adjust this value for desired ball speed
+
+  const maxBallForce = 10;
 
   const handleLaunch = () => {
     console.log('Ball launched!');
@@ -284,44 +257,29 @@ const scoreManager = ScoreManager();
       top: 200,
       left: 300,
     },
-    // ... (data for other tunnels)
   ];
 
   const handleObstacleCollision = (ballPosition, obstaclePosition) => {
-    // Implement logic for ball-obstacle collision (e.g., deflect ball, lose points)
     console.log('Ball collided with obstacle!');
   };
 
-// Inside Pinball.js
-
-const handleBallMovement = (/* other ball movement logic */) => {
-  // ... (existing ball movement code)
-
-  // Check if ball collides with tube entrance
-  if (ballPosition.x >= tubeEntranceX &&
+  const handleBallMovement = (/* other ball movement logic */) => {
+    if (ballPosition.x >= tubeEntranceX &&
       ballPosition.x <= tubeEntranceX + tubeWidth &&
       ballPosition.y >= tubeEntranceY &&
       ballPosition.y <= tubeEntranceY + tubeHeight) {
-    // Ball enters the tube
-    ballIsInTube = true;
-    ballVelocity.y = -ballSpeed; // Move ball upwards into the tube
-  } else if (ballIsInTube) {
-    // Ball inside the tube
-    ballPosition.y += ballVelocity.y;
-
-    // Check if ball exits the tube
-    if (ballPosition.y <= tubeExitY) {
-      ballIsInTube = false;
-      ballVelocity.y = ballSpeed; // Change direction to fall down
+      ballIsInTube = true;
+      ballVelocity.y = -ballSpeed;
+    } else if (ballIsInTube) {
+      ballPosition.y += ballVelocity.y;
+      if (ballPosition.y <= tubeExitY) {
+        ballIsInTube = false;
+        ballVelocity.y = ballSpeed;
+      }
+    } else {
+      // Ball outside the tube
     }
-  } else {
-    // Ball outside the tube (existing movement logic applies)
-    // ... (existing ball movement code)
-  }
-};
-
-
-// Define other launch-related variables
+  };
 
 
 
@@ -410,7 +368,6 @@ const handleBallMovement = (/* other ball movement logic */) => {
   
    }}/>
 <VerticalBallLauncher onLaunch={handleLaunch} />
-<ScoreManager/>
 
     </PinballGame>
   </Container>

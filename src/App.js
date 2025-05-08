@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Pinball from './Pinball';
-import { GameManager, useGame } from './components/GameManager';
+import { GameManager } from './components/GameManager';
 
 
 
