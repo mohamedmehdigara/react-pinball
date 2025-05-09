@@ -1,23 +1,20 @@
+// App.js
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Pinball from './Pinball';
 import { GameManager } from './components/GameManager';
 
-
-
-const App = () => {
+function App() {
   return (
-    <div className="App">
+    <Router>
       <GameManager>
-
-      <Routes>
-        
-        <Route path="/pinball" element={<Pinball/>} />
-        
-      </Routes>
+        <Routes>
+          <Route path="/pinball" element={<Pinball />} />
+          {/* Other routes */}
+        </Routes>
       </GameManager>
-    </div>
+    </Router>
   );
-};
+}
 
 export default App;
