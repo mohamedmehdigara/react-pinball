@@ -18,8 +18,6 @@ import LaunchPlunger from './components/LaunchPlunger';
 import FlipperCollisionDetector from './components/FlipperCollisionDetector';
 import VerticalBallLauncher from './components/VerticalBallLauncher';
 import Tunnels from './components/Tunnels';
-import ScoreManager from './components/ScoreManager';
-import { useGame } from './components/GameManager';
 
 // Constants
 const BALL_RADIUS = 10;
@@ -29,6 +27,8 @@ const INITIAL_BALL_X = PLAY_AREA_WIDTH / 2;
 const INITIAL_BALL_Y = PLAY_AREA_HEIGHT - 100;
 const LANE_CHANGE_DISTANCE = 50;
 const LANE_CHANGE_COOLDOWN = 1000;
+const BUMPER_SCORE = 100;
+const TARGET_SCORE = 200;
 
 const Container = styled.div`
  display: flex;
@@ -59,15 +59,18 @@ const Pinball = () => {
  const [tubeHeight, setTubeHeight] = useState(0);
  const [flipper1Position, setFlipper1Position] = useState({ x: 100, y: 550 });
  const [flipper2Position, setFlipper2Position] = useState({ x: 300, y: 550 });
- const { score, lives, isGameOver, decreaseLives } = useGame();
- const scoreManager = ScoreManager();
+ const [score, setScore] = useState(0);
+ const [lives, setLives] = useState(3);
+ const [activeBonus, setActiveBonus] = useState(0);
+ const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
+
  const tubeExitY = tubeEntranceY + tubeHeight;
- const playerLives = lives; // Use lives from context
  const isLaneChangeAllowed = true; // Keep as constant within component
 
  const handleCollision = (ballPosition, gameElements) => {
  if (!gameElements?.length) return;
- gameElements.forEach(element => { const isColliding =
+  gameElements.forEach(element => {
+ const isColliding =
  ballPosition.x + BALL_RADIUS > element.position.x &&
  ballPosition.x - BALL_RADIUS < element.position.x + element.width &&
  ballPosition.y + BALL_RADIUS > element.position.y &&
@@ -75,19 +78,20 @@ const Pinball = () => {
 
  if (isColliding) {
  switch (element.type) {
- case 'bumper': scoreManager.awardPoints('bumperHit'); break;
- case 'target': scoreManager.awardPoints('targetHit'); break;
+ case 'bumper': setScore(prev => prev + BUMPER_SCORE); break;
+ case 'target': setScore(prev => prev + TARGET_SCORE); break;
  case 'flipper': setBallVelocity(prev => ({ x: Math.min(Math.max(-1, prev.x), 1), y: prev.y * -10 })); break;
  default: break;
  }
  }
- });
+});
  };
 
- const handleOutOfBounds = (ballPosition) => { if (ballPosition.x < 0 || ballPosition.x > PLAY_AREA_WIDTH || ballPosition.y > PLAY_AREA_HEIGHT) {
+ const handleOutOfBounds = (ballPosition) => {
+ if (ballPosition.x < 0 || ballPosition.x > PLAY_AREA_WIDTH || ballPosition.y > PLAY_AREA_HEIGHT) {
  setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
- decreaseLives();
- if (playerLives <= 1) { // Check lives from context
+ setLives(prev => prev - 1);
+ if (lives <= 1) {
  setGameOver(true);
  }
  setBallLaunched(false);
@@ -108,12 +112,12 @@ const Pinball = () => {
  const interval = setInterval(() => {
  setBallPosition(prev => ({ x: prev.x + ballVelocity.x, y: prev.y + ballVelocity.y }));
  if (currentBallPosition.x - BALL_RADIUS < 0 || currentBallPosition.x + BALL_RADIUS > PLAY_AREA_WIDTH) setBallVelocity(prev => ({ ...prev, x: -prev.x }));
-  handleOutOfBounds(currentBallPosition);
+ handleOutOfBounds(currentBallPosition);
  // handleCollision(currentBallPosition, /* your game elements */);
  }, 16);
  return () => clearInterval(interval);
  }
- }, [gameOver, ballLaunched, ballVelocity, currentBallPosition, decreaseLives]);
+ }, [gameOver, ballLaunched, ballVelocity, currentBallPosition, lives]);
 
  const launchBall = (power) => {
  setBallPosition({ x: 400, y: 550 });
@@ -124,7 +128,7 @@ const Pinball = () => {
  const handleLaunchBall = () => launchBall(5); // Simple launch
 
  const handleBallDrain = () => {
- decreaseLives();
+ setLives(prev => prev - 1);
  setBallLaunched(false);
  setBallVelocity({ x: 0, y: 0 });
  setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
@@ -158,14 +162,16 @@ const Pinball = () => {
  <Tube type="top" onEntrance={handleTubeEntrance} x={100} y={50} width={50} height={100} />
  <Spinner type="left" />
  <Ball position={currentBallPosition} radius={BALL_RADIUS} />
- <Bumper onCollision={() => scoreManager.awardPoints('bumperHit')} x={150} y={100} radius={30} />
+ <Bumper onCollision={() => setScore(prev => prev + BUMPER_SCORE)} x={150} y={100} radius={30} />
  <Outlane onDrain={handleBallDrain} />
  <LaneChange onClick={handleLaneChange} />
  <LaunchPlunger onLaunch={handleLaunchBall} maxPull={75} />
- <Scoreboard score={score} lives={lives} />
+ <Scoreboard score={score} lives={lives} bonus={activeBonus} extraBalls={earnedExtraBalls} />
  <ScoreDisplay score={score} />
- {isGameOver && <GameOverMessage score={score} />}
-</PinballGame>
+ {activeBonus > 1 && <BonusDisplay bonus={activeBonus} duration={3000} />}
+ <ExtraBallIndicator earnedExtraBalls={earnedExtraBalls} />
+ {gameOver && <GameOverMessage score={score} />}
+ </PinballGame>
  </Container>
  );
 };
