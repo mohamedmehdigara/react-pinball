@@ -18,6 +18,7 @@ import LaunchPlunger from './components/LaunchPlunger';
 import FlipperCollisionDetector from './components/FlipperCollisionDetector';
 import VerticalBallLauncher from './components/VerticalBallLauncher';
 import Tunnels from './components/Tunnels';
+import GameStartButton from './components/GameStartButton';
 
 // Constants
 const BALL_RADIUS = 10;
@@ -154,6 +155,15 @@ const Pinball = () => {
  }
  }, [currentBallPosition, tubeEntranceX, tubeEntranceY, tubeWidth, tubeHeight, tubeExitY, ballIsInTube]);
 
+const handleGameStart = () => {
+  console.log('Game started!');
+  setGameOver(false);
+  setScore(0);
+  setLives(3);
+  setBallLaunched(true);
+  // ... any other game initialization logic
+};
+
  return (
  <Container>
  <PinballGame>
@@ -171,6 +181,7 @@ const Pinball = () => {
  {activeBonus > 1 && <BonusDisplay bonus={activeBonus} duration={3000} />}
  <ExtraBallIndicator earnedExtraBalls={earnedExtraBalls} />
  {gameOver && <GameOverMessage score={score} />}
+ <GameStartButton onStartGame={handleGameStart} />
  </PinballGame>
  </Container>
  );
