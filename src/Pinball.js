@@ -69,11 +69,11 @@ const PinballGame = styled.div`
 `;
 
 const Pinball = () => {
-  const [currentBallPosition, setBallPosition] = useState({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+const [currentBallPosition, setBallPosition] = useState({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
   const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
   const [gameOver, setGameOver] = useState(false);
   const [ballLaunched, setBallLaunched] = useState(false);
-  const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 });
+const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initialize velocity
   const [ballIsInTube, setBallIsInTube] = useState(false);
   const [tubeEntranceX, setTubeEntranceX] = useState(0);
   const [tubeEntranceY, setTubeEntranceY] = useState(0);
@@ -149,14 +149,19 @@ const Pinball = () => {
     }
   }, [gameOver, ballLaunched, ballVelocity, currentBallPosition, lives]);
 
+
   const launchBall = (power) => {
     setBallPosition({ x: 400, y: 550 });
     setBallVelocity({ x: 0, y: -power * 5 });
     setBallLaunched(true);
   };
 
-  const handleLaunchBall = () => launchBall(5); // Simple launch
-
+const handleLaunchBall = (power) => {
+  const launchForce = power * 15;
+  setBallPosition({ x: 400, y: 550 });
+  setBallVelocity({ x: 0, y: -launchForce });
+  setBallLaunched(true);
+};
   const handleBallDrain = () => {
     setLives(prev => prev - 1);
     setBallLaunched(false);
@@ -194,13 +199,39 @@ const Pinball = () => {
     setBallVelocity({ x: 0, y: -5 }); // Initial launch
   };
 
+
+ const handleBallCollision = (ballPosition, ballRadius, ballVelocity) => {
+    // This function will be called by the Ball component whenever a collision occurs
+    console.log('Ball collided!', { ballPosition, ballRadius, ballVelocity });
+
+    // Here you can implement logic to check for collisions with other game elements
+    // (bumpers, targets, flippers, etc.) based on the ball's position and radius.
+    // You might need to compare the ball's bounding circle with the bounds of other elements.
+
+    // For example, a very basic check with a bumper (assuming you have bumper state):
+    // if (isCircleCollidingWithRectangle(ballPosition, ballRadius, bumperPosition, bumperWidth, bumperHeight)) {
+    //   setScore(prevScore => prevScore + BUMPER_SCORE);
+    //   // Update ball velocity based on collision
+    //   setBallVelocity({ x: -ballVelocity.x * 0.8, y: -ballVelocity.y * 0.8 });
+    // }
+  };
+
+
  return (
  <Container>
  <PinballGame>
  <LeftFlipper top={500} left={200} />
  <RightFlipper top={500} left={400} />
- <Ball position={currentBallPosition} radius={BALL_RADIUS} />
- <Tube type="top" onEntrance={handleTubeEntrance} x={100} y={50} width={50} height={100} />
+<Ball
+  position={currentBallPosition}
+  velocity={ballVelocity}
+  radius={BALL_RADIUS}
+  updateBallPosition={setBallPosition} // Use your existing state setter
+  onCollision={handleBallCollision} // Your collision detection function
+  playAreaWidth={PLAY_AREA_WIDTH}
+  playAreaHeight={PLAY_AREA_HEIGHT}
+  // Optional: friction={0.02} gravity={0.2}
+/> <Tube type="top" onEntrance={handleTubeEntrance} x={100} y={50} width={50} height={100} />
  <Spinner type="left" />
  <Bumper onCollision={() => setScore(prev => prev + BUMPER_SCORE)} x={150} y={100} radius={30} />
  <Outlane onDrain={handleBallDrain} />
