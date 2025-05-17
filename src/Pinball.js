@@ -40,6 +40,7 @@ import ComboMeter from './components/ComboMeter';
 import Ramp from './components/Ramp';
 import Blocks from './components/Blocks';
 import LaneGuide from './components/LaneGuide';
+import BallLauncher from './components/BallLauncher';
 
 // Constants
 const BALL_RADIUS = 10;
@@ -231,7 +232,9 @@ const handleLaunchBall = (power) => {
   playAreaWidth={PLAY_AREA_WIDTH}
   playAreaHeight={PLAY_AREA_HEIGHT}
   // Optional: friction={0.02} gravity={0.2}
-/> <Tube type="top" onEntrance={handleTubeEntrance} x={100} y={50} width={50} height={100} />
+/>
+<BallLauncher/>
+ <Tube type="top" onEntrance={handleTubeEntrance} x={100} y={50} width={50} height={100} />
  <Spinner type="left" />
  <Bumper onCollision={() => setScore(prev => prev + BUMPER_SCORE)} x={150} y={100} radius={30} />
  <Outlane onDrain={handleBallDrain} />
