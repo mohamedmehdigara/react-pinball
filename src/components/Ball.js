@@ -1,72 +1,137 @@
 import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import styled, { keyframes } from 'styled-components';
 
-const Ball = ({ position, velocity, updateBallPosition, onCollision }) => {
-  const ballRef = useRef(null); // Create a ref for the ball element
+// Keyframes for a subtle shine effect
+const shine = keyframes`
+  0% {
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.1);
+  }
+`;
 
-  // Update ball position on every render (assuming constant velocity)
+const StyledBall = styled.div`
+  position: absolute;
+  left: ${props => props.x}px;
+  top: ${props => props.y}px;
+  width: ${props => props.radius * 2}px;
+  height: ${props => props.radius * 2}px;
+  border-radius: 50%;
+  background-image: radial-gradient(circle at 40% 40%, #eee, #bbb 60%, #888); /* Realistic shading */
+  box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.5); /* Subtle shadow for depth */
+  transition: transform 0.05s linear; /* Smoother, more frequent updates */
+  animation: ${shine} 2s infinite alternate; /* Subtle shine */
+
+  /* Add a specular highlight */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 15%;
+    left: 15%;
+    width: 25%;
+    height: 25%;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    filter: blur(2px);
+  }
+`;
+
+const Ball = ({ position, velocity, radius, updateBallPosition, onCollision, playAreaWidth, playAreaHeight, friction = 0.01, gravity = 0.1 }) => {
+  const ballRef = useRef(null);
+
   useEffect(() => {
-    if (ballRef.current) {
+    let animationFrameId;
+    let currentVelocity = { ...velocity };
+    let currentPosition = { ...position };
+
+    const gameLoop = () => {
+      if (!ballRef.current) return;
+
+      // Apply gravity
+      currentVelocity.y += gravity;
+
+      // Apply friction (only when not colliding significantly)
+      const speed = Math.sqrt(currentVelocity.x ** 2 + currentVelocity.y ** 2);
+      if (speed > 0.5) { // Prevent tiny movements
+        currentVelocity.x *= (1 - friction);
+        currentVelocity.y *= (1 - friction);
+      } else {
+        currentVelocity.x = 0;
+        currentVelocity.y = 0;
+      }
+
       const newPosition = {
-        x: position.x + velocity.x,
-        y: position.y + velocity.y,
+        x: currentPosition.x + currentVelocity.x,
+        y: currentPosition.y + currentVelocity.y,
       };
 
-      // Check for boundaries (adjust based on your canvas size)
-      if (newPosition.y <= 0 || newPosition.y >= window.innerHeight) { // Assuming full window height for playfield
-        // Reverse vertical velocity for bouncing off walls
-        velocity.y *= -1;
+      // Boundary collision detection with energy loss (coefficient of restitution)
+      const COR = 0.8; // Coefficient of restitution (0 to 1, 1 is perfectly elastic)
+
+      if (newPosition.y - radius < 0) {
+        newPosition.y = radius;
+        currentVelocity.y *= -COR;
+      } else if (newPosition.y + radius > playAreaHeight) {
+        newPosition.y = playAreaHeight - radius;
+        currentVelocity.y *= -COR;
       }
 
-      // Optional additional boundary checks for walls and sides (adjust as needed)
-      // ... (check for left and right boundaries and adjust velocity.x)
+      if (newPosition.x - radius < 0) {
+        newPosition.x = radius;
+        currentVelocity.x *= -COR;
+      } else if (newPosition.x + radius > playAreaWidth) {
+        newPosition.x = playAreaWidth - radius;
+        currentVelocity.x *= -COR;
+      }
 
-      // Update position in parent component (Pinball.js)
-      updateBallPosition(newPosition);
+      currentPosition = newPosition;
+      updateBallPosition(currentPosition, currentVelocity); // Pass back velocity for external use
 
-      // Optional collision callback (replace with your actual logic)
       if (onCollision) {
-        onCollision(newPosition); // Pass the new position for collision detection
+        onCollision(currentPosition, radius, currentVelocity);
       }
-    }
-  }, [position, velocity]); // Re-run on position, velocity, or updateBallPosition change
+
+      animationFrameId = requestAnimationFrame(gameLoop);
+    };
+
+    animationFrameId = requestAnimationFrame(gameLoop);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [position, velocity, radius, updateBallPosition, onCollision, playAreaWidth, playAreaHeight, friction, gravity]);
 
   return (
-    <div
-      ref={ballRef} // Assign the ref to the ball element
-      style={{
-        position: 'absolute',
-        left: position.x,
-        top: position.y,
-        width: '20px',
-        height: '20px',
-        backgroundColor: 'red',
-        borderRadius: '50%',
-        transition: 'transform 0.1s ease-in-out', // Smooth movement
-      }}
+    <StyledBall
+      ref={ballRef}
+      x={position.x - radius}
+      y={position.y - radius}
+      radius={radius}
     />
   );
-};
-
-Ball.defaultProps = {
-  position: { x: 0, y: 0 }, // Starting position (adjust x and y as needed)
-  velocity: { x: 0, y: 5 }, // Initial velocity with positive y for upward movement
-  updateBallPosition: () => {},
-  onCollision: null, // Replace with your actual collision handling logic (e.g., call FlipperCollisionDetector)
 };
 
 Ball.propTypes = {
   position: PropTypes.shape({
     x: PropTypes.number.isRequired,
     y: PropTypes.number.isRequired,
-  }),
+  }).isRequired,
   velocity: PropTypes.shape({
     x: PropTypes.number.isRequired,
     y: PropTypes.number.isRequired,
-  }),
-  updateBallPosition: PropTypes.func, // Optional update function
-  onCollision: PropTypes.func, // Optional collision callback
+  }).isRequired,
+  radius: PropTypes.number.isRequired,
+  updateBallPosition: PropTypes.func.isRequired,
+  onCollision: PropTypes.func,
+  playAreaWidth: PropTypes.number.isRequired,
+  playAreaHeight: PropTypes.number.isRequired,
+  friction: PropTypes.number,
+  gravity: PropTypes.number,
 };
 
 export default Ball;
-
