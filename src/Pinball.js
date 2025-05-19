@@ -176,13 +176,13 @@ const Pinball = () => {
       <PinballGame>
         {/* Bottom Right Launcher and Tube */}
         <BallLauncher onLaunch={handlePlungerRelease} right={20} bottom={20} />
-        <Tube
-  type="top" // Or 'bottom' depending on which end you want the defined entrance
+    <Tube
+  type="bottom" // Assuming the entrance is at the bottom near the launcher
   onEntrance={handleTubeEntrance}
   x={PLAY_AREA_WIDTH - 70} // Adjust x for alignment
-  y={PLAY_AREA_HEIGHT - 300} // Adjust y to position the top of the tube
+  y={50} // Position the top of the tube closer to the top (adjust as needed)
   width={40} // Adjust width
-  height={150} // Make it longer
+  height={PLAY_AREA_HEIGHT - 220} // Make it extend towards the bottom
 />
 
         {/* Middle Area Components */}
