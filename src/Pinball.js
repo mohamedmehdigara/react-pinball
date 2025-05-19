@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
@@ -13,7 +13,7 @@ import Outlane from './components/Outlane';
 import Scoreboard from './components/Scoreboard';
 import BonusDisplay from './components/BonusDisplay';
 import ExtraBallIndicator from './components/ExtraBallIndicator';
-import LaunchPlunger from './components/LaunchPlunger';
+import BallLauncher from './components/BallLauncher'; // Using the improved one
 import FlipperCollisionDetector from './components/FlipperCollisionDetector';
 import VerticalBallLauncher from './components/VerticalBallLauncher';
 import Tunnels from './components/Tunnels';
@@ -40,258 +40,186 @@ import ComboMeter from './components/ComboMeter';
 import Ramp from './components/Ramp';
 import Blocks from './components/Blocks';
 import LaneGuide from './components/LaneGuide';
-import BallLauncher from './components/BallLauncher';
 
 // Constants
 const BALL_RADIUS = 10;
 const PLAY_AREA_WIDTH = 800;
 const PLAY_AREA_HEIGHT = 600;
-const INITIAL_BALL_X = PLAY_AREA_WIDTH / 2;
-const INITIAL_BALL_Y = PLAY_AREA_HEIGHT - 100;
+const INITIAL_BALL_X = PLAY_AREA_WIDTH * 0.75; // Start near the launcher
+const INITIAL_BALL_Y = PLAY_AREA_HEIGHT - 50; // Start near the launcher
 const LANE_CHANGE_DISTANCE = 50;
 const LANE_CHANGE_COOLDOWN = 1000;
 const BUMPER_SCORE = 100;
 const TARGET_SCORE = 200;
 
 const Container = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  background-color: #222;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #222;
 `;
 
 const PinballGame = styled.div`
-  position: relative;
-  width: 800px;
-  height: 600px;
-  background-color: #444;
-  border: 2px solid #222;
+  position: relative;
+  width: 800px;
+  height: 600px;
+  background-color: #444;
+  border: 2px solid #222;
 `;
 
 const Pinball = () => {
-const [currentBallPosition, setBallPosition] = useState({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
-  const [ballSpeed, setBallSpeed] = useState({ x: 0, y: -3 });
-  const [gameOver, setGameOver] = useState(false);
-  const [ballLaunched, setBallLaunched] = useState(false);
-const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initialize velocity
-  const [ballIsInTube, setBallIsInTube] = useState(false);
-  const [tubeEntranceX, setTubeEntranceX] = useState(0);
-  const [tubeEntranceY, setTubeEntranceY] = useState(0);
-  const [tubeWidth, setTubeWidth] = useState(0);
-  const [tubeHeight, setTubeHeight] = useState(0);
-  const [flipper1Position, setFlipper1Position] = useState({ x: 100, y: 550 });
-  const [flipper2Position, setFlipper2Position] = useState({ x: 300, y: 550 });
-  const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
-  const [activeBonus, setActiveBonus] = useState(0);
-  const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
+  const [currentBallPosition, setBallPosition] = useState({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+  const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 });
+  const [gameOver, setGameOver] = useState(false);
+  const [ballLaunched, setBallLaunched] = useState(false);
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [activeBonus, setActiveBonus] = useState(0);
+  const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
+  const [tubeEntranceX, setTubeEntranceX] = useState(0);
+  const [tubeEntranceY, setTubeEntranceY] = useState(0);
+  const [tubeWidth, setTubeWidth] = useState(0);
+  const [tubeHeight, setTubeHeight] = useState(0);
+  const [ballIsInTube, setBallIsInTube] = useState(false);
+  const ballRef = useRef(null);
 
-  const tubeExitY = tubeEntranceY + tubeHeight;
-  const isLaneChangeAllowed = true; // Keep as constant within component
+  const tubeExitY = tubeEntranceY + tubeHeight;
+  const isLaneChangeAllowed = true;
 
-  const gameElements = [
-    { type: 'bumper', position: { x: 150, y: 100 }, width: 60, height: 60 }, // Example
-    { type: 'target', position: { x: 300, y: 150 }, width: 50, height: 30 }, // Example
-    { type: 'flipper', position: flipper1Position, width: 80, height: 20 }, // Example
-    { type: 'flipper', position: flipper2Position, width: 80, height: 20 }, // Example
-    // Add positions and dimensions for other interactive elements
-  ];
-
-
-
-  const handleCollision = (ballPosition) => {
-    if (!gameElements?.length) return;
-    gameElements.forEach(element => {
-      const isColliding =
-        ballPosition.x + BALL_RADIUS > element.position.x &&
-        ballPosition.x - BALL_RADIUS < element.position.x + element.width &&
-        ballPosition.y + BALL_RADIUS > element.position.y &&
-        ballPosition.y - BALL_RADIUS < element.position.y + element.height;
-
-      if (isColliding) {
-        switch (element.type) {
-          case 'bumper': setScore(prev => prev + BUMPER_SCORE); break;
-          case 'target': setScore(prev => prev + TARGET_SCORE); break;
-          case 'flipper': setBallVelocity(prev => ({ x: Math.min(Math.max(-1, prev.x), 1), y: prev.y * -10 })); break;
-          default: break;
-        }
-      }
-    });
-  };
-
-  const handleOutOfBounds = (ballPosition) => {
-    if (ballPosition.x < 0 || ballPosition.x > PLAY_AREA_WIDTH || ballPosition.y > PLAY_AREA_HEIGHT) {
-      setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
-      setLives(prev => prev - 1);
-      if (lives <= 0) {
-        setGameOver(true);
-      }
-      setBallLaunched(false);
-      setBallVelocity({ x: 0, y: 0 });
-    } else if (ballPosition.y < 0) {
-      setBallVelocity(prev => ({ ...prev, y: -prev.y })); // Bounce off top
-    }
-  };
-
-  const handleLaneChange = (direction) => {
-    if (!isLaneChangeAllowed) return;
-    setBallPosition(prev => ({ ...prev, x: prev.x + (direction === 'left' ? -LANE_CHANGE_DISTANCE : LANE_CHANGE_DISTANCE) }));
-    setTimeout(() => {}, LANE_CHANGE_COOLDOWN); // Simple cooldown
-  };
-
-  useEffect(() => {
-    if (!gameOver && ballLaunched) {
-      const interval = setInterval(() => {
-        setBallPosition(prev => ({ x: prev.x + ballVelocity.x, y: prev.y + ballVelocity.y }));
-        if (currentBallPosition.x - BALL_RADIUS < 0 || currentBallPosition.x + BALL_RADIUS > PLAY_AREA_WIDTH) setBallVelocity(prev => ({ ...prev, x: -prev.x }));
-        handleOutOfBounds(currentBallPosition);
-        handleCollision(currentBallPosition);
-      }, 16);
-      return () => clearInterval(interval);
-    }
-  }, [gameOver, ballLaunched, ballVelocity, currentBallPosition, lives]);
-
-
-  const launchBall = (power) => {
-    setBallPosition({ x: 400, y: 550 });
-    setBallVelocity({ x: 0, y: -power * 5 });
-    setBallLaunched(true);
-  };
-
-const handleLaunchBall = (power) => {
-  const launchForce = power * 15;
-  setBallPosition({ x: 400, y: 550 });
-  setBallVelocity({ x: 0, y: -launchForce });
-  setBallLaunched(true);
-};
-  const handleBallDrain = () => {
-    setLives(prev => prev - 1);
-    setBallLaunched(false);
-    setBallVelocity({ x: 0, y: 0 });
-    setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
-  };
-
-  const handleTubeEntrance = (x, y, width, height) => {
-    setTubeEntranceX(x);
-    setTubeEntranceY(y);
-    setTubeWidth(width);
-    setTubeHeight(height);
-  };
-
-  useEffect(() => {
-    if (ballIsInTube) {
-      setBallPosition(prev => ({ ...prev, y: prev.y - 5 }));
-      if (currentBallPosition.y <= tubeExitY) {
-        setBallIsInTube(false);
-        setBallPosition(prev => ({ ...prev, x: tubeEntranceX + tubeWidth / 2 }));
-        setBallVelocity(prev => ({ ...prev, y: 5 }));
-      }
-    } else if (currentBallPosition.x >= tubeEntranceX && currentBallPosition.x <= tubeEntranceX + tubeWidth && currentBallPosition.y >= tubeEntranceY && currentBallPosition.y <= tubeEntranceY + tubeHeight) {
-      setBallIsInTube(true);
-    }
-  }, [currentBallPosition, tubeEntranceX, tubeEntranceY, tubeWidth, tubeHeight, tubeExitY, ballIsInTube]);
-
-  const handleGameStart = () => {
-    console.log('Game started!');
-    setGameOver(false);
-    setScore(0);
-    setLives(3);
-    setBallLaunched(true);
-    setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y + 100 }); // Position for launch
-    setBallVelocity({ x: 0, y: -5 }); // Initial launch
-  };
-
-
- const handleBallCollision = (ballPosition, ballRadius, ballVelocity) => {
-    // This function will be called by the Ball component whenever a collision occurs
-    console.log('Ball collided!', { ballPosition, ballRadius, ballVelocity });
-
-    // Here you can implement logic to check for collisions with other game elements
-    // (bumpers, targets, flippers, etc.) based on the ball's position and radius.
-    // You might need to compare the ball's bounding circle with the bounds of other elements.
-
-    // For example, a very basic check with a bumper (assuming you have bumper state):
-    // if (isCircleCollidingWithRectangle(ballPosition, ballRadius, bumperPosition, bumperWidth, bumperHeight)) {
-    //   setScore(prevScore => prevScore + BUMPER_SCORE);
-    //   // Update ball velocity based on collision
-    //   setBallVelocity({ x: -ballVelocity.x * 0.8, y: -ballVelocity.y * 0.8 });
-    // }
+  const handleCollision = (ballPosition, radius, velocity) => {
+    // Basic collision with walls (using ball's internal physics now)
   };
 
-const handlePlungerRelease = (launchPower) => {
+  const handleOutOfBounds = (ballPosition) => {
+    if (ballPosition.y > PLAY_AREA_HEIGHT + BALL_RADIUS * 2) {
+      setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+      setBallVelocity({ x: 0, y: 0 });
+      setBallLaunched(false);
+      setLives(prev => prev - 1);
+      if (lives <= 0) {
+        setGameOver(true);
+      }
+    } else if (ballPosition.y < -BALL_RADIUS * 2) {
+      setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.8 }));
+    } else if (ballPosition.x < -BALL_RADIUS * 2 || ballPosition.x > PLAY_AREA_WIDTH + BALL_RADIUS * 2) {
+      setBallVelocity(prev => ({ ...prev, x: -prev.x * 0.8 }));
+    }
+  };
+
+  const handleLaneChange = (direction) => {
+    if (!isLaneChangeAllowed) return;
+    setBallPosition(prev => ({ ...prev, x: prev.x + (direction === 'left' ? -LANE_CHANGE_DISTANCE : LANE_CHANGE_DISTANCE) }));
+    setTimeout(() => {}, LANE_CHANGE_COOLDOWN);
+  };
+
+  useEffect(() => {
+    if (!gameOver && ballLaunched && ballRef.current) {
+      const animationFrameId = requestAnimationFrame(() => {
+        setBallPosition(prevPosition => ({
+          x: prevPosition.x + ballVelocity.x,
+          y: prevPosition.y + ballVelocity.y,
+        }));
+      });
+      return () => cancelAnimationFrame(animationFrameId);
+    }
+  }, [gameOver, ballLaunched, ballVelocity]);
+
+  const handlePlungerRelease = (launchPower) => {
     console.log(`Launch power: ${launchPower}`);
     if (!ballLaunched) {
       const launchForce = launchPower * 15;
-      setBallPosition({ x: PLAY_AREA_WIDTH - 60, y: PLAY_AREA_HEIGHT - 50 }); // Position near the launcher on the right
-      setBallVelocity({ x: -5, y: -launchForce }); // Initial velocity towards the left and up
+      setBallVelocity({ x: -5, y: -launchForce }); // Launch to the left and up
       setBallLaunched(true);
     }
   };
 
- return (
- <Container>
- <PinballGame>
- <LeftFlipper top={500} left={200} />
- <RightFlipper top={500} left={400} />
-<Ball
-  position={currentBallPosition}
-  velocity={ballVelocity}
-  radius={BALL_RADIUS}
-  updateBallPosition={setBallPosition} // Use your existing state setter
-  onCollision={handleBallCollision} // Your collision detection function
-  playAreaWidth={PLAY_AREA_WIDTH}
-  playAreaHeight={PLAY_AREA_HEIGHT}
-  // Optional: friction={0.02} gravity={0.2}
-/>
+  const handleBallDrain = () => {
+    setLives(prev => prev - 1);
+    setBallLaunched(false);
+    setBallVelocity({ x: 0, y: 0 });
+    setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+  };
+
+  const handleTubeEntrance = (x, y, width, height) => {
+    setTubeEntranceX(x);
+    setTubeEntranceY(y);
+    setTubeWidth(width);
+    setTubeHeight(height);
+  };
+
+   useEffect(() => {
+    if (ballLaunched && ballIsInTube) {
+      setBallPosition(prev => ({ ...prev, y: prev.y - 5 }));
+      if (currentBallPosition.y <= tubeExitY) {
+        setBallIsInTube(false);
+        setBallPosition(prev => ({ ...prev, x: tubeEntranceX + tubeWidth / 2 }));
+        setBallVelocity(prev => ({ ...prev, y: 5 }));
+      }
+    } else if (ballLaunched && currentBallPosition.x >= tubeEntranceX && currentBallPosition.x <= tubeEntranceX + tubeWidth && currentBallPosition.y >= tubeEntranceY && currentBallPosition.y <= tubeEntranceY + tubeHeight) {
+      setBallIsInTube(true);
+    }
+  }, [ballLaunched, currentBallPosition, tubeEntranceX, tubeEntranceY, tubeWidth, tubeHeight, tubeExitY, ballIsInTube]);
+
+  const handleGameStart = () => {
+    console.log('Game started!');
+    setGameOver(false);
+    setScore(0);
+    setLives(3);
+    setBallLaunched(false);
+    setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+    setBallVelocity({ x: 0, y: 0 });
+  };
+
+  return (
+    <Container>
+      <PinballGame>
+        {/* Bottom Right Launcher and Tube */}
         <BallLauncher onLaunch={handlePlungerRelease} right={20} bottom={20} />
-<Tube
-  type="vertical" // Or 'bottom' depending on the visual orientation you want
-  onEntrance={handleTubeEntrance}
-  x={PLAY_AREA_WIDTH - 100} // Adjust this value to be to the left of the launcher
-  y={PLAY_AREA_HEIGHT - 200} // Adjust this value to be above the launcher
-  width={50} // Adjust as needed
-  height={100} // Adjust as needed
-/>
- <Spinner type="left" />
- <Bumper onCollision={() => setScore(prev => prev + BUMPER_SCORE)} x={150} y={100} radius={30} />
- <Outlane onDrain={handleBallDrain} />
- <LaneChange onClick={handleLaneChange} />
- <LaunchPlunger onLaunch={handleLaunchBall} maxPull={75} />
- <Scoreboard score={score} lives={lives} bonus={activeBonus} extraBalls={earnedExtraBalls} />
- <ScoreDisplay score={score} />
- {activeBonus > 1 && <BonusDisplay bonus={activeBonus} duration={3000} />}
- <ExtraBallIndicator earnedExtraBalls={earnedExtraBalls} />
- {gameOver && <GameOverMessage score={score} />}
- <GameStartButton onStartGame={handleGameStart} />
- {/* Static elements */}
- <VerticalBallLauncher onLaunch={() => {}} /> {/* No functional prop here */}
- <Tunnels tunnels={[]} /> {/* Assuming empty for now */}
- <PinballTarget id="target1" size={50} initialTop={200} initialLeft={100} onClick={() => {}} />
- <Slingshot top={500} left={100} armLength={80} angle={30} />
- <LoopShot size="60px" top="250px" left="650px" speed="3s" />
- <SpinnerTarget size="50px" top="100px" left="600px" speed="2s" />
- <PopBumper top={200} left={350} />
- <MultiballLock top={50} left={500} />
- <SkillShotLane top={50} left={50} />
- <Kickback />
- <Rollover />
- <DropTarget />
- <KickoutHole />
- <Magnet />
- <CaptiveBall />
- <Hole />
- <Multiball initialBallsCount={1} onBallLost={() => {}} onScore={() => {}} />
- <SkillShot />
- <DynamicObstacle width={30} height={30} animationDuration={5} movementDistance={50} onCollision={() => {}} />
- <MysteryTarget />
- <ComboMeter />
- <Ramp width={150} height={40} top={400} left={550} angle={-20} />
- <Blocks />
- <LaneGuide />
- </PinballGame>
- </Container>
- );
+        <Tube
+          type="vertical"
+          onEntrance={handleTubeEntrance}
+          x={PLAY_AREA_WIDTH - 80}
+          y={PLAY_AREA_HEIGHT - 220} // Position above the launcher
+          width={40}
+          height={100}
+        />
+
+        {/* Middle Area Components */}
+        <LeftFlipper top={450} left={150} />
+        <RightFlipper top={450} left={400} />
+        <Bumper onCollision={() => setScore(prev => prev + BUMPER_SCORE)} x={250} y={150} radius={30} />
+        <Bumper onCollision={() => setScore(prev => prev + BUMPER_SCORE)} x={550} y={150} radius={30} />
+        <PinballTarget id="target1" size={40} initialTop={100} initialLeft={300} onClick={() => setScore(prev => prev + TARGET_SCORE)} />
+        <PinballTarget id="target2" size={40} initialTop={100} initialLeft={500} onClick={() => setScore(prev => prev + TARGET_SCORE)} />
+        <Slingshot top={400} left={100} armLength={70} angle={30} />
+        <Slingshot top={400} left={600} armLength={70} angle={-30} />
+        <Spinner type="left" top={200} left={350} />
+        <Ramp width={180} height={50} top={300} left={50} angle={15} />
+        <LoopShot size="50px" top="250px" left="650px" speed="2s" />
+        <PopBumper top={250} left={400} />
+        <DropTarget top={150} left={650} />
+        <Magnet top={100} left={150} />
+        {/* ... more components in the middle ... */}
+        <Outlane onDrain={handleBallDrain} left={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} />
+        <Outlane onDrain={handleBallDrain} right={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} />
+        <LaneChange onClick={() => handleLaneChange('left')} left={120} top={PLAY_AREA_HEIGHT - 100} />
+        <LaneChange onClick={() => handleLaneChange('right')} left={580} top={PLAY_AREA_HEIGHT - 100} />
+
+        <Ball position={currentBallPosition} radius={BALL_RADIUS} ref={ballRef} velocity={ballVelocity} updateBallPosition={setBallPosition} onCollision={handleCollision} playAreaWidth={PLAY_AREA_WIDTH} playAreaHeight={PLAY_AREA_HEIGHT} friction={0.01} gravity={0.1} />
+
+        {/* UI Elements */}
+        <Scoreboard score={score} lives={lives} bonus={activeBonus} extraBalls={earnedExtraBalls} top={20} left={20} />
+        <ScoreDisplay score={score} top={60} left={20} />
+        {activeBonus > 1 && <BonusDisplay bonus={activeBonus} duration={3000} top={100} left={20} />}
+        <ExtraBallIndicator earnedExtraBalls={earnedExtraBalls} top={140} left={20} />
+        {gameOver && <GameOverMessage score={score} />}
+        <GameStartButton onStartGame={handleGameStart} top={20} left={PLAY_AREA_WIDTH - 150} />
+        {/* Removed VerticalBallLauncher and Tunnels as they are not visually placed */}
+        {/* You can add more components in the middle as needed */}
+      </PinballGame>
+    </Container>
+  );
 };
 
 export default Pinball;

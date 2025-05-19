@@ -2,7 +2,6 @@ import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import styled, { keyframes } from 'styled-components';
 
-// Keyframes for a subtle shine effect
 const shine = keyframes`
   0% {
     box-shadow: 0 0 5px rgba(255, 255, 255, 0.1);
@@ -22,12 +21,11 @@ const StyledBall = styled.div`
   width: ${props => props.radius * 2}px;
   height: ${props => props.radius * 2}px;
   border-radius: 50%;
-  background-image: radial-gradient(circle at 40% 40%, #eee, #bbb 60%, #888); /* Realistic shading */
-  box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.5); /* Subtle shadow for depth */
-  transition: transform 0.05s linear; /* Smoother, more frequent updates */
-  animation: ${shine} 2s infinite alternate; /* Subtle shine */
+  background-image: radial-gradient(circle at 40% 40%, #eee, #bbb 60%, #888);
+  box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.5);
+  transition: transform 0.05s linear;
+  animation: ${shine} 2s infinite alternate;
 
-  /* Add a specular highlight */
   &::before {
     content: '';
     position: absolute;
@@ -41,7 +39,7 @@ const StyledBall = styled.div`
   }
 `;
 
-const Ball = ({ position, velocity, radius, updateBallPosition, onCollision, playAreaWidth, playAreaHeight, friction = 0.01, gravity = 0.1 }) => {
+const Ball = React.forwardRef(({ position, velocity, radius, updateBallPosition, onCollision, playAreaWidth, playAreaHeight, friction = 0.01, gravity = 0.1 }, ref) => {
   const ballRef = useRef(null);
 
   useEffect(() => {
@@ -52,12 +50,10 @@ const Ball = ({ position, velocity, radius, updateBallPosition, onCollision, pla
     const gameLoop = () => {
       if (!ballRef.current) return;
 
-      // Apply gravity
       currentVelocity.y += gravity;
 
-      // Apply friction (only when not colliding significantly)
       const speed = Math.sqrt(currentVelocity.x ** 2 + currentVelocity.y ** 2);
-      if (speed > 0.5) { // Prevent tiny movements
+      if (speed > 0.1) { // Reduced threshold for stopping
         currentVelocity.x *= (1 - friction);
         currentVelocity.y *= (1 - friction);
       } else {
@@ -70,8 +66,7 @@ const Ball = ({ position, velocity, radius, updateBallPosition, onCollision, pla
         y: currentPosition.y + currentVelocity.y,
       };
 
-      // Boundary collision detection with energy loss (coefficient of restitution)
-      const COR = 0.8; // Coefficient of restitution (0 to 1, 1 is perfectly elastic)
+      const COR = 0.8;
 
       if (newPosition.y - radius < 0) {
         newPosition.y = radius;
@@ -90,7 +85,7 @@ const Ball = ({ position, velocity, radius, updateBallPosition, onCollision, pla
       }
 
       currentPosition = newPosition;
-      updateBallPosition(currentPosition, currentVelocity); // Pass back velocity for external use
+      updateBallPosition(currentPosition);
 
       if (onCollision) {
         onCollision(currentPosition, radius, currentVelocity);
@@ -114,7 +109,7 @@ const Ball = ({ position, velocity, radius, updateBallPosition, onCollision, pla
       radius={radius}
     />
   );
-};
+});
 
 Ball.propTypes = {
   position: PropTypes.shape({
