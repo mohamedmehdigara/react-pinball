@@ -172,23 +172,21 @@ const bumper1Ref = useRef(null);
     const target1 = target1Ref.current;
     if (target1) {
       const targetRect = target1.getBoundingClientRect();
-      if (isCircleCollidingWithRectangle(ballCircle, targetRect)) {
-        setScore(prev => prev + TARGET_SCORE);
-        target1.style.opacity = 0.5;
+      if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
+        target1.handleCollision(); // Trigger the target's hit logic
         setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.7 }));
       }
     }
 
+    // Collision with Target 2
     const target2 = target2Ref.current;
     if (target2) {
       const targetRect = target2.getBoundingClientRect();
-      if (isCircleCollidingWithRectangle(ballCircle, targetRect)) {
-        setScore(prev => prev + TARGET_SCORE);
-        target2.style.opacity = 0.5;
+      if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
+        target2.handleCollision(); // Trigger the target's hit logic
         setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.7 }));
       }
     }
-
     // Collision with Flipper
     const leftFlipper = leftFlipperRef.current;
     if (leftFlipper) {
@@ -305,6 +303,9 @@ const bumper1Ref = useRef(null);
     setBallVelocity({ x: 0, y: 0 });
     bumper1Ref.current?.resetHitCount(); // Reset bumper 1 hit count on game start
     bumper2Ref.current?.resetHitCount(); // Reset bumper 2 hit count on game start
+    target1Ref.current?.resetTarget(); // Reset target 1 on game start
+    target2Ref.current?.resetTarget(); // Reset target 2 on game start
+  
   };
 
   const handleFlipperAction = (isLeft) => {
@@ -376,9 +377,27 @@ const bumper1Ref = useRef(null);
           glowColor="#cc3366"
           scoreValue={200}
         />
-        <PinballTarget ref={target1Ref} id="target1" size={40} initialTop={100} initialLeft={300} onClick={() => {}} />
-        <PinballTarget ref={target2Ref} id="target2" size={40} initialTop={100} initialLeft={500} onClick={() => {}} />
-         <Slingshot ref={slingshotLeftRef} top={400} left={100} armLength={70} angle={30} onCollision={(impulse) => setScore(prev => prev + 50)} />
+         <PinballTarget
+          ref={target1Ref}
+          id="target1"
+          size={40}
+          initialTop={100}
+          initialLeft={300}
+          onClick={(score) => setScore(prev => prev + score)} // Get score from target
+          scoreValue={250} // Set a specific score value
+          resetDelay={5000} // Reset after 5 seconds
+        />
+        <PinballTarget
+          ref={target2Ref}
+          id="target2"
+          size={40}
+          initialTop={100}
+          initialLeft={500}
+          onClick={(score) => setScore(prev => prev + score)} // Get score from target
+          scoreValue={300} // Set a different score value
+          resetDelay={3000} // Reset after 3 seconds
+        />
+        <Slingshot ref={slingshotLeftRef} top={400} left={100} armLength={70} angle={30} onCollision={(impulse) => setScore(prev => prev + 50)} />
         <Slingshot ref={slingshotRightRef} top={400} left={600} armLength={70} angle={-30} onCollision={(impulse) => setScore(prev => prev + 50)} />
       
         <Spinner type="left" top={200} left={350} />
