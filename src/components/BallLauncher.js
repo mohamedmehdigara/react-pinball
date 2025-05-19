@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
+import PropTypes from 'prop-types';
 
 const LauncherContainer = styled.div`
   position: absolute;
-  bottom: 20px;
-  left: 20px;
-  width: 60px;
-  height: 150px;
+  bottom: ${props => props.bottom}px;
+  right: ${props => props.right}px;
+  width: ${props => props.width}px;
+  height: ${props => props.height}px;
   background-color: #555;
   border-radius: 10px;
   border: 2px solid #333;
@@ -18,7 +19,7 @@ const LauncherContainer = styled.div`
 
 const PlungerTrack = styled.div`
   width: 30px;
-  height: 120px;
+  height: ${props => props.trackHeight}px;
   background-color: #777;
   border-radius: 5px;
   margin-bottom: 10px;
@@ -30,7 +31,7 @@ const PlungerHandle = styled.div`
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 40px;
+  height: ${props => props.handleHeight}px;
   background-color: #aaa;
   border-radius: 5px;
   border: 1px solid #666;
@@ -43,8 +44,8 @@ const PlungerHandle = styled.div`
 `;
 
 const BallDisplay = styled.div`
-  width: 24px;
-  height: 24px;
+  width: ${props => props.ballSize}px;
+  height: ${props => props.ballSize}px;
   border-radius: 50%;
   background-color: #eee;
   border: 1px solid #ccc;
@@ -54,7 +55,7 @@ const BallDisplay = styled.div`
   transform: translateX(-50%);
 `;
 
-const BallLauncher = ({ onLaunch }) => {
+const BallLauncher = ({ onLaunch, bottom = 20, right = 20, width = 60, height = 150, trackHeight = 120, handleHeight = 40, ballSize = 24, maxPull = 80 }) => {
   const [pullPosition, setPullPosition] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const plungerTrackRef = useRef(null);
@@ -70,10 +71,9 @@ const BallLauncher = ({ onLaunch }) => {
     const trackRect = plungerTrackRef.current.getBoundingClientRect();
     const mouseY = e.clientY;
     const topOfTrack = trackRect.top;
-    const bottomOfTrack = trackRect.bottom - 40; // Account for handle height
+    const bottomOfTrack = trackRect.bottom - handleHeight;
 
-    // Calculate new pull position relative to the track
-    let newPull = Math.max(0, Math.min(bottomOfTrack - mouseY, 80)); // Limit pull
+    let newPull = Math.max(0, Math.min(bottomOfTrack - mouseY, maxPull));
     setPullPosition(newPull);
   };
 
@@ -83,10 +83,8 @@ const BallLauncher = ({ onLaunch }) => {
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
 
-    // Calculate launch power based on pull position (0 to 80)
-    const launchPower = pullPosition / 80; // Normalize to 0-1
+    const launchPower = pullPosition / maxPull;
 
-    // "Release" the plunger and trigger launch
     setPullPosition(0);
     if (launchPower > 0 && onLaunch) {
       onLaunch(launchPower);
@@ -94,12 +92,13 @@ const BallLauncher = ({ onLaunch }) => {
   };
 
   return (
-    <LauncherContainer>
-      <PlungerTrack ref={plungerTrackRef}>
-        <BallDisplay />
+    <LauncherContainer bottom={bottom} right={right} width={width} height={height}>
+      <PlungerTrack ref={plungerTrackRef} trackHeight={trackHeight}>
+        <BallDisplay ballSize={ballSize} />
         <PlungerHandle
           style={{ bottom: pullPosition + 'px' }}
           onMouseDown={handleMouseDown}
+          handleHeight={handleHeight}
         >
           Pull
         </PlungerHandle>
@@ -107,6 +106,18 @@ const BallLauncher = ({ onLaunch }) => {
       <div>Pull and Release</div>
     </LauncherContainer>
   );
+};
+
+BallLauncher.propTypes = {
+  onLaunch: PropTypes.func.isRequired,
+  bottom: PropTypes.number,
+  right: PropTypes.number,
+  width: PropTypes.number,
+  height: PropTypes.number,
+  trackHeight: PropTypes.number,
+  handleHeight: PropTypes.number,
+  ballSize: PropTypes.number,
+  maxPull: PropTypes.number,
 };
 
 export default BallLauncher;

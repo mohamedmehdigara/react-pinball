@@ -98,6 +98,8 @@ const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 }); // Initialize 
     // Add positions and dimensions for other interactive elements
   ];
 
+
+
   const handleCollision = (ballPosition) => {
     if (!gameElements?.length) return;
     gameElements.forEach(element => {
@@ -217,6 +219,15 @@ const handleLaunchBall = (power) => {
     // }
   };
 
+const handlePlungerRelease = (launchPower) => {
+    console.log(`Launch power: ${launchPower}`);
+    if (!ballLaunched) {
+      const launchForce = launchPower * 15;
+      setBallPosition({ x: PLAY_AREA_WIDTH - 60, y: PLAY_AREA_HEIGHT - 50 }); // Position near the launcher on the right
+      setBallVelocity({ x: -5, y: -launchForce }); // Initial velocity towards the left and up
+      setBallLaunched(true);
+    }
+  };
 
  return (
  <Container>
@@ -233,8 +244,15 @@ const handleLaunchBall = (power) => {
   playAreaHeight={PLAY_AREA_HEIGHT}
   // Optional: friction={0.02} gravity={0.2}
 />
-<BallLauncher/>
- <Tube type="top" onEntrance={handleTubeEntrance} x={100} y={50} width={50} height={100} />
+        <BallLauncher onLaunch={handlePlungerRelease} right={20} bottom={20} />
+<Tube
+  type="vertical" // Or 'bottom' depending on the visual orientation you want
+  onEntrance={handleTubeEntrance}
+  x={PLAY_AREA_WIDTH - 100} // Adjust this value to be to the left of the launcher
+  y={PLAY_AREA_HEIGHT - 200} // Adjust this value to be above the launcher
+  width={50} // Adjust as needed
+  height={100} // Adjust as needed
+/>
  <Spinner type="left" />
  <Bumper onCollision={() => setScore(prev => prev + BUMPER_SCORE)} x={150} y={100} radius={30} />
  <Outlane onDrain={handleBallDrain} />
