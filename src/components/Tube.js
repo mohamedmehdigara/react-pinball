@@ -11,43 +11,43 @@ const TubeContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: ${props => props.type === 'top' ? 'flex-start' : (props.type === 'bottom' ? 'flex-end' : 'center')};
-  overflow: hidden; /* To contain inner tube and shadows */
+  overflow: hidden;
 `;
 
-const InnerTube = styled.div`
-  width: 80%;
+const TubeBody = styled.div`
+  width: 60%;
   height: 100%;
-  background-color: #444; /* Darker inner color */
-  border-radius: 8px;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3) inset,
-              -1px -1px 3px rgba(255, 255, 255, 0.1) inset; /* Inner shadow for depth */
+  background: linear-gradient(to right, #555, #444); /* Metallic gradient */
+  border-radius: 5px;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4) inset,
+              -1px -1px 3px rgba(255, 255, 255, 0.1) inset;
   position: relative;
 
-  /* Add a subtle shine effect */
   &::before {
     content: '';
     position: absolute;
-    top: 10%;
+    top: 15%;
     left: 10%;
-    width: 30%;
+    width: 20%;
     height: 10%;
     background: rgba(255, 255, 255, 0.2);
-    border-radius: 5px;
+    border-radius: 3px;
     filter: blur(1px);
   }
 `;
 
-const EntranceGlow = styled.div`
+const TubeEntrance = styled.div`
   position: absolute;
-  top: ${props => props.type === 'top' ? '-10px' : 'auto'};
-  bottom: ${props => props.type === 'bottom' ? '-10px' : 'auto'};
+  top: ${props => props.type === 'top' ? '-15px' : 'auto'};
+  bottom: ${props => props.type === 'bottom' ? '-15px' : 'auto'};
   left: 50%;
   transform: translateX(-50%);
-  width: 60%;
+  width: 70%;
   height: 20px;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent);
-  opacity: 0.7;
+  background: linear-gradient(to bottom, #666, #444);
+  border-radius: 3px;
+  border: 1px solid #333;
+  z-index: 1; /* Ensure it's on top of the body */
 `;
 
 const Tube = ({ type, x, y, width, height, onEntrance }) => {
@@ -59,8 +59,8 @@ const Tube = ({ type, x, y, width, height, onEntrance }) => {
 
   return (
     <TubeContainer x={x} y={y} width={width} height={height} type={type} onMouseEnter={handleMouseEnter}>
-      <EntranceGlow type={type} />
-      <InnerTube />
+      <TubeEntrance type={type} />
+      <TubeBody />
     </TubeContainer>
   );
 };

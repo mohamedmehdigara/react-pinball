@@ -177,13 +177,13 @@ const Pinball = () => {
         {/* Bottom Right Launcher and Tube */}
         <BallLauncher onLaunch={handlePlungerRelease} right={20} bottom={20} />
         <Tube
-          type="vertical"
-          onEntrance={handleTubeEntrance}
-          x={PLAY_AREA_WIDTH - 80}
-          y={PLAY_AREA_HEIGHT - 220} // Position above the launcher
-          width={40}
-          height={100}
-        />
+  type="top" // Or 'bottom' depending on which end you want the defined entrance
+  onEntrance={handleTubeEntrance}
+  x={PLAY_AREA_WIDTH - 70} // Adjust x for alignment
+  y={PLAY_AREA_HEIGHT - 300} // Adjust y to position the top of the tube
+  width={40} // Adjust width
+  height={150} // Make it longer
+/>
 
         {/* Middle Area Components */}
         <LeftFlipper top={450} left={150} />
