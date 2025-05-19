@@ -1,66 +1,96 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
+import PropTypes from 'prop-types';
 
-// Define a kick animation
 const kickAnimation = keyframes`
-  0% { transform: rotate(0deg); }
-  50% { transform: rotate(-20deg); }
-  100% { transform: rotate(0deg); }
+  0% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
+  100% { transform: translateX(0); }
 `;
 
-// Styled component for the kickback
-const KickbackContainer = styled.div`
+const KickbackPad = styled.div`
   position: absolute;
+  width: 20px;
+  height: 40px;
+  background-color: #4CAF50;
+  bottom: ${props => props.bottom}px;
+  left: ${props => props.left}px;
+  border-radius: 0 5px 5px 0;
+  transform-origin: center left;
+  transform: rotate(${props => props.angle}deg);
+  animation: ${props => props.isKicking ? `${kickAnimation} 0.1s ease-in-out` : 'none'};
 `;
 
-const KickbackStyled = styled.div`
-  width: ${(props) => props.width || '100px'};
-  height: ${(props) => props.height || '20px'};
-  background-color: #8B4513; /* Brown color for the kickback */
-  position: absolute;
-  top: ${(props) => `${props.top}px` || '0'};
-  left: ${(props) => `${props.left}px` || '0'};
-  cursor: pointer;
-  animation: ${kickAnimation} 0.5s ease; /* Apply the kick animation */
+const Kickback = React.forwardRef(({ bottom, left, angle = 0, onKickback }, ref) => {
+  const [isKicking, setIsKicking] = useState(false);
+  const isCoolingDown = useRef(false);
 
-  &:hover {
-    background-color: #A0522D; /* Darker brown color on hover */
-  }
-`;
+  const handleCollision = (ballPosition, ballRadius) => {
+    const kickbackRect = ref.current ? ref.current.getBoundingClientRect() : null;
 
-const Kickback = ({ width, height, top, left, onClick }) => {
-  const [isKicked, setIsKicked] = useState(false);
+    if (!kickbackRect || isCoolingDown.current) {
+      return null;
+    }
 
-  useEffect(() => {
-    const handleKick = () => {
-      setIsKicked(true);
-      setTimeout(() => setIsKicked(false), 500); // Reset isKicked state after a delay
-      onClick && onClick();
-    };
+    // Basic AABB collision detection
+    const kickLeft = kickbackRect.left;
+    const kickRight = kickbackRect.right;
+    const kickTop = kickbackRect.top;
+    const kickBottom = kickbackRect.bottom;
 
-    // Add event listener for kick action
-    // Adjust this based on your game's logic
-    // document.addEventListener('someEvent', handleKick);
+    const ballLeft = ballPosition.x - ballRadius;
+    const ballRight = ballPosition.x + ballRadius;
+    const ballTop = ballPosition.y - ballRadius;
+    const ballBottom = ballPosition.y + ballRadius;
 
-    // Clean up event listener
-    return () => {
-      // document.removeEventListener('someEvent', handleKick);
-    };
-  }, [onClick]);
+    if (ballRight > kickLeft && ballLeft < kickRight && ballBottom > kickTop && ballTop < kickBottom) {
+      setIsKicking(true);
+      isCoolingDown.current = true;
+      setTimeout(() => setIsKicking(false), 100);
+      setTimeout(() => isCoolingDown.current = false, 500); // Cooldown period
+
+      // Calculate a kickback impulse (simplified)
+      const angleRad = angle * Math.PI / 180;
+      const kickStrength = 18;
+      const impulseX = kickStrength * Math.cos(angleRad); // Kick to the right/left
+      const impulseY = -kickStrength * Math.sin(angleRad) - 5; // Kick upwards
+
+      if (onKickback) {
+        onKickback(); // Notify Pinball.js that a kickback occurred (for scoring, etc.)
+      }
+      return { x: impulseX, y: impulseY };
+    }
+    return null;
+  };
+
+  const getBoundingClientRect = () => {
+    if (ref.current) {
+      return ref.current.getBoundingClientRect();
+    }
+    return null;
+  };
+
+  React.useImperativeHandle(ref, () => ({
+    handleCollision: handleCollision,
+    getBoundingClientRect: getBoundingClientRect,
+  }));
 
   return (
-    <KickbackContainer>
-      {!isKicked && (
-        <KickbackStyled
-          width={width}
-          height={height}
-          top={top}
-          left={left}
-          onClick={onClick}
-        />
-      )}
-    </KickbackContainer>
+    <KickbackPad
+      ref={ref}
+      bottom={bottom}
+      left={left}
+      angle={angle}
+      isKicking={isKicking}
+    />
   );
+});
+
+Kickback.propTypes = {
+  bottom: PropTypes.number.isRequired,
+  left: PropTypes.number.isRequired,
+  angle: PropTypes.number,
+  onKickback: PropTypes.func,
 };
 
 export default Kickback;

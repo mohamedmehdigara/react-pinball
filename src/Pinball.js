@@ -104,6 +104,12 @@ const bumper1Ref = useRef(null);
   const rampRef = useRef(null);
   const slingshotLeftRef = useRef(null); // Ref for the left slingshot
   const slingshotRightRef = useRef(null);
+    const spinnerRef = useRef(null); // Ref for the spinner
+     const outlaneLeftRef = useRef(null); // Ref for the left outlane
+  const outlaneRightRef = useRef(null); // Ref for the right outlane
+  const kickbackLeftRef = useRef(null); // Ref for the left kickback
+  const kickbackRightRef = useRef(null); // Ref for the right kickback
+
   const tubeExitY = tubeEntranceY + tubeHeight;
   const isLaneChangeAllowed = true;
 
@@ -213,6 +219,17 @@ const bumper1Ref = useRef(null);
         setBallPosition(prev => ({ ...prev, y: prev.y - 5 }));
       }
     }
+  const spinner = spinnerRef.current;
+    if (spinner) {
+      const spinnerRect = spinner.getBoundingClientRect();
+      if (spinnerRect && isCircleCollidingWithRectangle(ballCircle, spinnerRect)) {
+        const score = spinner.handleCollision(velocity);
+        setScore(prev => prev + score);
+        // You might want to adjust the ball's velocity upon hitting the spinner
+        setBallVelocity(prev => ({ ...prev, x: -prev.x * 0.6, y: -prev.y * 0.6 }));
+      }
+    }
+  
   };
 
   const handleOutOfBounds = (ballPosition) => {
@@ -265,12 +282,29 @@ const bumper1Ref = useRef(null);
     }
   };
 
-  const handleBallDrain = () => {
-    setLives(prev => prev - 1);
-    setBallLaunched(false);
-    setBallVelocity({ x: 0, y: 0 });
-    setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+ const handleBallDrain = () => {
+    if (lives > 0) {
+      // Check if kickback can save the ball (example: only on the first drain)
+      if (lives === 3 && kickbackLeftRef.current && currentBallPosition.x < PLAY_AREA_WIDTH * 0.2) {
+        const impulse = kickbackLeftRef.current.handleCollision(currentBallPosition, BALL_RADIUS);
+        if (impulse) {
+          setBallVelocity(impulse);
+          setBallLaunched(true); // Ensure the game loop continues
+          setLives(prev => prev); // Don't decrease life
+          return; // Prevent standard ball drain
+        }
+      }
+      // Standard ball drain logic
+      setLives(prev => prev - 1);
+      setBallLaunched(false);
+      setBallVelocity({ x: 0, y: 0 });
+      setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+      if (lives <= 0) {
+        setGameOver(true);
+      }
+    }
   };
+
 
   const handleTubeEntrance = (x, y, width, height) => {
     setTubeEntranceX(x);
@@ -400,7 +434,7 @@ const bumper1Ref = useRef(null);
         <Slingshot ref={slingshotLeftRef} top={400} left={100} armLength={70} angle={30} onCollision={(impulse) => setScore(prev => prev + 50)} />
         <Slingshot ref={slingshotRightRef} top={400} left={600} armLength={70} angle={-30} onCollision={(impulse) => setScore(prev => prev + 50)} />
       
-        <Spinner type="left" top={200} left={350} />
+        <Spinner ref={spinnerRef} top={200} left={350} type="left" scorePerRotation={75} />
         <Ramp ref={rampRef} width={180} height={50} top={300} left={50} angle={15} />
         <LoopShot size="50px" top="250px" left="650px" speed="2s" />
         <PopBumper top={250} left={400} />
@@ -431,6 +465,9 @@ const bumper1Ref = useRef(null);
         <ExtraBallIndicator earnedExtraBalls={earnedExtraBalls} top={140} left={20} />
         {gameOver && <GameOverMessage score={score} />}
         <GameStartButton onStartGame={handleGameStart} top={20} left={PLAY_AREA_WIDTH - 150} />
+        <Kickback ref={kickbackLeftRef} bottom={PLAY_AREA_HEIGHT - 120} left={20} angle={30} onKickback={() => setScore(prev => prev + 100)} />
+        {/* You might have a kickback on the other side as well */}
+         <Kickback ref={kickbackRightRef} bottom={PLAY_AREA_HEIGHT - 120} left={PLAY_AREA_WIDTH - 40} angle={-30} onKickback={() => setScore(prev => prev + 100)} />
       </PinballGame>
     </Container>
   );
