@@ -95,14 +95,15 @@ const Pinball = () => {
   const bumper2HitCooldown = useRef(0);
 
   // Refs for interactive elements
-  const bumper1Ref = useRef(null);
+const bumper1Ref = useRef(null);
   const bumper2Ref = useRef(null);
   const target1Ref = useRef(null);
   const target2Ref = useRef(null);
   const leftFlipperRef = useRef(null);
   const rightFlipperRef = useRef(null);
   const rampRef = useRef(null);
-
+  const slingshotLeftRef = useRef(null); // Ref for the left slingshot
+  const slingshotRightRef = useRef(null);
   const tubeExitY = tubeEntranceY + tubeHeight;
   const isLaneChangeAllowed = true;
 
@@ -117,6 +118,23 @@ const Pinball = () => {
 
   const handleCollision = (ballPosition, radius, velocity) => {
     const ballCircle = { x: ballPosition.x, y: ballPosition.y, radius: radius };
+
+     const slingshotLeft = slingshotLeftRef.current;
+    if (slingshotLeft) {
+      const impulse = slingshotLeft.handleCollision(ballPosition, radius);
+      if (impulse) {
+        setBallVelocity(prev => ({ x: prev.x + impulse.x, y: prev.y + impulse.y }));
+      }
+    }
+
+    // Collision with Right Slingshot
+    const slingshotRight = slingshotRightRef.current;
+    if (slingshotRight) {
+      const impulse = slingshotRight.handleCollision(ballPosition, radius);
+      if (impulse) {
+        setBallVelocity(prev => ({ x: prev.x + impulse.x, y: prev.y + impulse.y }));
+      }
+    }
 
     // Collision with Bumper 1
     const bumper1 = bumper1Ref.current;
@@ -360,8 +378,9 @@ const Pinball = () => {
         />
         <PinballTarget ref={target1Ref} id="target1" size={40} initialTop={100} initialLeft={300} onClick={() => {}} />
         <PinballTarget ref={target2Ref} id="target2" size={40} initialTop={100} initialLeft={500} onClick={() => {}} />
-        <Slingshot top={400} left={100} armLength={70} angle={30} />
-        <Slingshot top={400} left={600} armLength={70} angle={-30} />
+         <Slingshot ref={slingshotLeftRef} top={400} left={100} armLength={70} angle={30} onCollision={(impulse) => setScore(prev => prev + 50)} />
+        <Slingshot ref={slingshotRightRef} top={400} left={600} armLength={70} angle={-30} onCollision={(impulse) => setScore(prev => prev + 50)} />
+      
         <Spinner type="left" top={200} left={350} />
         <Ramp ref={rampRef} width={180} height={50} top={300} left={50} angle={15} />
         <LoopShot size="50px" top="250px" left="650px" speed="2s" />

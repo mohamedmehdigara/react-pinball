@@ -1,65 +1,90 @@
-// Slingshot.js
+import React, { useRef, useState, useEffect } from 'react';
+import styled, { keyframes } from 'styled-components';
+import PropTypes from 'prop-types';
 
-import React, { useState } from 'react';
-import styled from 'styled-components';
-
-// Define the slingshot container
-const SlingshotContainer = styled.div`
-  position: absolute;
+const armSqueeze = keyframes`
+  0% { transform: scale(1, 1); }
+  50% { transform: scale(0.8, 1.2); }
+  100% { transform: scale(1, 1); }
 `;
 
-// Define the slingshot base
-const SlingshotBase = styled.div`
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  background-color: #333;
-  border-radius: 50%;
-  top: ${(props) => props.top}px;
-  left: ${(props) => props.left}px;
-`;
-
-// Define the slingshot arm
 const SlingshotArm = styled.div`
   position: absolute;
-  width: 2px;
-  height: ${(props) => props.armLength}px;
-  background-color: #666;
-  top: ${(props) => props.top}px;
-  left: ${(props) => props.left}px;
-  transform: rotate(${(props) => props.angle}deg);
+  width: 10px;
+  height: ${props => props.armLength}px;
+  background-color: #cc3300;
+  border-radius: 5px;
+  transform-origin: top center;
+  transform: rotate(${props => props.angle}deg);
+  top: ${props => props.top}px;
+  left: ${props => props.left - 5}px;
+  animation: ${props => props.isHit ? armSqueeze : 'none'} 0.1s ease-in-out;
 `;
 
-const Slingshot = ({ top, left, armLength, angle }) => {
-  // Define state to track whether the slingshot is activated
-  const [activated, setActivated] = useState(false);
+const Slingshot = React.forwardRef(({ top, left, armLength, angle, onCollision }, ref) => {
+  const armRef = useRef(null);
+  const [isHit, setIsHit] = useState(false);
 
-  // Function to handle the slingshot activation
-  const activateSlingshot = () => {
-    // Logic to trigger the slingshot, e.g., apply force to the ball
-    setActivated(true);
+  const handleCollision = (ballPosition, ballRadius) => {
+    const armRect = armRef.current ? armRef.current.getBoundingClientRect() : null;
 
-    // Reset activation state after a delay to simulate the slingshot action
-    setTimeout(() => {
-      setActivated(false);
-    }, 100);
+    if (!armRect) {
+      return null;
+    }
+
+    // Simple AABB (Axis-Aligned Bounding Box) collision for the arm
+    const armLeft = armRect.left;
+    const armRight = armRect.right;
+    const armTop = armRect.top;
+    const armBottom = armRect.bottom;
+
+    const ballLeft = ballPosition.x - ballRadius;
+    const ballRight = ballPosition.x + ballRadius;
+    const ballTop = ballPosition.y - ballRadius;
+    const ballBottom = ballPosition.y + ballRadius;
+
+    if (ballRight > armLeft && ballLeft < armRight && ballBottom > armTop && ballTop < armBottom) {
+      setIsHit(true);
+      setTimeout(() => setIsHit(false), 100);
+
+      // Calculate impulse vector (simplified based on arm angle)
+      const angleRad = angle * Math.PI / 180;
+      const impulseStrength = 15; // Adjust for force
+      const impulseX = impulseStrength * Math.sin(angleRad);
+      const impulseY = -impulseStrength * Math.cos(angleRad); // Negative Y for upward direction
+
+      if (onCollision) {
+        onCollision({ x: impulseX, y: impulseY });
+      }
+      return { x: impulseX, y: impulseY }; // Return the impulse to Pinball.js
+    }
+    return null;
   };
 
+  React.useImperativeHandle(ref, () => ({
+    handleCollision: handleCollision,
+  }));
+
   return (
-    <SlingshotContainer>
-      {/* Render the slingshot base */}
-      <SlingshotBase top={top} left={left} />
-
-      {/* Render the slingshot arm */}
-      <SlingshotArm top={top} left={left} armLength={armLength} angle={angle} />
-
-      {/* Add event listener to activate the slingshot on mouse down */}
-      <div
-        style={{ position: 'absolute', top: top + armLength, left: left, width: 20, height: 20, cursor: 'pointer' }}
-        onMouseDown={activateSlingshot}
-      ></div>
-    </SlingshotContainer>
+    <>
+      <SlingshotArm
+        ref={armRef}
+        top={top}
+        left={left}
+        armLength={armLength}
+        angle={angle}
+        isHit={isHit}
+      />
+    </>
   );
+});
+
+Slingshot.propTypes = {
+  top: PropTypes.number.isRequired,
+  left: PropTypes.number.isRequired,
+  armLength: PropTypes.number.isRequired,
+  angle: PropTypes.number.isRequired,
+  onCollision: PropTypes.func,
 };
 
 export default Slingshot;
