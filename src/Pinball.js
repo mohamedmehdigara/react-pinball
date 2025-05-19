@@ -53,6 +53,8 @@ const BUMPER_SCORE = 100;
 const TARGET_SCORE = 200;
 const FLIPPER_HEIGHT = 20;
 const FLIPPER_WIDTH = 80;
+const COLLISION_NUDGE = 5;
+const BUMPER_COOLDOWN_FRAMES = 10;
 
 const Container = styled.div`
   display: flex;
@@ -89,6 +91,8 @@ const Pinball = () => {
   const [isLeftFlipperActive, setIsLeftFlipperActive] = useState(false);
   const [isRightFlipperActive, setIsRightFlipperActive] = useState(false);
   const [ballIsInTube, setBallIsInTube] = useState(false);
+  const bumper1HitCooldown = useRef(0);
+  const bumper2HitCooldown = useRef(0);
 
   // Refs for interactive elements
   const bumper1Ref = useRef(null);
@@ -114,72 +118,83 @@ const Pinball = () => {
   const handleCollision = (ballPosition, radius, velocity) => {
     const ballCircle = { x: ballPosition.x, y: ballPosition.y, radius: radius };
 
-    // Collision with Bumpers
-    if (bumper1Ref.current) {
-      const bumperRect = bumper1Ref.current.getBoundingClientRect();
-      if (isCircleCollidingWithRectangle(ballCircle, bumperRect)) {
-        setScore(prev => prev + BUMPER_SCORE);
+    // Collision with Bumper 1
+    const bumper1 = bumper1Ref.current;
+    if (bumper1) {
+      const bumperRect = bumper1.getBoundingClientRect();
+      if (isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper1HitCooldown.current <= 0) {
+        bumper1.handleCollision();
+        setScore(prev => prev + bumper1.getScoreValue());
         setBallVelocity({ x: -velocity.x * 0.8, y: -velocity.y * 0.8 });
+        setBallPosition(prev => ({
+          x: prev.x + (prev.x < bumperRect.left ? -COLLISION_NUDGE : (prev.x > bumperRect.right ? COLLISION_NUDGE : 0)),
+          y: prev.y + (prev.y < bumperRect.top ? -COLLISION_NUDGE : (prev.y > bumperRect.bottom ? COLLISION_NUDGE : 0)),
+        }));
+        bumper1HitCooldown.current = BUMPER_COOLDOWN_FRAMES;
       }
     }
-    if (bumper2Ref.current) {
-      const bumperRect = bumper2Ref.current.getBoundingClientRect();
-      if (isCircleCollidingWithRectangle(ballCircle, bumperRect)) {
-        setScore(prev => prev + BUMPER_SCORE);
+
+    // Collision with Bumper 2
+    const bumper2 = bumper2Ref.current;
+    if (bumper2) {
+      const bumperRect = bumper2.getBoundingClientRect();
+      if (isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper2HitCooldown.current <= 0) {
+        bumper2.handleCollision();
+        setScore(prev => prev + bumper2.getScoreValue());
         setBallVelocity({ x: -velocity.x * 0.8, y: -velocity.y * 0.8 });
+        setBallPosition(prev => ({
+          x: prev.x + (prev.x < bumperRect.left ? -COLLISION_NUDGE : (prev.x > bumperRect.right ? COLLISION_NUDGE : 0)),
+          y: prev.y + (prev.y < bumperRect.top ? -COLLISION_NUDGE : (prev.y > bumperRect.bottom ? COLLISION_NUDGE : 0)),
+        }));
+        bumper2HitCooldown.current = BUMPER_COOLDOWN_FRAMES;
       }
     }
 
     // Collision with Targets
-    if (target1Ref.current) {
-      const targetRect = target1Ref.current.getBoundingClientRect();
+    const target1 = target1Ref.current;
+    if (target1) {
+      const targetRect = target1.getBoundingClientRect();
       if (isCircleCollidingWithRectangle(ballCircle, targetRect)) {
         setScore(prev => prev + TARGET_SCORE);
-        target1Ref.current.style.opacity = 0.5;
+        target1.style.opacity = 0.5;
         setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.7 }));
       }
     }
-    if (target2Ref.current) {
-      const targetRect = target2Ref.current.getBoundingClientRect();
+
+    const target2 = target2Ref.current;
+    if (target2) {
+      const targetRect = target2.getBoundingClientRect();
       if (isCircleCollidingWithRectangle(ballCircle, targetRect)) {
         setScore(prev => prev + TARGET_SCORE);
-        target2Ref.current.style.opacity = 0.5;
+        target2.style.opacity = 0.5;
         setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.7 }));
       }
     }
 
     // Collision with Flipper
-    if (leftFlipperRef.current) {
-      const flipperRect = {
-        left: leftFlipperRef.current.getBoundingClientRect().left,
-        top: leftFlipperRef.current.getBoundingClientRect().top,
-        right: leftFlipperRef.current.getBoundingClientRect().right,
-        bottom: leftFlipperRef.current.getBoundingClientRect().bottom,
-      };
+    const leftFlipper = leftFlipperRef.current;
+    if (leftFlipper) {
+      const flipperRect = leftFlipper.getBoundingClientRect();
       if (isCircleCollidingWithRectangle(ballCircle, flipperRect) && isLeftFlipperActive) {
         setBallVelocity({ x: Math.abs(velocity.x) + 5, y: -Math.abs(velocity.y) - 10 });
       }
     }
-    if (rightFlipperRef.current) {
-      const flipperRect = {
-        left: rightFlipperRef.current.getBoundingClientRect().left,
-        top: rightFlipperRef.current.getBoundingClientRect().top,
-        right: rightFlipperRef.current.getBoundingClientRect().right,
-        bottom: rightFlipperRef.current.getBoundingClientRect().bottom,
-      };
+
+    const rightFlipper = rightFlipperRef.current;
+    if (rightFlipper) {
+      const flipperRect = rightFlipper.getBoundingClientRect();
       if (isCircleCollidingWithRectangle(ballCircle, flipperRect) && isRightFlipperActive) {
         setBallVelocity({ x: -Math.abs(velocity.x) - 5, y: -Math.abs(velocity.y) - 10 });
       }
     }
 
     // Collision with Ramp (Basic - needs more detailed geometry)
-    if (rampRef.current) {
-      const rampRect = rampRef.current.getBoundingClientRect();
+    const ramp = rampRef.current;
+    if (ramp) {
+      const rampRect = ramp.getBoundingClientRect();
       if (isCircleCollidingWithRectangle(ballCircle, rampRect) && velocity.y > 0) {
-        // Simulate going up the ramp - adjust velocity and maybe position
         setBallVelocity({ x: velocity.x * 0.7, y: -Math.abs(velocity.y) * 0.5 });
-        setBallPosition(prev => ({ ...prev, y: prev.y - 5 })); // Move up slightly
-        // Potentially trigger a state change or score increase for ramp entry
+        setBallPosition(prev => ({ ...prev, y: prev.y - 5 }));
       }
     }
   };
@@ -213,6 +228,13 @@ const Pinball = () => {
           x: prevPosition.x + ballVelocity.x,
           y: prevPosition.y + ballVelocity.y,
         }));
+        // Decrement bumper cooldowns on each frame
+        if (bumper1HitCooldown.current > 0) {
+          bumper1HitCooldown.current -= 1;
+        }
+        if (bumper2HitCooldown.current > 0) {
+          bumper2HitCooldown.current -= 1;
+        }
       });
       return () => cancelAnimationFrame(animationFrameId);
     }
@@ -263,6 +285,8 @@ const Pinball = () => {
     setBallLaunched(false);
     setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
     setBallVelocity({ x: 0, y: 0 });
+    bumper1Ref.current?.resetHitCount(); // Reset bumper 1 hit count on game start
+    bumper2Ref.current?.resetHitCount(); // Reset bumper 2 hit count on game start
   };
 
   const handleFlipperAction = (isLeft) => {
@@ -305,18 +329,35 @@ const Pinball = () => {
         {/* Bottom Right Launcher and Tube */}
         <BallLauncher onLaunch={handlePlungerRelease} right={20} bottom={20} />
         <Tube
-  type="bottom" // Assuming the entrance is at the bottom near the launcher
-  onEntrance={handleTubeEntrance}
-  x={PLAY_AREA_WIDTH - 70} // Adjust x for alignment
-  y={50} // Position the top of the tube closer to the top (adjust as needed)
-  width={40} // Adjust width
-  height={PLAY_AREA_HEIGHT - 220} // Make it extend towards the bottom
-/>
+          type="bottom"
+          onEntrance={handleTubeEntrance}
+          x={PLAY_AREA_WIDTH - 70}
+          y={50}
+          width={40}
+          height={PLAY_AREA_HEIGHT - 220}
+        />
+
         {/* Middle Area Components with refs */}
         <LeftFlipper ref={leftFlipperRef} top={450} left={150} angle={leftFlipperAngle} />
         <RightFlipper ref={rightFlipperRef} top={450} left={400} angle={rightFlipperAngle} />
-        <Bumper ref={bumper1Ref} onCollision={() => {}} x={250} y={150} radius={30} />
-        <Bumper ref={bumper2Ref} onCollision={() => {}} x={550} y={150} radius={30} />
+        <Bumper
+          ref={bumper1Ref}
+          x={250}
+          y={150}
+          radius={30}
+          color="#00ffcc"
+          glowColor="#00aacc"
+          scoreValue={150}
+        />
+        <Bumper
+          ref={bumper2Ref}
+          x={550}
+          y={150}
+          radius={30}
+          color="#ff6699"
+          glowColor="#cc3366"
+          scoreValue={200}
+        />
         <PinballTarget ref={target1Ref} id="target1" size={40} initialTop={100} initialLeft={300} onClick={() => {}} />
         <PinballTarget ref={target2Ref} id="target2" size={40} initialTop={100} initialLeft={500} onClick={() => {}} />
         <Slingshot top={400} left={100} armLength={70} angle={30} />
@@ -327,12 +368,23 @@ const Pinball = () => {
         <PopBumper top={250} left={400} />
         <DropTarget top={150} left={650} />
         <Magnet top={100} left={150} />
-        <Outlane onDrain={handleBallDrain} left={0} top={PLAY_AREA_HEIGHT -80} width={100} height={80} />
+        <Outlane onDrain={handleBallDrain} left={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} />
         <Outlane onDrain={handleBallDrain} right={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} />
         <LaneChange onClick={() => handleLaneChange('left')} left={120} top={PLAY_AREA_HEIGHT - 100} />
         <LaneChange onClick={() => handleLaneChange('right')} left={580} top={PLAY_AREA_HEIGHT - 100} />
 
-        <Ball position={currentBallPosition} radius={BALL_RADIUS} ref={ballRef} velocity={ballVelocity} updateBallPosition={setBallPosition} onCollision={handleCollision} playAreaWidth={PLAY_AREA_WIDTH} playAreaHeight={PLAY_AREA_HEIGHT} friction={0.01} gravity={0.1} />
+        <Ball
+          position={currentBallPosition}
+          radius={BALL_RADIUS}
+          ref={ballRef}
+          velocity={ballVelocity}
+          updateBallPosition={setBallPosition}
+          onCollision={handleCollision}
+          playAreaWidth={PLAY_AREA_WIDTH}
+          playAreaHeight={PLAY_AREA_HEIGHT}
+          friction={0.01}
+          gravity={0.1}
+        />
 
         {/* UI Elements */}
         <Scoreboard score={score} lives={lives} bonus={activeBonus} extraBalls={earnedExtraBalls} top={20} left={20} />
