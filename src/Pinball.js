@@ -40,6 +40,7 @@ import ComboMeter from './components/ComboMeter';
 import Ramp from './components/Ramp';
 import Blocks from './components/Blocks';
 import LaneGuide from './components/LaneGuide';
+import Gate from './components/Gate';
 
 // Constants
 const BALL_RADIUS = 10;
@@ -91,6 +92,8 @@ const Pinball = () => {
   const [isLeftFlipperActive, setIsLeftFlipperActive] = useState(false);
   const [isRightFlipperActive, setIsRightFlipperActive] = useState(false);
   const [ballIsInTube, setBallIsInTube] = useState(false);
+  const [droppedTargets, setDroppedTargets] = useState({}); // Track which targets are dropped { 'target1': true, 'target2': false, ...}
+  const [litRollovers, setLitRollovers] = useState({});
   const bumper1HitCooldown = useRef(0);
   const bumper2HitCooldown = useRef(0);
 
@@ -102,13 +105,23 @@ const bumper1Ref = useRef(null);
   const leftFlipperRef = useRef(null);
   const rightFlipperRef = useRef(null);
   const rampRef = useRef(null);
-  const slingshotLeftRef = useRef(null); // Ref for the left slingshot
+  const slingshotLeftRef = useRef(null);
   const slingshotRightRef = useRef(null);
-    const spinnerRef = useRef(null); // Ref for the spinner
-     const outlaneLeftRef = useRef(null); // Ref for the left outlane
-  const outlaneRightRef = useRef(null); // Ref for the right outlane
-  const kickbackLeftRef = useRef(null); // Ref for the left kickback
-  const kickbackRightRef = useRef(null); // Ref for the right kickback
+  const spinnerRef = useRef(null); // Ref for the spinner
+  const outlaneLeftRef = useRef(null);
+  const outlaneRightRef = useRef(null);
+  const kickbackLeftRef = useRef(null);
+    const kickbackRightRef = useRef(null);
+
+  const skillShotLaneRef = useRef(null); // Ref for the Skill Shot Lane
+  const dropTarget1Ref = useRef(null); // Ref for Drop Target 1
+  const dropTarget2Ref = useRef(null); // Ref for Drop Target 2
+  const dropTarget3Ref = useRef(null); // Ref for Drop Target 3
+  const rolloverARef = useRef(null); // Ref for Rollover A
+  const rolloverBRef = useRef(null); // Ref for Rollover B
+  const rolloverCRef = useRef(null); // Ref for Rollover C
+  const gateRef = useRef(null); // Ref for the Gate component
+
 
   const tubeExitY = tubeEntranceY + tubeHeight;
   const isLaneChangeAllowed = true;
@@ -146,54 +159,53 @@ const bumper1Ref = useRef(null);
     const bumper1 = bumper1Ref.current;
     if (bumper1) {
       const bumperRect = bumper1.getBoundingClientRect();
-      if (isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper1HitCooldown.current <= 0) {
+      if (bumperRect && isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper1HitCooldown.current <= 0) {
         bumper1.handleCollision();
         setScore(prev => prev + bumper1.getScoreValue());
-        setBallVelocity({ x: -velocity.x * 0.8, y: -velocity.y * 0.8 });
-        setBallPosition(prev => ({
-          x: prev.x + (prev.x < bumperRect.left ? -COLLISION_NUDGE : (prev.x > bumperRect.right ? COLLISION_NUDGE : 0)),
-          y: prev.y + (prev.y < bumperRect.top ? -COLLISION_NUDGE : (prev.y > bumperRect.bottom ? COLLISION_NUDGE : 0)),
-        }));
+        const newVelocity = { x: -velocity.x * 0.8, y: -velocity.y * 0.8 };
+        setBallVelocity(newVelocity);
+        const nudgeX = ballPosition.x < bumperRect.left ? -COLLISION_NUDGE : (ballPosition.x > bumperRect.right ? COLLISION_NUDGE : 0);
+        const nudgeY = ballPosition.y < bumperRect.top ? -COLLISION_NUDGE : (ballPosition.y > bumperRect.bottom ? COLLISION_NUDGE : 0);
+        const newPosition = { x: ballPosition.x + nudgeX, y: ballPosition.y + nudgeY };
+        setBallPosition(newPosition);
         bumper1HitCooldown.current = BUMPER_COOLDOWN_FRAMES;
       }
     }
-
     // Collision with Bumper 2
     const bumper2 = bumper2Ref.current;
     if (bumper2) {
       const bumperRect = bumper2.getBoundingClientRect();
-      if (isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper2HitCooldown.current <= 0) {
+      if (bumperRect && isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper2HitCooldown.current <= 0) {
         bumper2.handleCollision();
         setScore(prev => prev + bumper2.getScoreValue());
-        setBallVelocity({ x: -velocity.x * 0.8, y: -velocity.y * 0.8 });
-        setBallPosition(prev => ({
-          x: prev.x + (prev.x < bumperRect.left ? -COLLISION_NUDGE : (prev.x > bumperRect.right ? COLLISION_NUDGE : 0)),
-          y: prev.y + (prev.y < bumperRect.top ? -COLLISION_NUDGE : (prev.y > bumperRect.bottom ? COLLISION_NUDGE : 0)),
-        }));
+        const newVelocity = { x: -velocity.x * 0.8, y: -velocity.y * 0.8 };
+        setBallVelocity(newVelocity);
+        const nudgeX = ballPosition.x < bumperRect.left ? -COLLISION_NUDGE : (ballPosition.x > bumperRect.right ? COLLISION_NUDGE : 0);
+        const nudgeY = ballPosition.y < bumperRect.top ? -COLLISION_NUDGE : (ballPosition.y > bumperRect.bottom ? COLLISION_NUDGE : 0);
+        const newPosition = { x: ballPosition.x + nudgeX, y: ballPosition.y + nudgeY };
+        setBallPosition(newPosition);
         bumper2HitCooldown.current = BUMPER_COOLDOWN_FRAMES;
       }
     }
-
     // Collision with Targets
     const target1 = target1Ref.current;
     if (target1) {
       const targetRect = target1.getBoundingClientRect();
       if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
-        target1.handleCollision(); // Trigger the target's hit logic
+        target1.handleCollision();
         setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.7 }));
       }
     }
-
     // Collision with Target 2
     const target2 = target2Ref.current;
     if (target2) {
       const targetRect = target2.getBoundingClientRect();
       if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
-        target2.handleCollision(); // Trigger the target's hit logic
+        target2.handleCollision();
         setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.7 }));
       }
-    }
-    // Collision with Flipper
+    }// Collision with Flipper
+
     const leftFlipper = leftFlipperRef.current;
     if (leftFlipper) {
       const flipperRect = leftFlipper.getBoundingClientRect();
@@ -225,12 +237,121 @@ const bumper1Ref = useRef(null);
       if (spinnerRect && isCircleCollidingWithRectangle(ballCircle, spinnerRect)) {
         const score = spinner.handleCollision(velocity);
         setScore(prev => prev + score);
-        // You might want to adjust the ball's velocity upon hitting the spinner
         setBallVelocity(prev => ({ ...prev, x: -prev.x * 0.6, y: -prev.y * 0.6 }));
       }
     }
+const kickbackLeft = kickbackLeftRef.current;
+    if (kickbackLeft) {
+      const kickbackRect = kickbackLeft.getBoundingClientRect();
+      if (kickbackRect && isCircleCollidingWithRectangle(ballCircle, kickbackRect)) {
+        // Kickback's handleCollision needs ballPosition and radius
+        const impulse = kickbackLeft.handleCollision(ballPosition, radius);
+        if (impulse) {
+          setBallVelocity(impulse);
+        }
+      }
+    }
+
+    const skillShotLane = skillShotLaneRef.current;
+    if (skillShotLane) {
+      // SkillShotLane's handleCollision needs ballPosition and radius
+      const score = skillShotLane.handleCollision(ballPosition, radius);
+      if (score > 0) {
+        setScore(prev => prev + score);
+        setBallVelocity(prev => ({ ...prev, y: prev.y * 0.8 }));
+      }
+    }
+
+     const dropTargetRefs = [dropTarget1Ref, dropTarget2Ref, dropTarget3Ref];
+    dropTargetRefs.forEach(dtRef => {
+      const dropTarget = dtRef.current;
+      if (dropTarget) {
+        const dropTargetRect = dropTarget.getBoundingClientRect();
+        if (dropTargetRect && isCircleCollidingWithRectangle(ballCircle, dropTargetRect)) {
+          // The handleCollision method on DropTarget will call onHit, which updates score and state
+          dropTarget.handleCollision();
+          setBallVelocity(prev => ({ x: prev.x * 0.9, y: -prev.y * 0.8 }));
+        }
+      }
+    });
+
+    const rolloverRefs = [rolloverARef, rolloverBRef, rolloverCRef];
+    rolloverRefs.forEach(rlRef => {
+      const rollover = rlRef.current;
+      if (rollover) {
+        const rolloverRect = rollover.getBoundingClientRect();
+        if (rolloverRect && isCircleCollidingWithRectangle(ballCircle, rolloverRect)) {
+          // The handleCollision method on Rollover will call onRollOver, which updates score and state
+          rollover.handleCollision();
+          setBallVelocity(prev => ({ x: prev.x * 0.9, y: prev.y * 0.9 })); // Slight dampening
+        }
+      }
+    });
+
+    const gate = gateRef.current;
+    if (gate) {
+      const gateRect = gate.getBoundingClientRect();
+      if (gateRect && isCircleCollidingWithRectangle(ballCircle, gateRect)) {
+        const currentIsOpen = gate.getIsOpen();
+        const passageDirection = gate.props.passageDirection;
+
+        let collisionHandled = false;
+
+        if (currentIsOpen) {
+          // If gate is open, allow passage in the designated direction
+          if (passageDirection === 'right' && velocity.x > 0) { collisionHandled = true; }
+          else if (passageDirection === 'left' && velocity.x < 0) { collisionHandled = true; }
+          else if (passageDirection === 'down' && velocity.y > 0) { collisionHandled = true; }
+          else if (passageDirection === 'up' && velocity.y < 0) { collisionHandled = true; }
+
+          // If trying to go against the open gate or other directions, treat as a normal wall bounce
+          if (!collisionHandled) {
+             setBallVelocity(prev => ({ x: -prev.x * 0.7, y: -prev.y * 0.7 }));
+             collisionHandled = true;
+          }
+        } else { // Gate is closed
+          // If gate is closed, block passage against its one-way nature
+          if (passageDirection === 'right' && velocity.x < 0) { // Trying to pass from right to left (blocked)
+              setBallVelocity(prev => ({ x: -prev.x * 0.7, y: prev.y * 0.7 })); // Bounce horizontally
+              collisionHandled = true;
+          } else if (passageDirection === 'left' && velocity.x > 0) { // Trying to pass from left to right (blocked)
+              setBallVelocity(prev => ({ x: -prev.x * 0.7, y: prev.y * 0.7 })); // Bounce horizontally
+              collisionHandled = true;
+          } else if (passageDirection === 'down' && velocity.y < 0) { // Trying to pass from bottom to top (blocked)
+              setBallVelocity(prev => ({ x: prev.x * 0.7, y: -prev.y * 0.7 })); // Bounce vertically
+              collisionHandled = true;
+          } else if (passageDirection === 'up' && velocity.y > 0) { // Trying to pass from top to bottom (blocked)
+              setBallVelocity(prev => ({ x: prev.x * 0.7, y: -prev.y * 0.7 })); // Bounce vertically
+              collisionHandled = true;
+          } else {
+              // If moving in the allowed direction when closed (which shouldn't happen unless gate design is tricky),
+              // or any other direction, it's a hard bounce as it's a blocking wall.
+              setBallVelocity(prev => ({ x: -prev.x * 0.7, y: -prev.y * 0.7 })); // General bounce
+              collisionHandled = true;
+          }
+        }
+        // Important: Nudge the ball slightly out of the gate's collision area if it's blocking
+        if (collisionHandled && !currentIsOpen) { // Only nudge if it acted as a blocker
+            // Determine the direction of the nudge more accurately based on collision side
+            let nudgeX = 0;
+            let nudgeY = 0;
+
+            if (ballPosition.x < gateRect.left + radius && velocity.x > 0) nudgeX = -COLLISION_NUDGE;
+            else if (ballPosition.x > gateRect.right - radius && velocity.x < 0) nudgeX = COLLISION_NUDGE;
+
+            if (ballPosition.y < gateRect.top + radius && velocity.y > 0) nudgeY = -COLLISION_NUDGE;
+            else if (ballPosition.y > gateRect.bottom - radius && velocity.y < 0) nudgeY = COLLISION_NUDGE;
+
+            // If a nudge was calculated, apply it
+            if (nudgeX !== 0 || nudgeY !== 0) {
+              setBallPosition(prev => ({ x: prev.x + nudgeX, y: prev.y + nudgeY }));
+            }
+        }
+      }
+    }
   
-  };
+
+  }
 
   const handleOutOfBounds = (ballPosition) => {
     if (ballPosition.y > PLAY_AREA_HEIGHT + BALL_RADIUS * 2) {
@@ -335,12 +456,24 @@ const bumper1Ref = useRef(null);
     setBallLaunched(false);
     setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
     setBallVelocity({ x: 0, y: 0 });
-    bumper1Ref.current?.resetHitCount(); // Reset bumper 1 hit count on game start
-    bumper2Ref.current?.resetHitCount(); // Reset bumper 2 hit count on game start
-    target1Ref.current?.resetTarget(); // Reset target 1 on game start
-    target2Ref.current?.resetTarget(); // Reset target 2 on game start
-  
+    bumper1Ref.current?.resetHitCount();
+    bumper2Ref.current?.resetHitCount();
+    target1Ref.current?.resetTarget();
+    target2Ref.current?.resetTarget();
+    skillShotLaneRef.current?.activateSkillShot();
+    dropTarget1Ref.current?.resetTarget();
+    dropTarget2Ref.current?.resetTarget();
+    dropTarget3Ref.current?.resetTarget();
+    setDroppedTargets({});
+    rolloverARef.current?.resetLight();
+    rolloverBRef.current?.resetLight();
+    rolloverCRef.current?.resetLight();
+    setLitRollovers({});
+
+    // Ensure gate is closed at the start of the game
+    gateRef.current?.close();
   };
+
 
   const handleFlipperAction = (isLeft) => {
     const angleSpeed = 20;
@@ -372,6 +505,81 @@ const bumper1Ref = useRef(null);
       setRightFlipperAngle(prev => Math.max(0, prev - 5));
     }
   }, [isRightFlipperActive, rightFlipperAngle]);
+
+   const gate = gateRef.current;
+    if (gate) {
+      const gateRect = gate.getBoundingClientRect();
+      // Ensure gateRect is valid before proceeding
+      if (gateRect && isCircleCollidingWithRectangle(ballCircle, gateRect)) {
+        const currentIsOpen = gate.getIsOpen();
+        const passageDirection = gate.props.passageDirection; // Access prop directly from ref.props
+
+        let collisionHandled = false;
+
+        if (currentIsOpen) {
+          // If gate is open, allow passage in the designated direction
+          // This typically means no collision response in the allowed direction,
+          // but a bounce if trying to pass against the open gate.
+          if (passageDirection === 'right' && velocity.x > 0) {
+            // Allow passage, no bounce
+            collisionHandled = true;
+          } else if (passageDirection === 'left' && velocity.x < 0) {
+            // Allow passage, no bounce
+            collisionHandled = true;
+          } else if (passageDirection === 'down' && velocity.y > 0) {
+            // Allow passage, no bounce
+            collisionHandled = true;
+          } else if (passageDirection === 'up' && velocity.y < 0) {
+            // Allow passage, no bounce
+            collisionHandled = true;
+          }
+          // If trying to go against the open gate or other directions, treat as a normal wall bounce
+          if (!collisionHandled) {
+             setBallVelocity(prev => ({ x: -prev.x * 0.7, y: -prev.y * 0.7 }));
+             collisionHandled = true;
+          }
+        } else { // Gate is closed
+          // If gate is closed, allow passage only in the designated direction
+          // Otherwise, it's a block/bounce
+          if (passageDirection === 'right' && velocity.x < 0) { // Trying to pass from right to left
+              setBallVelocity(prev => ({ x: -prev.x * 0.7, y: prev.y * 0.7 })); // Bounce horizontally
+              collisionHandled = true;
+          } else if (passageDirection === 'left' && velocity.x > 0) { // Trying to pass from left to right
+              setBallVelocity(prev => ({ x: -prev.x * 0.7, y: prev.y * 0.7 })); // Bounce horizontally
+              collisionHandled = true;
+          } else if (passageDirection === 'down' && velocity.y < 0) { // Trying to pass from bottom to top
+              setBallVelocity(prev => ({ x: prev.x * 0.7, y: -prev.y * 0.7 })); // Bounce vertically
+              collisionHandled = true;
+          } else if (passageDirection === 'up' && velocity.y > 0) { // Trying to pass from top to bottom
+              setBallVelocity(prev => ({ x: prev.x * 0.7, y: -prev.y * 0.7 })); // Bounce vertically
+              collisionHandled = true;
+          } else {
+              // If moving in the allowed direction when closed, or any other direction,
+              // it's a hard bounce as it's a blocking wall.
+              setBallVelocity(prev => ({ x: -prev.x * 0.7, y: -prev.y * 0.7 })); // General bounce
+              collisionHandled = true;
+          }
+        }
+        // Important: Nudge the ball slightly out of the gate's collision area if it's blocking
+        if (collisionHandled && !currentIsOpen) { // Only nudge if it acted as a blocker
+            const nudgeX = ballPosition.x < gateRect.left ? -COLLISION_NUDGE : (ballPosition.x > gateRect.right ? COLLISION_NUDGE : 0);
+            const nudgeY = ballPosition.y < gateRect.top ? -COLLISION_NUDGE : (ballPosition.y > gateRect.bottom ? COLLISION_NUDGE : 0);
+            setBallPosition(prev => ({ x: prev.x + nudgeX, y: prev.y + nudgeY }));
+        }
+      }
+    }
+
+    useEffect(() => {
+    if (score >= 10000 && gateRef.current && !gateRef.current.getIsOpen()) {
+      console.log("Score reached 10000, opening gate!");
+      gateRef.current.open();
+    } else if (score < 10000 && gateRef.current && gateRef.current.getIsOpen()) {
+      // You might want to close it back if the score drops, or keep it open
+      // For this example, let's keep it open once reached
+      // gateRef.current.close();
+    }
+  }, [score]);
+
 
   return (
     <Container>
@@ -468,6 +676,17 @@ const bumper1Ref = useRef(null);
         <Kickback ref={kickbackLeftRef} bottom={PLAY_AREA_HEIGHT - 120} left={20} angle={30} onKickback={() => setScore(prev => prev + 100)} />
         {/* You might have a kickback on the other side as well */}
          <Kickback ref={kickbackRightRef} bottom={PLAY_AREA_HEIGHT - 120} left={PLAY_AREA_WIDTH - 40} angle={-30} onKickback={() => setScore(prev => prev + 100)} />
+          <Gate
+          ref={gateRef}
+          top={350} // Adjust position as needed
+          left={150} // Adjust position as needed
+          width={5} // Thin bar
+          height={40} // Vertical bar
+          pivotX={0} // Hinge at the left edge
+          pivotY={0} // Hinge at the top
+          initialIsOpen={false}
+          passageDirection="right" // Ball can pass right-to-left when open, blocked otherwise
+        />
       </PinballGame>
     </Container>
   );
