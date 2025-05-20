@@ -43,7 +43,7 @@ import LaneGuide from './components/LaneGuide';
 import Gate from './components/Gate';
 
 // Constants
-const BALL_RADIUS = 10;
+const radius = 10;
 const PLAY_AREA_WIDTH = 800;
 const PLAY_AREA_HEIGHT = 600;
 const INITIAL_BALL_X = PLAY_AREA_WIDTH * 0.75;
@@ -414,7 +414,7 @@ const bumper1Ref = useRef(null);
     if (lives > 0) {
       // Check if kickback can save the ball (example: only on the first drain)
       if (lives === 3 && kickbackLeftRef.current && ballPosition.x < PLAY_AREA_WIDTH * 0.2) {
-        const impulse = kickbackLeftRef.current.handleCollision(ballPosition, BALL_RADIUS);
+        const impulse = kickbackLeftRef.current.handleCollision(ballPosition, radius);
         if (impulse) {
           setBallVelocity(impulse);
           setBallLaunched(true); // Ensure the game loop continues
@@ -447,10 +447,10 @@ const bumper1Ref = useRef(null);
       setBallPosition(prev => ({ ...prev, y: prev.y - 5 }));
       if (ballPosition.y <= tubeEntranceY - tubeHeight) { // Exit at the top
         setBallIsInTube(false);
-        setBallPosition(prev => ({ ...prev, x: tubeEntranceX + tubeWidth / 2, y: tubeEntranceY - tubeHeight - BALL_RADIUS * 2 }));
+        setBallPosition(prev => ({ ...prev, x: tubeEntranceX + tubeWidth / 2, y: tubeEntranceY - tubeHeight - radius * 2 }));
         setBallVelocity({ x: 5, y: 10 }); // Example exit velocity
       }
-    } else if (ballLaunched && ballPosition.x >= tubeEntranceX && ballPosition.x <= tubeEntranceX + tubeWidth && ballPosition.y + BALL_RADIUS >= tubeEntranceY && ballPosition.y - BALL_RADIUS <= tubeEntranceY + tubeHeight / 2) {
+    } else if (ballLaunched && ballPosition.x >= tubeEntranceX && ballPosition.x <= tubeEntranceX + tubeWidth && ballPosition.y + radius >= tubeEntranceY && ballPosition.y - radius <= tubeEntranceY + tubeHeight / 2) {
       setBallIsInTube(true);
     }
   }, [ballLaunched, ballPosition, tubeEntranceX, tubeEntranceY, tubeWidth, tubeHeight, ballIsInTube]);
@@ -527,16 +527,16 @@ const bumper1Ref = useRef(null);
           // If gate is open, allow passage in the designated direction
           // This typically means no collision response in the allowed direction,
           // but a bounce if trying to pass against the open gate.
-          if (passageDirection === 'right' && velocity.x > 0) {
+          if (passageDirection === 'right' && ballVelocity.x > 0) {
             // Allow passage, no bounce
             collisionHandled = true;
-          } else if (passageDirection === 'left' && velocity.x < 0) {
+          } else if (passageDirection === 'left' && ballVelocity.x < 0) {
             // Allow passage, no bounce
             collisionHandled = true;
-          } else if (passageDirection === 'down' && velocity.y > 0) {
+          } else if (passageDirection === 'down' && ballVelocity.y > 0) {
             // Allow passage, no bounce
             collisionHandled = true;
-          } else if (passageDirection === 'up' && velocity.y < 0) {
+          } else if (passageDirection === 'up' && ballVelocity.y < 0) {
             // Allow passage, no bounce
             collisionHandled = true;
           }
@@ -548,16 +548,16 @@ const bumper1Ref = useRef(null);
         } else { // Gate is closed
           // If gate is closed, allow passage only in the designated direction
           // Otherwise, it's a block/bounce
-          if (passageDirection === 'right' && velocity.x < 0) { // Trying to pass from right to left
+          if (passageDirection === 'right' && ballVelocity.x < 0) { // Trying to pass from right to left
               setBallVelocity(prev => ({ x: -prev.x * 0.7, y: prev.y * 0.7 })); // Bounce horizontally
               collisionHandled = true;
-          } else if (passageDirection === 'left' && velocity.x > 0) { // Trying to pass from left to right
+          } else if (passageDirection === 'left' && ballVelocity.x > 0) { // Trying to pass from left to right
               setBallVelocity(prev => ({ x: -prev.x * 0.7, y: prev.y * 0.7 })); // Bounce horizontally
               collisionHandled = true;
-          } else if (passageDirection === 'down' && velocity.y < 0) { // Trying to pass from bottom to top
+          } else if (passageDirection === 'down' && ballVelocity.y < 0) { // Trying to pass from bottom to top
               setBallVelocity(prev => ({ x: prev.x * 0.7, y: -prev.y * 0.7 })); // Bounce vertically
               collisionHandled = true;
-          } else if (passageDirection === 'up' && velocity.y > 0) { // Trying to pass from top to bottom
+          } else if (passageDirection === 'up' && ballVelocity.y > 0) { // Trying to pass from top to bottom
               setBallVelocity(prev => ({ x: prev.x * 0.7, y: -prev.y * 0.7 })); // Bounce vertically
               collisionHandled = true;
           } else {
@@ -662,7 +662,7 @@ const bumper1Ref = useRef(null);
 
         <Ball
           position={ballPosition}
-          radius={BALL_RADIUS}
+          radius={radius}
           ref={ballRef}
           velocity={ballVelocity}
           updateBallPosition={setBallPosition}
