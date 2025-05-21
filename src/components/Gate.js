@@ -34,10 +34,10 @@ const Gate = React.forwardRef(({
   left,
   width = 5,
   height = 40,
-  pivotX = 0, // Pivot point relative to the gate's top-left corner
+  pivotX = 0,
   pivotY = 0,
-  initialIsOpen = false, // Initial state of the gate
-  passageDirection = 'right' // 'up', 'down', 'left', 'right' - direction ball can pass through
+  initialIsOpen = false,
+  passageDirection = 'right'
 }, ref) => {
   const [isOpen, setIsOpen] = useState(initialIsOpen);
   const [isAnimatingOpen, setIsAnimatingOpen] = useState(false);
@@ -78,11 +78,19 @@ const Gate = React.forwardRef(({
       if (gateRef.current) {
         return gateRef.current.getBoundingClientRect();
       }
-      return null; // Return null if ref is not attached
+      // --- FIX: Return a default, non-colliding DOMRect when the ref is not attached ---
+      // This ensures that getBoundingClientRect always returns a valid object,
+      // preventing potential infinite loops if consumers expect a DOMRect.
+      // Make sure its dimensions are small or outside the active playfield
+      // if it's not meant to collide when not mounted.
+      return {
+        x: 0, y: 0, width: 0, height: 0,
+        top: 0, right: 0, bottom: 0, left: 0 // Explicitly define all properties of a DOMRect
+     };
     },
-    // We can add a canBallPass method here, but it's better handled in Pinball.js
-    // as it needs ball velocity and gate state.
+    // ... (other exposed methods) ...
   }));
+
 
   return (
     <GateElement

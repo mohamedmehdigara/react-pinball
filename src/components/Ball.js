@@ -1,112 +1,59 @@
-import React, { useRef, useEffect } from 'react';
+// src/components/Ball.js
+import React, { useRef, useImperativeHandle } from 'react';
+import styled from 'styled-components';
 import PropTypes from 'prop-types';
-import styled, { keyframes } from 'styled-components';
-
-const shine = keyframes`
-  0% {
-    box-shadow: 0 0 5px rgba(255, 255, 255, 0.1);
-  }
-  50% {
-    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
-  }
-  100% {
-    box-shadow: 0 0 5px rgba(255, 255, 255, 0.1);
-  }
-`;
 
 const StyledBall = styled.div`
   position: absolute;
-  left: ${props => props.x}px;
-  top: ${props => props.y}px;
-  width: ${props => props.radius * 2}px;
-  height: ${props => props.radius * 2}px;
+  width: ${props => props.size * 2}px; // Diameter
+  height: ${props => props.size * 2}px; // Diameter
+  background-color: silver;
   border-radius: 50%;
-  background-image: radial-gradient(circle at 40% 40%, #eee, #bbb 60%, #888);
-  box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.5);
-  transition: transform 0.05s linear;
-  animation: ${shine} 2s infinite alternate;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 15%;
-    left: 15%;
-    width: 25%;
-    height: 25%;
-    background: rgba(255, 255, 255, 0.4);
-    border-radius: 50%;
-    filter: blur(2px);
-  }
+  box-shadow: inset -3px -3px 5px rgba(0, 0, 0, 0.4),
+              3px 3px 5px rgba(255, 255, 255, 0.6);
+  left: ${props => props.x - props.size}px; // Adjust for center positioning
+  top: ${props => props.y - props.size}px; // Adjust for center positioning
+  z-index: 100; // Ensure ball is on top
 `;
 
-const Ball = React.forwardRef(({ position, velocity, radius, updateBallPosition, onCollision, playAreaWidth, playAreaHeight, friction = 0.01, gravity = 0.1 }, ref) => {
-  const ballRef = useRef(null);
+const Ball = React.forwardRef(({
+  position, // Received as { x, y }
+  radius,   // Received as a number
+}, ref) => {
+  const ballElementRef = useRef(null);
 
-  useEffect(() => {
-    let animationFrameId;
-    let currentVelocity = { ...velocity };
-    let currentPosition = { ...position };
-
-    const gameLoop = () => {
-      if (!ballRef.current) return;
-
-      currentVelocity.y += gravity;
-
-      const speed = Math.sqrt(currentVelocity.x ** 2 + currentVelocity.y ** 2);
-      if (speed > 0.1) { // Reduced threshold for stopping
-        currentVelocity.x *= (1 - friction);
-        currentVelocity.y *= (1 - friction);
-      } else {
-        currentVelocity.x = 0;
-        currentVelocity.y = 0;
+  // Expose getBoundingClientRect if needed, but for a perfect circle,
+  // position and radius are often enough for collision in parent.
+  useImperativeHandle(ref, () => ({
+    getBoundingClientRect: () => {
+      if (ballElementRef.current) {
+        return ballElementRef.current.getBoundingClientRect();
       }
-
-      const newPosition = {
-        x: currentPosition.x + currentVelocity.x,
-        y: currentPosition.y + currentVelocity.y,
+      // Provide a sensible fallback if the ref is not attached yet
+      // This is crucial to prevent "maximum call stack size exceeded" errors
+      // if something tries to get the rect before render.
+      return {
+        x: position.x - radius,
+        y: position.y - radius,
+        width: radius * 2,
+        height: radius * 2,
+        top: position.y - radius,
+        right: position.x + radius,
+        bottom: position.y + radius,
+        left: position.x - radius,
       };
-
-      const COR = 0.8;
-
-      if (newPosition.y - radius < 0) {
-        newPosition.y = radius;
-        currentVelocity.y *= -COR;
-      } else if (newPosition.y + radius > playAreaHeight) {
-        newPosition.y = playAreaHeight - radius;
-        currentVelocity.y *= -COR;
-      }
-
-      if (newPosition.x - radius < 0) {
-        newPosition.x = radius;
-        currentVelocity.x *= -COR;
-      } else if (newPosition.x + radius > playAreaWidth) {
-        newPosition.x = playAreaWidth - radius;
-        currentVelocity.x *= -COR;
-      }
-
-      currentPosition = newPosition;
-      updateBallPosition(currentPosition);
-
-      if (onCollision) {
-        onCollision(currentPosition, radius, currentVelocity);
-      }
-
-      animationFrameId = requestAnimationFrame(gameLoop);
-    };
-
-    animationFrameId = requestAnimationFrame(gameLoop);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [position, velocity, radius, updateBallPosition, onCollision, playAreaWidth, playAreaHeight, friction, gravity]);
+    },
+    // You might also expose the current position and radius if other components need it
+    // getPosition: () => position,
+    // getRadius: () => radius,
+  }));
 
   return (
     <StyledBall
-      ref={ballRef}
-      x={position.x - radius}
-      y={position.y - radius}
-      radius={radius}
+      ref={ballElementRef}
+      x={position.x}
+      y={position.y}
+      size={radius}
     />
   );
 });
@@ -116,17 +63,7 @@ Ball.propTypes = {
     x: PropTypes.number.isRequired,
     y: PropTypes.number.isRequired,
   }).isRequired,
-  velocity: PropTypes.shape({
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-  }).isRequired,
   radius: PropTypes.number.isRequired,
-  updateBallPosition: PropTypes.func.isRequired,
-  onCollision: PropTypes.func,
-  playAreaWidth: PropTypes.number.isRequired,
-  playAreaHeight: PropTypes.number.isRequired,
-  friction: PropTypes.number,
-  gravity: PropTypes.number,
 };
 
 export default Ball;
