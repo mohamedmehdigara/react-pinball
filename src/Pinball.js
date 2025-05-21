@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
@@ -56,6 +56,8 @@ const FLIPPER_HEIGHT = 20;
 const FLIPPER_WIDTH = 80;
 const COLLISION_NUDGE = 5;
 const BUMPER_COOLDOWN_FRAMES = 10;
+const TARGET_BANK_BONUS_SCORE = 10000; // Bonus for completing the target bank
+const TARGET_BANK_TIMEOUT = 10000; 
 
 const Container = styled.div`
   display: flex;
@@ -94,6 +96,7 @@ const Pinball = () => {
   const [ballIsInTube, setBallIsInTube] = useState(false);
   const [droppedTargets, setDroppedTargets] = useState({}); // Track which targets are dropped { 'target1': true, 'target2': false, ...}
   const [litRollovers, setLitRollovers] = useState({});
+  const [activeTargetInBank, setActiveTargetInBank] = useState(0);
   const bumper1HitCooldown = useRef(0);
   const bumper2HitCooldown = useRef(0);
 
@@ -121,7 +124,12 @@ const bumper1Ref = useRef(null);
   const rolloverBRef = useRef(null); // Ref for Rollover B
   const rolloverCRef = useRef(null); // Ref for Rollover C
   const gateRef = useRef(null); // Ref for the Gate component
-
+  const variableTarget1Ref = useRef(null);
+  const variableTarget2Ref = useRef(null);
+  const variableTarget3Ref = useRef(null);
+  const variableTarget4Ref = useRef(null);
+  const targetBankTimeoutRef = useRef(null);
+ 
 
   const tubeExitY = tubeEntranceY + tubeHeight;
   const isLaneChangeAllowed = true;
@@ -373,6 +381,30 @@ const bumper1Ref = useRef(null);
         }
       }
     }
+
+    const variableTargetRefs = [
+      variableTarget1Ref,
+      variableTarget2Ref,
+      variableTarget3Ref,
+      variableTarget4Ref // Include if using 4th target
+    ];
+    variableTargetRefs.forEach(vtRef => {
+      const variableTarget = vtRef.current;
+      if (variableTarget) {
+        const targetRect = variableTarget.getBoundingClientRect();
+        if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
+          // Call the target's collision handler, which will internally check isHit state
+          // and then call handleVariableTargetHit if not already hit.
+          const scoreAwarded = variableTarget.handleCollision(); // handleCollision now returns score
+          if (scoreAwarded > 0) {
+            // No need to setScore here, handleVariableTargetHit already does
+            // setScore(prev => prev + scoreAwarded);
+            setBallVelocity(prev => ({ x: prev.x * 0.9, y: -prev.y * 0.8 })); // Bounce
+          }
+        }
+      }
+    });
+
   };
 
 
@@ -455,7 +487,7 @@ const bumper1Ref = useRef(null);
     }
   }, [ballLaunched, ballPosition, tubeEntranceX, tubeEntranceY, tubeWidth, tubeHeight, ballIsInTube]);
 
-  const handleGameStart = () => {
+ const handleGameStart = () => {
     console.log('Game started!');
     setGameOver(false);
     setScore(0);
@@ -465,8 +497,8 @@ const bumper1Ref = useRef(null);
     setBallVelocity({ x: 0, y: 0 });
     bumper1Ref.current?.resetHitCount();
     bumper2Ref.current?.resetHitCount();
-    target1Ref.current?.resetTarget();
-    target2Ref.current?.resetTarget();
+    target1Ref.current?.resetTarget(); // Regular targets
+    target2Ref.current?.resetTarget(); // Regular targets
     skillShotLaneRef.current?.activateSkillShot();
     dropTarget1Ref.current?.resetTarget();
     dropTarget2Ref.current?.resetTarget();
@@ -476,9 +508,10 @@ const bumper1Ref = useRef(null);
     rolloverBRef.current?.resetLight();
     rolloverCRef.current?.resetLight();
     setLitRollovers({});
-
-    // Ensure gate is closed at the start of the game
     gateRef.current?.close();
+
+    // Reset the variable target bank on game start
+    resetVariableTargetBank();
   };
 
 
@@ -588,6 +621,92 @@ const bumper1Ref = useRef(null);
   }, [score]);
 
 
+   const handleVariableTargetHit = useCallback((id, score) => {
+    setScore(prev => prev + score);
+    console.log(`Variable Target ${id} hit! Score: ${score}`);
+
+    // Logic to advance the bank sequence
+    const targets = [
+      variableTarget1Ref.current,
+      variableTarget2Ref.current,
+      variableTarget3Ref.current,
+      variableTarget4Ref.current // Include if using 4th target
+    ].filter(Boolean); // Filter out any null refs
+
+    const hitIndex = targets.findIndex(target => target?.id === id);
+
+    if (hitIndex !== -1) {
+      if (hitIndex === activeTargetInBank) {
+        // Correct target hit: advance the sequence
+        // Dim the previously active target
+        if (targets[activeTargetInBank]) {
+          targets[activeTargetInBank].dimTarget();
+        }
+
+        // Light up the next target
+        const nextActiveIndex = activeTargetInBank + 1;
+        if (nextActiveIndex < targets.length) {
+          targets[nextActiveIndex].lightTarget();
+          setActiveTargetInBank(nextActiveIndex);
+          // Reset the timeout whenever a correct target is hit
+          clearTimeout(targetBankTimeoutRef.current);
+          targetBankTimeoutRef.current = setTimeout(resetVariableTargetBank, TARGET_BANK_TIMEOUT);
+        } else {
+          // All targets in the bank completed!
+          setScore(prev => prev + TARGET_BANK_BONUS_SCORE);
+          console.log("Variable Target Bank completed! Awarding bonus and resetting.");
+          resetVariableTargetBank(); // Reset after completion
+        }
+      } else {
+        // Wrong target hit or hit an already completed/unlit target in sequence
+        // You could add a penalty or just do nothing, or reset the bank.
+        console.log(`Incorrect target ${id} hit. Expected target ${targets[activeTargetInBank]?.id || 'N/A'}`);
+        // Optional: reset the bank if an incorrect target is hit
+        // resetVariableTargetBank();
+      }
+    }
+  }, [activeTargetInBank]); // activeTargetInBank is a dependency here
+
+
+   const resetVariableTargetBank = useCallback(() => {
+    console.log("Resetting variable target bank.");
+    clearTimeout(targetBankTimeoutRef.current); // Clear any existing timeout
+
+    const targets = [
+      variableTarget1Ref.current,
+      variableTarget2Ref.current,
+      variableTarget3Ref.current,
+      variableTarget4Ref.current
+    ].filter(Boolean);
+
+    targets.forEach(target => target.dimTarget()); // Dim all targets
+    setActiveTargetInBank(0); // Reset sequence to start
+
+    // Light the first target to begin the sequence again
+    if (targets[0]) {
+      targets[0].lightTarget();
+      setActiveTargetInBank(0); // Set first target as active
+      // Start the timeout again
+      targetBankTimeoutRef.current = setTimeout(resetVariableTargetBank, TARGET_BANK_TIMEOUT);
+    }
+  }, []); // No dependencies as it operates on refs
+
+  // Effect to initialize the target bank when the game starts or component mounts
+  useEffect(() => {
+    // Only initialize if not already active
+    if (!ballLaunched && !gameOver && activeTargetInBank === 0) {
+      resetVariableTargetBank(); // This will light the first target and start the timer
+    }
+
+    // Cleanup function for the timeout
+    return () => {
+      clearTimeout(targetBankTimeoutRef.current);
+    };
+  }, [ballLaunched, gameOver, resetVariableTargetBank]); // Run when game starts/ends or reset callback changes
+
+
+
+
   return (
     <Container>
       <PinballGame onKeyDown={(e) => {
@@ -636,16 +755,49 @@ const bumper1Ref = useRef(null);
           scoreValue={250} // Set a specific score value
           resetDelay={5000} // Reset after 5 seconds
         />
-        <PinballTarget
-          ref={target2Ref}
-          id="target2"
+       <PinballTarget
+          ref={variableTarget1Ref}
+          id="VT1"
           size={40}
-          initialTop={100}
+          initialTop={200}
           initialLeft={500}
-          onClick={(score) => setScore(prev => prev + score)} // Get score from target
-          scoreValue={300} // Set a different score value
-          resetDelay={3000} // Reset after 3 seconds
+          scoreValue={200}
+          onHit={handleVariableTargetHit} // Use the new handler
+          initialIsLit={false} // Will be lit by resetVariableTargetBank
         />
+          <PinballTarget
+          ref={variableTarget2Ref}
+          id="VT2"
+          size={40}
+          initialTop={200}
+          initialLeft={550}
+          scoreValue={200}
+          onHit={handleVariableTargetHit}
+          initialIsLit={false}
+          />
+
+          <PinballTarget
+          ref={variableTarget3Ref}
+          id="VT3"
+          size={40}
+          initialTop={200}
+          initialLeft={600}
+          scoreValue={200}
+          onHit={handleVariableTargetHit}
+          initialIsLit={false}
+        />
+        {/* Optional: Add a fourth target */}
+        <PinballTarget
+          ref={variableTarget4Ref}
+          id="VT4"
+          size={40}
+          initialTop={200}
+          initialLeft={650}
+          scoreValue={200}
+          onHit={handleVariableTargetHit}
+          initialIsLit={false}
+        />
+
         <Slingshot ref={slingshotLeftRef} top={400} left={100} armLength={70} angle={30} onCollision={(impulse) => setScore(prev => prev + 50)} />
         <Slingshot ref={slingshotRightRef} top={400} left={600} armLength={70} angle={-30} onCollision={(impulse) => setScore(prev => prev + 50)} />
       
