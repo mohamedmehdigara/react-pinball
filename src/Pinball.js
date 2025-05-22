@@ -59,6 +59,8 @@ const COLLISION_NUDGE = 5;
 const BUMPER_COOLDOWN_FRAMES = 10;
 const TARGET_BANK_BONUS_SCORE = 10000; // Bonus for completing the target bank
 const TARGET_BANK_TIMEOUT = 10000; 
+const MAX_BONUS_MULTIPLIER = 10; // Maximum multiplier value
+
 const MYSTERY_PRIZES = {
     SCORE_SMALL: 5000,
     SCORE_MEDIUM: 15000,
@@ -85,6 +87,21 @@ const PinballGame = styled.div`
   border: 2px solid #222;
 `;
 
+const MultiplierDisplay = styled.div`
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #ffcc00;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 16px;
+  font-weight: bold;
+  z-index: 1000;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+`;
+
+
 const Pinball = () => {
   const [ballPosition, setBallPosition] = useState({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
   const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 });
@@ -108,6 +125,8 @@ const Pinball = () => {
   const [litRollovers, setLitRollovers] = useState({});
   const [activeTargetInBank, setActiveTargetInBank] = useState(0);
   const [isBallCaptured, setIsBallCaptured] = useState(false);
+    const [bonusMultiplier, setBonusMultiplier] = useState(1); // Start with 1x multiplier
+
   const bumper1HitCooldown = useRef(0);
   const bumper2HitCooldown = useRef(0);
 
@@ -268,17 +287,16 @@ const bumper1Ref = useRef(null);
     }
 
     // --- Spinner Collision ---
-    const spinner = spinnerRef.current;
+     const spinner = spinnerRef.current;
     if (spinner) {
       const spinnerRect = spinner.getBoundingClientRect();
       if (spinnerRect && isCircleCollidingWithRectangle(ballCircle, spinnerRect)) {
-        // Spinner's handleCollision needs the current velocity of the ball
-        const score = spinner.handleCollision(velocity);
-        setScore(prev => prev + score);
+        const baseScore = spinner.handleCollision(velocity);
+        const multipliedScore = applyBonusMultiplier(baseScore);
+        setScore(prev => prev + multipliedScore);
         setBallVelocity(prev => ({ ...prev, x: -prev.x * 0.6, y: -prev.y * 0.6 }));
       }
     }
-
     // --- Kickback Collision ---
     const kickbackLeft = kickbackLeftRef.current;
     if (kickbackLeft) {
@@ -545,7 +563,7 @@ const bumper1Ref = useRef(null);
      mysterySaucerRef.current?.resetSaucer(); // Reset saucer at game start
     mysterySaucerRef.current?.lightSaucer();
     gateRef.current?.close();
-
+     resetBonusMultiplier();
     // Reset the variable target bank on game start
     resetVariableTargetBank();
   };
@@ -657,51 +675,6 @@ const bumper1Ref = useRef(null);
   }, [score]);
 
 
-   const handleVariableTargetHit = useCallback((id, score) => {
-    setScore(prev => prev + score);
-    console.log(`Variable Target ${id} hit! Score: ${score}`);
-
-    // Logic to advance the bank sequence
-    const targets = [
-      variableTarget1Ref.current,
-      variableTarget2Ref.current,
-      variableTarget3Ref.current,
-      variableTarget4Ref.current // Include if using 4th target
-    ].filter(Boolean); // Filter out any null refs
-
-    const hitIndex = targets.findIndex(target => target?.id === id);
-
-    if (hitIndex !== -1) {
-      if (hitIndex === activeTargetInBank) {
-        // Correct target hit: advance the sequence
-        // Dim the previously active target
-        if (targets[activeTargetInBank]) {
-          targets[activeTargetInBank].dimTarget();
-        }
-
-        // Light up the next target
-        const nextActiveIndex = activeTargetInBank + 1;
-        if (nextActiveIndex < targets.length) {
-          targets[nextActiveIndex].lightTarget();
-          setActiveTargetInBank(nextActiveIndex);
-          // Reset the timeout whenever a correct target is hit
-          clearTimeout(targetBankTimeoutRef.current);
-          targetBankTimeoutRef.current = setTimeout(resetVariableTargetBank, TARGET_BANK_TIMEOUT);
-        } else {
-          // All targets in the bank completed!
-          setScore(prev => prev + TARGET_BANK_BONUS_SCORE);
-          console.log("Variable Target Bank completed! Awarding bonus and resetting.");
-          resetVariableTargetBank(); // Reset after completion
-        }
-      } else {
-        // Wrong target hit or hit an already completed/unlit target in sequence
-        // You could add a penalty or just do nothing, or reset the bank.
-        console.log(`Incorrect target ${id} hit. Expected target ${targets[activeTargetInBank]?.id || 'N/A'}`);
-        // Optional: reset the bank if an incorrect target is hit
-        // resetVariableTargetBank();
-      }
-    }
-  }, [activeTargetInBank]); // activeTargetInBank is a dependency here
 
 
    const resetVariableTargetBank = useCallback(() => {
@@ -740,60 +713,6 @@ const bumper1Ref = useRef(null);
     };
   }, [ballLaunched, gameOver, resetVariableTargetBank]); // Run when game starts/ends or reset callback changes
 
-const onActivateMystery = useCallback((baseScore) => {
-    setScore(prev => prev + baseScore); // Award base score for hitting it
-
-    // Capture the ball immediately
-    setIsBallCaptured(true);
-    ballCapturePosition.current = ballPosition; // Store where it was captured
-    setBallVelocity({ x: 0, y: 0 }); // Stop the ball
-
-    // Determine random prize
-    const prizeKeys = Object.keys(MYSTERY_PRIZES);
-    const randomPrizeKey = prizeKeys[Math.floor(Math.random() * prizeKeys.length)];
-    const prize = MYSTERY_PRIZES[randomPrizeKey];
-
-    console.log(`Mystery activated! You won: ${randomPrizeKey}`);
-
-    let message = "Mystery Prize!"; // Display to user
-
-    if (typeof prize === 'number') {
-      setScore(prev => prev + prize);
-      message = `+${prize} Points!`;
-    } else {
-      switch (prize) {
-        case 'extraBall':
-          setEarnedExtraBalls(prev => prev + 1);
-          setLives(prev => prev + 1); // Add a life for extra ball
-          message = "Extra Ball!";
-          break;
-        case 'advanceBonusMultiplier':
-          // Implement bonus multiplier logic here if you have it
-          setActiveBonus(prev => Math.min(prev + 1, 10)); // Max 10x multiplier
-          message = "Bonus Multiplier Advanced!";
-          break;
-        case 'lightKickback':
-          kickbackLeftRef.current?.lightKickback();
-          message = "Kickback Lit!";
-          break;
-        default:
-          message = "Nothing (for now)!";
-          break;
-      }
-    }
-
-    // Display a message (you might want a dedicated UI for this)
-    alert(message); // Simple alert for now, replace with proper UI
-
-    // After a short delay, release the ball
-    setTimeout(() => {
-      setIsBallCaptured(false);
-      mysterySaucerRef.current?.resetSaucer(); // Allow saucer to be hit again
-      // Eject the ball with some velocity
-      setBallPosition(prev => ({ x: ballCapturePosition.current.x, y: ballCapturePosition.current.y - radius * 2 })); // Move slightly up
-      setBallVelocity({ x: (Math.random() > 0.5 ? 1 : -1) * 5, y: -10 }); // Random left/right eject
-    }, 2000); // Ball captured for 2 seconds
-  }, [ballPosition, setScore, setEarnedExtraBalls, setLives, setActiveBonus]);
 
  useEffect(() => {
     let animationFrameId;
@@ -834,6 +753,137 @@ const onActivateMystery = useCallback((baseScore) => {
       cancelAnimationFrame(animationFrameId);
     };
   }, [ballLaunched, gameOver, ballVelocity, tubeExitY, isBallCaptured]); // Add isBallCaptured to dependencies
+
+
+const increaseBonusMultiplier = useCallback(() => {
+    setBonusMultiplier(prev => Math.min(prev + 1, MAX_BONUS_MULTIPLIER));
+  }, []);
+
+  // Function to reset the bonus multiplier
+  const resetBonusMultiplier = useCallback(() => {
+    setBonusMultiplier(1); // Reset to 1x
+  }, []);
+
+  // Function to apply the bonus multiplier to a score
+  const applyBonusMultiplier = useCallback((score) => {
+    return score * bonusMultiplier;
+  }, [bonusMultiplier]);
+
+
+  const handleDropTargetHit = useCallback((id, score) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    console.log(`Drop Target ${id} hit! Score: ${multipliedScore}`);
+    setDroppedTargets(prev => ({ ...prev, [id]: true }));
+  }, [applyBonusMultiplier]);
+
+  const handleRollover = useCallback((id, score) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    console.log(`Rollover ${id} activated! Score: ${multipliedScore}`);
+    setLitRollovers(prev => ({ ...prev, [id]: true }));
+  }, [applyBonusMultiplier]);
+
+  const handleVariableTargetHit = useCallback((id, score) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    console.log(`Variable Target ${id} hit! Score: ${multipliedScore}`);
+
+    // Logic to advance the bank sequence
+    const targets = [
+      variableTarget1Ref.current,
+      variableTarget2Ref.current,
+      variableTarget3Ref.current,
+      variableTarget4Ref.current
+    ].filter(Boolean);
+
+    const hitIndex = targets.findIndex(target => target?.id === id);
+
+    if (hitIndex !== -1) {
+      if (hitIndex === activeTargetInBank) {
+        // Correct target hit: advance the sequence
+        if (targets[activeTargetInBank]) {
+          targets[activeTargetInBank].dimTarget();
+        }
+
+        const nextActiveIndex = activeTargetInBank + 1;
+        if (nextActiveIndex < targets.length) {
+          targets[nextActiveIndex].lightTarget();
+          setActiveTargetInBank(nextActiveIndex);
+          clearTimeout(targetBankTimeoutRef.current);
+          targetBankTimeoutRef.current = setTimeout(resetVariableTargetBank, TARGET_BANK_TIMEOUT);
+        } else {
+          // All targets in the bank completed!
+          const bonusScore = applyBonusMultiplier(TARGET_BANK_BONUS_SCORE);
+          setScore(prev => prev + bonusScore);
+          console.log("Variable Target Bank completed! Awarding bonus and resetting.");
+          resetVariableTargetBank(); // Reset after completion
+          increaseBonusMultiplier(); // Award a multiplier increase for completing the bank
+        }
+      } else {
+        // Wrong target hit or hit an already completed/unlit target in sequence
+        console.log(`Incorrect target ${id} hit. Expected target ${targets[activeTargetInBank]?.id || 'N/A'}`);
+        // Optional: reset the bank if an incorrect target is hit
+        // resetVariableTargetBank();
+      }
+    }
+  }, [activeTargetInBank, applyBonusMultiplier, increaseBonusMultiplier]);
+
+  const onActivateMystery = useCallback((baseScore) => {
+    const multipliedBaseScore = applyBonusMultiplier(baseScore);
+    setScore(prev => prev + multipliedBaseScore); // Apply multiplier to base score
+
+    // Capture the ball immediately
+    setIsBallCaptured(true);
+    ballCapturePosition.current = ballPosition;
+    setBallVelocity({ x: 0, y: 0 });
+
+    // Determine random prize
+    const prizeKeys = Object.keys(MYSTERY_PRIZES);
+    const randomPrizeKey = prizeKeys[Math.floor(Math.random() * prizeKeys.length)];
+    const prize = MYSTERY_PRIZES[randomPrizeKey];
+
+    console.log(`Mystery activated! You won: ${randomPrizeKey}`);
+
+    let message = "Mystery Prize!"; // Display to user
+
+    if (typeof prize === 'number') {
+      const multipliedPrize = applyBonusMultiplier(prize);
+      setScore(prev => prev + multipliedPrize);
+      message = `+${multipliedPrize} Points!`;
+    } else {
+      switch (prize) {
+        case 'extraBall':
+          setEarnedExtraBalls(prev => prev + 1);
+          setLives(prev => prev + 1); // Add a life for extra ball
+          message = "Extra Ball!";
+          break;
+        case 'advanceBonusMultiplier':
+          increaseBonusMultiplier(); // Award a multiplier increase
+          message = "Bonus Multiplier Advanced!";
+          break;
+        case 'lightKickback':
+          kickbackLeftRef.current?.lightKickback();
+          message = "Kickback Lit!";
+          break;
+        default:
+          message = "Nothing (for now)!";
+          break;
+      }
+    }
+
+    // Display a message (you might want a dedicated UI for this)
+    alert(message); // Simple alert for now, replace with proper UI
+
+    // After a short delay, release the ball
+    setTimeout(() => {
+      setIsBallCaptured(false);
+      mysterySaucerRef.current?.resetSaucer(); // Allow saucer to be hit again
+      // Eject the ball with some velocity
+      setBallPosition(prev => ({ x: ballCapturePosition.current.x, y: ballCapturePosition.current.y - radius * 2 })); // Move slightly up
+      setBallVelocity({ x: (Math.random() > 0.5 ? 1 : -1) * 5, y: -10 }); // Random left/right eject
+    }, 2000); // Ball captured for 2 seconds
+  }, [ballPosition, setScore, setEarnedExtraBalls, setLives, increaseBonusMultiplier, applyBonusMultiplier]);
 
 
   return (
@@ -984,6 +1034,9 @@ const onActivateMystery = useCallback((baseScore) => {
           initialIsLit={true} // Start lit, or activate via game logic later
           scoreValue={1000} // Base score for hitting it
         />
+         <MultiplierDisplay>
+          Bonus Multiplier: {bonusMultiplier}x
+        </MultiplierDisplay>
       </PinballGame>
     </Container>
   );
