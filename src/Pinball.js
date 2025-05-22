@@ -130,6 +130,14 @@ const Pinball = () => {
   const [isBallCaptured, setIsBallCaptured] = useState(false);
 const [bonusMultiplier, setBonusMultiplier] = useState(1);
   const [bonusScoreUnits, setBonusScoreUnits] = useState(0);
+  const [tiltWarnings, setTiltWarnings] = useState(0); // <--- Add this line
+  const [isTilted, setIsTilted] = useState(false);     // <--- Add this line
+
+  // --- NEW NUDGE/TILT REF DECLARATIONS ---
+  const tiltCooldownCounter = useRef(0); // <--- Add this line
+  const nudgeInputX = useRef(0);         // <--- Add this line
+  const nudgeInputY = useRef(0);         // <--- Add this line
+  const nudgeResetCounter = useRef(0); 
 
   const bumper1HitCooldown = useRef(0);
   const bumper2HitCooldown = useRef(0);
@@ -1120,10 +1128,10 @@ const increaseBonusMultiplier = useCallback(() => {
           Bonus Multiplier: {bonusMultiplier}x
         </MultiplierDisplay>
         {gameOver && (
-          <GameOverOverlay>
+          <GameOverMessage>
             Game Over! Final Score: {score}
             <RestartButton onClick={handleGameStart}>Restart</RestartButton>
-          </GameOverOverlay>
+          </GameOverMessage>
         )}
         <NudgeDisplay
           currentWarnings={tiltWarnings}
