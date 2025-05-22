@@ -41,6 +41,7 @@ import Ramp from './components/Ramp';
 import Blocks from './components/Blocks';
 import LaneGuide from './components/LaneGuide';
 import Gate from './components/Gate';
+import MysterySaucer from './components/MysterySaucer';
 
 // Constants
 const radius = 10;
@@ -58,6 +59,15 @@ const COLLISION_NUDGE = 5;
 const BUMPER_COOLDOWN_FRAMES = 10;
 const TARGET_BANK_BONUS_SCORE = 10000; // Bonus for completing the target bank
 const TARGET_BANK_TIMEOUT = 10000; 
+const MYSTERY_PRIZES = {
+    SCORE_SMALL: 5000,
+    SCORE_MEDIUM: 15000,
+    SCORE_LARGE: 50000,
+    EXTRA_BALL: 'extraBall',
+    ADVANCE_BONUS_MULTIPLIER: 'advanceBonusMultiplier', // Future enhancement
+    LIGHT_KICKBACK: 'lightKickback', // Future enhancement
+    POINTS_PENALTY: -2000, // Fun little penalty
+};
 
 const Container = styled.div`
   display: flex;
@@ -97,6 +107,7 @@ const Pinball = () => {
   const [droppedTargets, setDroppedTargets] = useState({}); // Track which targets are dropped { 'target1': true, 'target2': false, ...}
   const [litRollovers, setLitRollovers] = useState({});
   const [activeTargetInBank, setActiveTargetInBank] = useState(0);
+  const [isBallCaptured, setIsBallCaptured] = useState(false);
   const bumper1HitCooldown = useRef(0);
   const bumper2HitCooldown = useRef(0);
 
@@ -129,6 +140,8 @@ const bumper1Ref = useRef(null);
   const variableTarget3Ref = useRef(null);
   const variableTarget4Ref = useRef(null);
   const targetBankTimeoutRef = useRef(null);
+   const mysterySaucerRef = useRef(null);
+  const ballCapturePosition = useRef({ x: 0, y: 0 });
  
 
   const tubeExitY = tubeEntranceY + tubeHeight;
@@ -380,6 +393,27 @@ const bumper1Ref = useRef(null);
             }
         }
       }
+
+      const mysterySaucer = mysterySaucerRef.current;
+    if (mysterySaucer && mysterySaucer.getIsLit() && !isBallCaptured) { // Only collide if lit and not already captured
+      const saucerRect = mysterySaucer.getBoundingClientRect();
+      if (saucerRect && isCircleCollidingWithRectangle(ballCircle, saucerRect)) {
+        // If it was hit, let the saucer component handle its internal state and call onActivate
+        const scoreAwarded = mysterySaucer.handleCollision();
+        if (scoreAwarded > 0) {
+          // The onActivateMystery callback will handle score and ball capture
+          // No need to set score or velocity here directly, onActivateMystery does it
+        }
+        return; // Prevent other collisions while ball is captured
+      }
+    }
+
+    // --- If ball is captured, prevent further collision logic ---
+    if (isBallCaptured) {
+        setBallPosition(ballCapturePosition.current); // Keep ball at capture point
+        setBallVelocity({ x: 0, y: 0 }); // Keep ball still
+        return; // Skip all other collision checks if ball is captured
+    }
     }
 
     const variableTargetRefs = [
@@ -508,6 +542,8 @@ const bumper1Ref = useRef(null);
     rolloverBRef.current?.resetLight();
     rolloverCRef.current?.resetLight();
     setLitRollovers({});
+     mysterySaucerRef.current?.resetSaucer(); // Reset saucer at game start
+    mysterySaucerRef.current?.lightSaucer();
     gateRef.current?.close();
 
     // Reset the variable target bank on game start
@@ -704,7 +740,100 @@ const bumper1Ref = useRef(null);
     };
   }, [ballLaunched, gameOver, resetVariableTargetBank]); // Run when game starts/ends or reset callback changes
 
+const onActivateMystery = useCallback((baseScore) => {
+    setScore(prev => prev + baseScore); // Award base score for hitting it
 
+    // Capture the ball immediately
+    setIsBallCaptured(true);
+    ballCapturePosition.current = ballPosition; // Store where it was captured
+    setBallVelocity({ x: 0, y: 0 }); // Stop the ball
+
+    // Determine random prize
+    const prizeKeys = Object.keys(MYSTERY_PRIZES);
+    const randomPrizeKey = prizeKeys[Math.floor(Math.random() * prizeKeys.length)];
+    const prize = MYSTERY_PRIZES[randomPrizeKey];
+
+    console.log(`Mystery activated! You won: ${randomPrizeKey}`);
+
+    let message = "Mystery Prize!"; // Display to user
+
+    if (typeof prize === 'number') {
+      setScore(prev => prev + prize);
+      message = `+${prize} Points!`;
+    } else {
+      switch (prize) {
+        case 'extraBall':
+          setEarnedExtraBalls(prev => prev + 1);
+          setLives(prev => prev + 1); // Add a life for extra ball
+          message = "Extra Ball!";
+          break;
+        case 'advanceBonusMultiplier':
+          // Implement bonus multiplier logic here if you have it
+          setActiveBonus(prev => Math.min(prev + 1, 10)); // Max 10x multiplier
+          message = "Bonus Multiplier Advanced!";
+          break;
+        case 'lightKickback':
+          kickbackLeftRef.current?.lightKickback();
+          message = "Kickback Lit!";
+          break;
+        default:
+          message = "Nothing (for now)!";
+          break;
+      }
+    }
+
+    // Display a message (you might want a dedicated UI for this)
+    alert(message); // Simple alert for now, replace with proper UI
+
+    // After a short delay, release the ball
+    setTimeout(() => {
+      setIsBallCaptured(false);
+      mysterySaucerRef.current?.resetSaucer(); // Allow saucer to be hit again
+      // Eject the ball with some velocity
+      setBallPosition(prev => ({ x: ballCapturePosition.current.x, y: ballCapturePosition.current.y - radius * 2 })); // Move slightly up
+      setBallVelocity({ x: (Math.random() > 0.5 ? 1 : -1) * 5, y: -10 }); // Random left/right eject
+    }, 2000); // Ball captured for 2 seconds
+  }, [ballPosition, setScore, setEarnedExtraBalls, setLives, setActiveBonus]);
+
+ useEffect(() => {
+    let animationFrameId;
+    const GRAVITY = 0.1;
+    const FRICTION = 0.99;
+
+    const gameLoop = () => {
+      if (ballLaunched && !gameOver && !isBallCaptured) { // <-- Add !isBallCaptured here
+        setBallPosition(prevPosition => {
+          let newX = prevPosition.x + ballVelocity.x;
+          let newY = prevPosition.y + ballVelocity.y;
+
+          setBallVelocity(prevVelocity => {
+            let vx = prevVelocity.x * FRICTION;
+            let vy = prevVelocity.y * FRICTION + GRAVITY;
+            if (Math.abs(vx) < 0.1) vx = 0;
+            if (Math.abs(vy) < 0.1 && newY + radius >= PLAY_AREA_HEIGHT) vy = 0;
+            return { x: vx, y: vy };
+          });
+
+          // ... (boundary collisions) ...
+
+          handleCollision({ x: newX, y: newY }, radius, ballVelocity);
+          handleOutOfBounds({ x: newX, y: newY }, radius, ballVelocity);
+
+          if (bumper1HitCooldown.current > 0) bumper1HitCooldown.current -= 1;
+          if (bumper2HitCooldown.current > 0) bumper2HitCooldown.current -= 1;
+
+          return { x: newX, y: newY };
+        });
+      }
+      animationFrameId = requestAnimationFrame(gameLoop);
+    };
+
+    animationFrameId = requestAnimationFrame(gameLoop);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [ballLaunched, gameOver, ballVelocity, tubeExitY, isBallCaptured]); // Add isBallCaptured to dependencies
 
 
   return (
@@ -845,6 +974,15 @@ const bumper1Ref = useRef(null);
           pivotY={0} // Hinge at the top
           initialIsOpen={false}
           passageDirection="right" // Ball can pass right-to-left when open, blocked otherwise
+        />
+        <MysterySaucer
+          ref={mysterySaucerRef}
+          top={80} // Adjust position as needed
+          left={650} // Adjust position as needed
+          size={50}
+          onActivate={onActivateMystery} // The main callback
+          initialIsLit={true} // Start lit, or activate via game logic later
+          scoreValue={1000} // Base score for hitting it
         />
       </PinballGame>
     </Container>
