@@ -805,28 +805,7 @@ const Pinball = () => {
   }, [isBallCaptured, tubeExitY, setDisplayBallPosition, setDisplayBallVelocity]); // Added setters as dependencies
 
 
-  // --- Input Handling for Nudging and Flippers ---
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (gameOver || isTilted || !ballLaunched) return; // Use 'gameOver' consistently
-
-      // Flipper controls
-      if (e.key === 'ArrowLeft') handleFlipperAction(true);
-      if (e.key === 'ArrowRight') handleFlipperAction(false);
-
-      // Nudge controls
-      if (e.key === 'z') { handleNudge('left'); }
-      if (e.key === 'x') { handleNudge('up'); }
-      if (e.key === '/') { handleNudge('right'); }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [gameOver, isTilted, ballLaunched, handleFlipperAction, handleNudge]); // Use 'gameOver' consistently
-
-  // --- Nudge Logic ---
+  // --- Nudge Logic (Moved to be declared earlier) ---
   const handleNudge = useCallback((direction) => {
     if (isTilted || gameOver || !ballLaunched) return; // Use 'gameOver' consistently
 
@@ -856,6 +835,29 @@ const Pinball = () => {
     nudgeInputY.current += impulseY;
     nudgeResetCounter.current = NUDGE_RESET_FRAMES;
   }, [isTilted, gameOver, ballLaunched, setTiltWarnings, setIsTilted, setDisplayBallVelocity]); // Use 'gameOver' consistently, added setters
+
+
+  // --- Input Handling for Nudging and Flippers (Now handleNudge is defined) ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (gameOver || isTilted || !ballLaunched) return; // Use 'gameOver' consistently
+
+      // Flipper controls
+      if (e.key === 'ArrowLeft') handleFlipperAction(true);
+      if (e.key === 'ArrowRight') handleFlipperAction(false);
+
+      // Nudge controls
+      if (e.key === 'z') { handleNudge('left'); }
+      if (e.key === 'x') { handleNudge('up'); }
+      if (e.key === '/') { handleNudge('right'); }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [gameOver, isTilted, ballLaunched, handleFlipperAction, handleNudge]); // Use 'gameOver' consistently
+
 
   // --- Main Game Loop (Physics and Updates) ---
   useEffect(() => {
