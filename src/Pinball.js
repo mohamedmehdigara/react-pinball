@@ -16,7 +16,6 @@ import Outlane from './components/Outlane';
 import Kickback from './components/Kickback';
 import LaneChange from './components/LaneChange';
 import SkillShotLane from './components/SkillShotLane';
-import GameOverMessage from './components/GameOverMessage';
 import GameStartButton from './components/GameStartButton';
 import BallLauncher from './components/BallLauncher';
 import Tube from './components/Tube';
@@ -25,7 +24,15 @@ import MysterySaucer from './components/MysterySaucer';
 import NudgeDisplay from './components/NudgeDisplay';
 import RestartButton from './components/RestartButton';
 import Rollover from './components/Rollover';
-import BallSaveDisplay from './components/BallSaveDisplay'; // Import the new component
+import BallSaveDisplay from './components/BallSaveDisplay';
+import GameOverOverlay from './components/GameOverMessage';
+import VUK from './components/VUK';
+
+// Firebase Imports (REMOVED)
+// import { initializeApp } from 'firebase/app';
+// import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+// import { getFirestore, collection, query, orderBy, limit, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+
 
 // Constants
 const BALL_RADIUS = 10;
@@ -47,6 +54,7 @@ const ROLLOVER_BANK_BONUS_SCORE = 2000;
 const MAX_BONUS_MULTIPLIER = 10;
 const END_OF_BALL_BONUS_FACTOR = 100;
 const TARGET_BANK_TIMEOUT = 10000;
+const TARGET_BANK_BONUS_SCORE = 100;
 
 // Mystery Prizes
 const MYSTERY_PRIZES = {
@@ -74,7 +82,6 @@ const BALL_SAVE_RETURN_VELOCITY_X = 0; // No horizontal push, or slight random
 // Physics Constants
 const GRAVITY = 0.1;
 const FRICTION = 0.99;
-const TARGET_BANK_BONUS_SCORE = 100;
 
 // Styled components
 const Container = styled.div`
@@ -136,22 +143,6 @@ const ConsolidatedScoreboard = styled.div`
   }
 `;
 
-const GameOverOverlay = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
-  color: white;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  font-size: 2em;
-  z-index: 2000;
-`;
-
 
 const Pinball = () => {
   // --- STATE FOR RENDERING (triggers re-renders) ---
@@ -174,6 +165,9 @@ const Pinball = () => {
   const [rightFlipperAngle, setRightFlipperAngle] = useState(0);
   const [ballSaveActive, setBallSaveActive] = useState(false);
   const [ballSaveTimer, setBallSaveTimer] = useState(0);
+  // const [highScores, setHighScores] = useState([]); // REMOVED: Firebase related state
+  // const [userId, setUserId] = useState(null); // REMOVED: Firebase related state
+  // const [isAuthReady, setIsAuthReady] = useState(false); // REMOVED: Firebase related state
 
 
   // --- REFS FOR GAME LOGIC (do NOT trigger re-renders by themselves) ---
@@ -193,6 +187,13 @@ const Pinball = () => {
   const targetBankTimeoutRef = useRef(null);
   const ballRef = useRef(null);
   const ballSaveIntervalRef = useRef(null);
+
+  // Firebase Refs (REMOVED)
+  // const dbRef = useRef(null);
+  // const authRef = useRef(null);
+  // const appRef = useRef(null);
+
+  const vukRef = useRef(null);
 
 
   // Refs for interactive elements (DOM refs)
@@ -227,6 +228,94 @@ const Pinball = () => {
   // Derived state (from refs, so it's always up-to-date in logic)
   const tubeExitY = tubeEntranceY.current + tubeHeight.current;
   const isLaneChangeAllowed = true;
+
+  // --- Firebase Initialization and Auth (REMOVED) ---
+  // useEffect(() => {
+  //   const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  //   const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+  //   const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+  //   if (!firebaseConfig) {
+  //     console.error("Firebase config is not available. High scores will not be saved.");
+  //     setIsAuthReady(true);
+  //     return;
+  //   }
+
+  //   const app = initializeApp(firebaseConfig);
+  //   appRef.current = app;
+  //   dbRef.current = getFirestore(app);
+  //   authRef.current = getAuth(app);
+
+  //   const authenticate = async () => {
+  //     try {
+  //       if (initialAuthToken) {
+  //         await signInWithCustomToken(authRef.current, initialAuthToken);
+  //       } else {
+  //         await signInAnonymously(authRef.current);
+  //       }
+  //     } catch (error) {
+  //       console.error("Firebase authentication failed:", error);
+  //     } finally {
+  //       setIsAuthReady(true);
+  //     }
+  //   };
+
+  //   const unsubscribe = onAuthStateChanged(authRef.current, (user) => {
+  //     if (user) {
+  //       setUserId(user.uid);
+  //     } else {
+  //       setUserId(crypto.randomUUID());
+  //     }
+  //     setIsAuthReady(true);
+  //   });
+
+  //   authenticate();
+  //   return () => unsubscribe();
+  // }, []);
+
+  // --- High Score Fetching (REMOVED) ---
+  // useEffect(() => {
+  //   if (!isAuthReady || !dbRef.current || !userId) {
+  //     return;
+  //   }
+
+  //   const highScoresCollectionRef = collection(dbRef.current, `artifacts/${__app_id}/public/data/highscores`);
+  //   const q = query(highScoresCollectionRef, orderBy("score", "desc"), limit(10));
+
+  //   const unsubscribe = onSnapshot(q, (snapshot) => {
+  //     const scores = snapshot.docs.map(doc => ({
+  //       id: doc.id,
+  //       ...doc.data()
+  //     }));
+  //     setHighScores(scores);
+  //   }, (error) => {
+  //     console.error("Error fetching high scores:", error);
+  //   });
+
+  //   return () => unsubscribe();
+  // }, [isAuthReady, userId]);
+
+  // --- Submit High Score (REMOVED) ---
+  // const submitHighScore = useCallback(async (playerName) => {
+  //   if (!dbRef.current || !userId || score === 0) {
+  //     console.error("Cannot submit high score: Firebase not ready, no user ID, or score is zero.");
+  //     return;
+  //   }
+
+  //   try {
+  //     const highScoresCollectionRef = collection(dbRef.current, `artifacts/${__app_id}/public/data/highscores`);
+  //     await addDoc(highScoresCollectionRef, {
+  //       name: playerName,
+  //       score: score,
+  //       timestamp: serverTimestamp(),
+  //       userId: userId
+  //     });
+  //     console.log("High score submitted successfully!");
+  //   } catch (error) {
+  //     console.error("Error submitting high score:", error);
+  //   }
+  // }, [score, userId]);
+
 
   // --- Utility Functions ---
   const isCircleCollidingWithRectangle = useCallback((circle, rect) => {
@@ -279,6 +368,24 @@ const Pinball = () => {
       });
     }, 1000);
   }, []);
+
+  // VUK Callbacks
+  const handleVUKCapture = useCallback((vukId) => {
+    setIsBallCaptured(true);
+    ballCapturePosition.current = { ...ballPositionRef.current }; // Store current ball position
+    ballVelocityRef.current = { x: 0, y: 0 }; // Stop the ball
+    setDisplayBallVelocity({ x: 0, y: 0 }); // Update display velocity
+    setScore(prev => prev + applyBonusMultiplier(500)); // Example score for VUK capture
+  }, [applyBonusMultiplier, setIsBallCaptured, setDisplayBallVelocity, setScore]);
+
+  const handleVUKEject = useCallback((vukId, newBallPosition, newBallVelocity) => {
+    setIsBallCaptured(false);
+    ballPositionRef.current = newBallPosition;
+    ballVelocityRef.current = newBallVelocity;
+    setDisplayBallPosition(newBallPosition);
+    setDisplayBallVelocity(newBallVelocity);
+    setBallLaunched(true); // Ensure ball is considered launched after eject
+  }, [setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setBallLaunched]);
 
 
   // --- Component-Specific Callbacks ---
@@ -460,6 +567,20 @@ const Pinball = () => {
         ballPositionRef.current = ballCapturePosition.current;
         ballVelocityRef.current = { x: 0, y: 0 };
         return;
+    }
+
+    // VUK Collision
+    const vuk = vukRef.current;
+    if (vuk) {
+      const vukRect = vuk.getBoundingClientRect();
+      if (vukRect && isCircleCollidingWithRectangle(ballCircle, vukRect)) {
+        const scoreAwarded = vuk.handleCollision(ballPosition, radius);
+        if (scoreAwarded > 0) {
+          // Score is handled by VUK's handleCollision, which calls onCapture
+          // No direct velocity change here, as VUK will handle ejection
+        }
+        return; // Ball is captured, prevent further collisions this frame
+      }
     }
 
     const mysterySaucer = mysterySaucerRef.current;
@@ -665,7 +786,7 @@ const Pinball = () => {
       }
     });
 
-  }, [isBallCaptured, applyBonusMultiplier, isCircleCollidingWithRectangle, mysterySaucerRef, bumper1Ref, bumper2Ref, target1Ref, target2Ref, slingshotLeftRef, slingshotRightRef, spinnerRef, kickbackLeftRef, skillShotLaneRef, dropTarget1Ref, dropTarget2Ref, dropTarget3Ref, rolloverARef, rolloverBRef, rolloverCRef, gateRef, variableTarget1Ref, variableTarget2Ref, variableTarget3Ref, variableTarget4Ref]);
+  }, [isBallCaptured, applyBonusMultiplier, isCircleCollidingWithRectangle, mysterySaucerRef, bumper1Ref, bumper2Ref, target1Ref, target2Ref, slingshotLeftRef, slingshotRightRef, spinnerRef, kickbackLeftRef, skillShotLaneRef, dropTarget1Ref, dropTarget2Ref, dropTarget3Ref, rolloverARef, rolloverBRef, rolloverCRef, gateRef, variableTarget1Ref, variableTarget2Ref, variableTarget3Ref, variableTarget4Ref, vukRef]);
 
   // --- Handle Out of Bounds (Drain) ---
   const handleOutOfBounds = useCallback((ballPosition, radius, velocity) => {
@@ -771,9 +892,10 @@ const Pinball = () => {
     resetVariableTargetBank();
     resetBonusMultiplier();
     resetBonusScoreUnits();
+    vukRef.current?.resetVUK(); // Reset VUK state
 
     activateBallSave(); // Activate ball save at the start of a new game/ball
-  }, [resetVariableTargetBank, resetBonusMultiplier, resetBonusScoreUnits, setGameOver, setScore, setLives, setBallLaunched, setIsTilted, setTiltWarnings, setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setDroppedTargets, setLitRollovers, activateBallSave]);
+  }, [resetVariableTargetBank, resetBonusMultiplier, resetBonusScoreUnits, setGameOver, setScore, setLives, setBallLaunched, setIsTilted, setTiltWarnings, setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setDroppedTargets, setLitRollovers, activateBallSave, vukRef]);
 
   // --- Ball Launcher Logic ---
   const handlePlungerRelease = useCallback((launchPower) => {
@@ -984,6 +1106,13 @@ const Pinball = () => {
             <span>BONUS UNITS:</span>
             <span>{bonusScoreUnits}</span>
           </div>
+          {/* userId display REMOVED */}
+          {/* {userId && (
+            <div>
+              <span>USER ID:</span>
+              <span>{userId}</span>
+            </div>
+          )} */}
         </ConsolidatedScoreboard>
 
         {/* Nudge/Tilt Warning Display */}
@@ -995,12 +1124,14 @@ const Pinball = () => {
         {/* Ball Save Display */}
         <BallSaveDisplay active={ballSaveActive} timer={ballSaveTimer} />
 
-        {/* Game Over Overlay */}
+        {/* Game Over Overlay (now handles high score input and display) */}
         {gameOver && (
-          <GameOverOverlay>
-            Game Over! Final Score: {score}
-            <RestartButton onClick={handleGameStart}>Restart Game</RestartButton>
-          </GameOverOverlay>
+          <GameOverOverlay
+            finalScore={score}
+            // highScores={highScores} // REMOVED: Firebase related prop
+            // onSubmitHighScore={submitHighScore} // REMOVED: Firebase related prop
+            onRestartGame={handleGameStart}
+          />
         )}
 
         {/* Bottom Right Launcher and Tube */}
@@ -1025,6 +1156,20 @@ const Pinball = () => {
           onSkillShotHit={(score) => setScore(prev => prev + score)}
           isActiveInitially={false}
           deactivationDelay={2000}
+        />
+
+        {/* VUK Component */}
+        <VUK
+          ref={vukRef}
+          id="vuk1"
+          top={100}
+          left={100}
+          size={50}
+          ejectStrength={15}
+          captureDelay={500}
+          scoreValue={500}
+          onCapture={handleVUKCapture}
+          onEject={handleVUKEject}
         />
 
         {/* Middle Area Components with refs */}
