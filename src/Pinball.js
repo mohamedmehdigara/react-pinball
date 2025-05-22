@@ -1,53 +1,39 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
+import Ball from './components/Ball';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
-import Ball from './components/Ball';
-import Tube from './components/Tube';
-import Spinner from './components/Spinner';
-import GameOverMessage from './components/GameOverMessage';
-import ScoreDisplay from './components/ScoreDisplay';
 import Bumper from './components/Bumper';
-import LaneChange from './components/LaneChange';
-import Outlane from './components/Outlane';
-import Scoreboard from './components/Scoreboard';
-import BonusDisplay from './components/BonusDisplay';
-import ExtraBallIndicator from './components/ExtraBallIndicator';
-import BallLauncher from './components/BallLauncher';
-import FlipperCollisionDetector from './components/FlipperCollisionDetector';
-import VerticalBallLauncher from './components/VerticalBallLauncher';
-import Tunnels from './components/Tunnels';
-import GameStartButton from './components/GameStartButton';
 import PinballTarget from './components/PinballTarget';
 import Slingshot from './components/Slingshot';
-import LoopShot from './components/LoopShot';
-import SpinnerTarget from './components/SpinnerTarget';
-import PopBumper from './components/PopBumper';
-import MultiballLock from './components/MultiballLock';
-import SkillShotLane from './components/SkillShotLane';
-import Kickback from './components/Kickback';
-import Rollover from './components/Rollover';
-import DropTarget from './components/DropTarget';
-import KickoutHole from './components/KickoutHole';
-import Magnet from './components/Magnet';
-import CaptiveBall from './components/CaptiveBall';
-import Hole from './components/Hole';
-import Multiball from './components/Multiball';
-import SkillShot from './components/SkillShot';
-import DynamicObstacle from './components/DynamicObstacle';
-import MysteryTarget from './components/MysteryTarget';
-import ComboMeter from './components/ComboMeter';
+import Spinner from './components/Spinner';
 import Ramp from './components/Ramp';
-import Blocks from './components/Blocks';
-import LaneGuide from './components/LaneGuide';
+import LoopShot from './components/LoopShot';
+import PopBumper from './components/PopBumper';
+import DropTarget from './components/DropTarget';
+import Magnet from './components/Magnet';
+import Outlane from './components/Outlane';
+import Kickback from './components/Kickback';
+import LaneChange from './components/LaneChange';
+import SkillShotLane from './components/SkillShotLane';
+import Scoreboard from './components/Scoreboard';
+import ScoreDisplay from './components/ScoreDisplay'; // Will be consolidated
+import BonusDisplay from './components/BonusDisplay'; // Will be consolidated
+import ExtraBallIndicator from './components/ExtraBallIndicator'; // Will be consolidated
+import GameOverMessage from './components/GameOverMessage';
+import GameStartButton from './components/GameStartButton';
+import BallLauncher from './components/BallLauncher';
+import Tube from './components/Tube';
 import Gate from './components/Gate';
 import MysterySaucer from './components/MysterySaucer';
+import NudgeDisplay from './components/NudgeDisplay';
+import RestartButton from './components/RestartButton'; // Ensure this is imported
 
 // Constants
-const radius = 10;
+const BALL_RADIUS = 10;
 const PLAY_AREA_WIDTH = 800;
 const PLAY_AREA_HEIGHT = 600;
-const INITIAL_BALL_X = PLAY_AREA_WIDTH * 0.75;
+const INITIAL_BALL_X = PLAY_AREA_WIDTH - 50;
 const INITIAL_BALL_Y = PLAY_AREA_HEIGHT - 50;
 const LANE_CHANGE_DISTANCE = 50;
 const LANE_CHANGE_COOLDOWN = 1000;
@@ -57,93 +43,139 @@ const FLIPPER_HEIGHT = 20;
 const FLIPPER_WIDTH = 80;
 const COLLISION_NUDGE = 5;
 const BUMPER_COOLDOWN_FRAMES = 10;
-const TARGET_BANK_BONUS_SCORE = 10000; // Bonus for completing the target bank
-const TARGET_BANK_TIMEOUT = 10000; 
+const SKILL_SHOT_SCORE = 1000;
+const DROP_TARGET_BONUS_SCORE = 5000;
+const ROLLOVER_BANK_BONUS_SCORE = 2000;
 const MAX_BONUS_MULTIPLIER = 10;
-const END_OF_BALL_BONUS_FACTOR = 100; 
+const END_OF_BALL_BONUS_FACTOR = 100;
 
-const MYSTERY_PRIZES = {
-    SCORE_SMALL: 5000,
-    SCORE_MEDIUM: 15000,
-    SCORE_LARGE: 50000,
-    EXTRA_BALL: 'extraBall',
-    ADVANCE_BONUS_MULTIPLIER: 'advanceBonusMultiplier', // Future enhancement
-    LIGHT_KICKBACK: 'lightKickback', // Future enhancement
-    POINTS_PENALTY: -2000, // Fun little penalty
-};
+// Nudge/Tilt Constants
+const MAX_TILT_WARNINGS = 2;
+const NUDGE_IMPULSE_STRENGTH = 1.5;
+const TILT_COOLDOWN_FRAMES = 60; // Frames to prevent rapid tilts (e.g., 1 second at 60fps)
+const NUDGE_RESET_FRAMES = 180; // Frames after which warnings reset if no nudge occurs (e.g., 3 seconds at 60fps)
+const WALL_BOUNCE_DAMPENING = 0.8;
 
+// Physics Constants
+const GRAVITY = 0.1;
+const FRICTION = 0.99;
+
+// Styled components
 const Container = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
   background-color: #222;
+  overflow: hidden;
 `;
 
 const PinballGame = styled.div`
   position: relative;
-  width: 800px;
-  height: 600px;
+  width: ${PLAY_AREA_WIDTH}px;
+  height: ${PLAY_AREA_HEIGHT}px;
   background-color: #444;
   border: 2px solid #222;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  &:focus {
+    outline: none;
+  }
 `;
 
-const MultiplierDisplay = styled.div`
+// Consolidated Scoreboard (as discussed)
+const ConsolidatedScoreboard = styled.div`
   position: absolute;
   top: 10px;
   left: 10px;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: #ffcc00;
-  padding: 5px 10px;
-  border-radius: 5px;
-  font-size: 16px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-family: 'Press Start 2P', cursive; /* Placeholder, ensure font is loaded */
+  font-size: 1.2em;
   font-weight: bold;
   z-index: 1000;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  border: 2px solid #ffcc00;
+  box-shadow: 0 0 15px rgba(255, 204, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  span:first-child {
+    color: #00ffff;
+  }
+
+  span:last-child {
+    color: #ffffff;
+  }
+`;
+
+// GameOverOverlay (as discussed)
+const GameOverOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 2em;
+  z-index: 2000;
 `;
 
 
-
-
 const Pinball = () => {
-  const [ballPosition, setBallPosition] = useState({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
-  const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 });
+  // --- STATE FOR RENDERING (triggers re-renders) ---
+  const [displayBallPosition, setDisplayBallPosition] = useState({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+  const [displayBallVelocity, setDisplayBallVelocity] = useState({ x: 0, y: 0 }); // Used for display/debugging if needed
   const [gameOver, setGameOver] = useState(false);
   const [ballLaunched, setBallLaunched] = useState(false);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
-  const [activeBonus, setActiveBonus] = useState(0);
-  const [earnedExtraBalls, setEarnedExtraBalls] = useState(0);
-  const [tubeEntranceX, setTubeEntranceX] = useState(0);
-  const [tubeEntranceY, setTubeEntranceY] = useState(0);
-  const [tubeWidth, setTubeWidth] = useState(0);
-  const [tubeHeight, setTubeHeight] = useState(0);
-  const ballRef = useRef(null);
-  const [leftFlipperAngle, setLeftFlipperAngle] = useState(0);
-  const [rightFlipperAngle, setRightFlipperAngle] = useState(0);
-  const [isLeftFlipperActive, setIsLeftFlipperActive] = useState(false);
-  const [isRightFlipperActive, setIsRightFlipperActive] = useState(false);
-  const [ballIsInTube, setBallIsInTube] = useState(false);
-  const [droppedTargets, setDroppedTargets] = useState({}); // Track which targets are dropped { 'target1': true, 'target2': false, ...}
-  const [litRollovers, setLitRollovers] = useState({});
-  const [activeTargetInBank, setActiveTargetInBank] = useState(0);
-  const [isBallCaptured, setIsBallCaptured] = useState(false);
-const [bonusMultiplier, setBonusMultiplier] = useState(1);
+  const [bonusMultiplier, setBonusMultiplier] = useState(1);
   const [bonusScoreUnits, setBonusScoreUnits] = useState(0);
-  const [tiltWarnings, setTiltWarnings] = useState(0); // <--- Add this line
-  const [isTilted, setIsTilted] = useState(false);     // <--- Add this line
+  const [tiltWarnings, setTiltWarnings] = useState(0);
+  const [isTilted, setIsTilted] = useState(false);
+  const [isBallCaptured, setIsBallCaptured] = useState(false);
+  const [activeTargetInBank, setActiveTargetInBank] = useState(0); // For Variable Target Bank
+  const [droppedTargets, setDroppedTargets] = useState({}); // For Drop Target Bank
+  const [litRollovers, setLitRollovers] = useState({}); // For Rollover Bank
 
-  // --- NEW NUDGE/TILT REF DECLARATIONS ---
-  const tiltCooldownCounter = useRef(0); // <--- Add this line
-  const nudgeInputX = useRef(0);         // <--- Add this line
-  const nudgeInputY = useRef(0);         // <--- Add this line
-  const nudgeResetCounter = useRef(0); 
-
+  // --- REFS FOR GAME LOGIC (do NOT trigger re-renders by themselves) ---
+  // These will hold the *actual* ball physics state and other mutable game variables
+  // that are updated frequently within the game loop.
+  const ballPositionRef = useRef({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+  const ballVelocityRef = useRef({ x: 0, y: 0 });
+  const tubeEntranceX = useRef(0);
+  const tubeEntranceY = useRef(0);
+  const tubeWidth = useRef(0);
+  const tubeHeight = useRef(0);
+  const ballCapturePosition = useRef({ x: 0, y: 0 });
   const bumper1HitCooldown = useRef(0);
   const bumper2HitCooldown = useRef(0);
+  const tiltCooldownCounter = useRef(0);
+  const nudgeInputX = useRef(0);
+  const nudgeInputY = useRef(0);
+  const nudgeResetCounter = useRef(0);
+  const targetBankTimeoutRef = useRef(null); // Ref for the timeout timer
 
-  // Refs for interactive elements
-const bumper1Ref = useRef(null);
+  // Refs for interactive elements (DOM refs)
+  const bumper1Ref = useRef(null);
   const bumper2Ref = useRef(null);
   const target1Ref = useRef(null);
   const target2Ref = useRef(null);
@@ -152,670 +184,114 @@ const bumper1Ref = useRef(null);
   const rampRef = useRef(null);
   const slingshotLeftRef = useRef(null);
   const slingshotRightRef = useRef(null);
-  const spinnerRef = useRef(null); // Ref for the spinner
+  const spinnerRef = useRef(null);
   const outlaneLeftRef = useRef(null);
   const outlaneRightRef = useRef(null);
   const kickbackLeftRef = useRef(null);
-    const kickbackRightRef = useRef(null);
-
-  const skillShotLaneRef = useRef(null); // Ref for the Skill Shot Lane
-  const dropTarget1Ref = useRef(null); // Ref for Drop Target 1
-  const dropTarget2Ref = useRef(null); // Ref for Drop Target 2
-  const dropTarget3Ref = useRef(null); // Ref for Drop Target 3
-  const rolloverARef = useRef(null); // Ref for Rollover A
-  const rolloverBRef = useRef(null); // Ref for Rollover B
-  const rolloverCRef = useRef(null); // Ref for Rollover C
-  const gateRef = useRef(null); // Ref for the Gate component
+  const skillShotLaneRef = useRef(null);
+  const dropTarget1Ref = useRef(null);
+  const dropTarget2Ref = useRef(null);
+  const dropTarget3Ref = useRef(null);
+  const rolloverARef = useRef(null);
+  const rolloverBRef = useRef(null);
+  const rolloverCRef = useRef(null);
+  const gateRef = useRef(null);
+  const mysterySaucerRef = useRef(null);
   const variableTarget1Ref = useRef(null);
   const variableTarget2Ref = useRef(null);
   const variableTarget3Ref = useRef(null);
   const variableTarget4Ref = useRef(null);
-  const targetBankTimeoutRef = useRef(null);
-   const mysterySaucerRef = useRef(null);
-  const ballCapturePosition = useRef({ x: 0, y: 0 });
- 
 
-  const tubeExitY = tubeEntranceY + tubeHeight;
-  const isLaneChangeAllowed = true;
 
-  const isCircleCollidingWithRectangle = (circle, rect) => {
+  // Derived state (from refs, so it's always up-to-date in logic)
+  const tubeExitY = tubeEntranceY.current + tubeHeight.current;
+  const isLaneChangeAllowed = true; // Not actively used in collision logic, but kept for future
+
+  // --- Utility Functions ---
+  const isCircleCollidingWithRectangle = useCallback((circle, rect) => {
+    if (!rect || !circle) return false;
     const closestX = Math.max(rect.left, Math.min(circle.x, rect.right));
     const closestY = Math.max(rect.top, Math.min(circle.y, rect.bottom));
     const distanceX = circle.x - closestX;
     const distanceY = circle.y - closestY;
     const distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
     return distanceSquared < (circle.radius * circle.radius);
-  };
+  }, []);
 
-        const ballCircle = { x: ballPosition.x, y: ballPosition.y, radius: radius };
-
-
-  const handleOutOfBounds = (ballPosition, radius, velocity) => {
-    // Note: The radius and velocity parameters are currently not explicitly used within handleOutOfBounds's
-    // core logic (like checking for drain), but they are now correctly passed from the game loop,
-    // maintaining consistency if you expand handleOutOfBounds later.
-
-
-    if (ballPosition.y > PLAY_AREA_HEIGHT + radius * 2) { // Use 'radius' here
-      // Logic for kickback check, ensuring currentBallPosition, BALL_RADIUS are available or handled
-      // For kickbackLeftRef.current.handleCollision, it expects ballPosition and radius.
-      if (kickbackLeftRef.current && ballPosition.x < PLAY_AREA_WIDTH * 0.2) { // Use ballPosition.x here
-        const impulse = kickbackLeftRef.current.handleCollision(ballPosition, radius); // Pass ballPosition and radius
-        if (impulse) {
-          setBallVelocity(impulse);
-          setBallLaunched(true);
-          setBallPosition({ x: impulse.x > 0 ? (PLAY_AREA_WIDTH / 4) : (PLAY_AREA_WIDTH * 3 / 4), y: PLAY_AREA_HEIGHT - 100 });
-          return; // Ball was saved, do not decrease life or reset
-        }
-      }
-
-      setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
-      setBallVelocity({ x: 0, y: 0 });
-      setBallLaunched(false);
-      setLives(prev => prev - 1);
-      if (lives <= 0) {
-        setGameOver(true);
-      }
-    } else if (ballPosition.y < -radius * 2) { // Use 'radius' here
-      setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.8 }));
-    } else if (ballPosition.x < -radius * 2 || ballPosition.x > PLAY_AREA_WIDTH + radius * 2) { // Use 'radius' here
-      setBallVelocity(prev => ({ ...prev, x: -prev.x * 0.8 }));
-    }
-  };
-
-
-  // Main collision handler for all game elements
-  // This function receives ballPosition, radius, and velocity from the game loop
-  const handleCollision = (ballPosition, radius, velocity) => {
-    const ballCircle = { x: ballPosition.x, y: ballPosition.y, radius: radius };
-
-    // --- Bumper Collisions ---
-    const bumper1 = bumper1Ref.current;
-    if (bumper1) {
-      const bumperRect = bumper1.getBoundingClientRect();
-      if (bumperRect && isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper1HitCooldown.current <= 0) {
-        bumper1.handleCollision();
-        setScore(prev => prev + bumper1.getScoreValue());
-        const newVelocity = { x: -velocity.x * 0.8, y: -velocity.y * 0.8 };
-        setBallVelocity(newVelocity);
-        const nudgeX = ballPosition.x < bumperRect.left ? -COLLISION_NUDGE : (ballPosition.x > bumperRect.right ? COLLISION_NUDGE : 0);
-        const nudgeY = ballPosition.y < bumperRect.top ? -COLLISION_NUDGE : (ballPosition.y > bumperRect.bottom ? COLLISION_NUDGE : 0);
-        const newPosition = { x: ballPosition.x + nudgeX, y: ballPosition.y + nudgeY };
-        setBallPosition(newPosition);
-        bumper1HitCooldown.current = BUMPER_COOLDOWN_FRAMES;
-      }
-    }
-
-    const bumper2 = bumper2Ref.current;
-    if (bumper2) {
-      const bumperRect = bumper2.getBoundingClientRect();
-      if (bumperRect && isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper2HitCooldown.current <= 0) {
-        bumper2.handleCollision();
-        setScore(prev => prev + bumper2.getScoreValue());
-        const newVelocity = { x: -velocity.x * 0.8, y: -velocity.y * 0.8 };
-        setBallVelocity(newVelocity);
-        const nudgeX = ballPosition.x < bumperRect.left ? -COLLISION_NUDGE : (ballPosition.x > bumperRect.right ? COLLISION_NUDGE : 0);
-        const nudgeY = ballPosition.y < bumperRect.top ? -COLLISION_NUDGE : (ballPosition.y > bumperRect.bottom ? COLLISION_NUDGE : 0);
-        const newPosition = { x: ballPosition.x + nudgeX, y: ballPosition.y + nudgeY };
-        setBallPosition(newPosition);
-        bumper2HitCooldown.current = BUMPER_COOLDOWN_FRAMES;
-      }
-    }
-
-    // --- Target Collisions ---
-    const target1 = target1Ref.current;
-    if (target1) {
-      const targetRect = target1.getBoundingClientRect();
-      if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
-        target1.handleCollision();
-        setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.7 }));
-      }
-    }
-
-    const target2 = target2Ref.current;
-    if (target2) {
-      const targetRect = target2.getBoundingClientRect();
-      if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
-        target2.handleCollision();
-        setBallVelocity(prev => ({ ...prev, y: -prev.y * 0.7 }));
-      }
-    }
-
-    // --- Slingshot Collisions ---
-    const slingshotLeft = slingshotLeftRef.current;
-    if (slingshotLeft) {
-      const impulse = slingshotLeft.handleCollision(ballPosition, radius);
-      if (impulse) {
-        setBallVelocity(prev => ({ x: prev.x + impulse.x, y: prev.y + impulse.y }));
-      }
-    }
-
-    const slingshotRight = slingshotRightRef.current;
-    if (slingshotRight) {
-      const impulse = slingshotRight.handleCollision(ballPosition, radius);
-      if (impulse) {
-        setBallVelocity(prev => ({ x: prev.x + impulse.x, y: prev.y + impulse.y }));
-      }
-    }
-
-    // --- Spinner Collision ---
-     const spinner = spinnerRef.current;
-    if (spinner) {
-      const spinnerRect = spinner.getBoundingClientRect();
-      if (spinnerRect && isCircleCollidingWithRectangle(ballCircle, spinnerRect)) {
-        const baseScore = spinner.handleCollision(velocity);
-        const multipliedScore = applyBonusMultiplier(baseScore);
-        setScore(prev => prev + multipliedScore);
-        setBallVelocity(prev => ({ ...prev, x: -prev.x * 0.6, y: -prev.y * 0.6 }));
-      }
-    }
-    // --- Kickback Collision ---
-    const kickbackLeft = kickbackLeftRef.current;
-    if (kickbackLeft) {
-      const kickbackRect = kickbackLeft.getBoundingClientRect();
-      if (kickbackRect && isCircleCollidingWithRectangle(ballCircle, kickbackRect)) {
-        // Kickback's handleCollision needs ballPosition and radius
-        const impulse = kickbackLeft.handleCollision(ballPosition, radius);
-        if (impulse) {
-          setBallVelocity(impulse);
-        }
-      }
-    }
-
-    // --- Skill Shot Lane Collision ---
-    const skillShotLane = skillShotLaneRef.current;
-    if (skillShotLane) {
-      // SkillShotLane's handleCollision needs ballPosition and radius
-      const score = skillShotLane.handleCollision(ballPosition, radius);
-      if (score > 0) {
-        setScore(prev => prev + score);
-        setBallVelocity(prev => ({ ...prev, y: prev.y * 0.8 }));
-      }
-    }
-
-    // --- Drop Target Collisions ---
-    const dropTargetRefs = [dropTarget1Ref, dropTarget2Ref, dropTarget3Ref];
-    dropTargetRefs.forEach(dtRef => {
-      const dropTarget = dtRef.current;
-      if (dropTarget) {
-        const dropTargetRect = dropTarget.getBoundingClientRect();
-        if (dropTargetRect && isCircleCollidingWithRectangle(ballCircle, dropTargetRect)) {
-          // The handleCollision method on DropTarget will call onHit, which updates score and state
-          dropTarget.handleCollision();
-          setBallVelocity(prev => ({ x: prev.x * 0.9, y: -prev.y * 0.8 }));
-        }
-      }
-    });
-
-    // --- Rollover Lane Collisions ---
-    const rolloverRefs = [rolloverARef, rolloverBRef, rolloverCRef];
-    rolloverRefs.forEach(rlRef => {
-      const rollover = rlRef.current;
-      if (rollover) {
-        const rolloverRect = rollover.getBoundingClientRect();
-        if (rolloverRect && isCircleCollidingWithRectangle(ballCircle, rolloverRect)) {
-          // The handleCollision method on Rollover will call onRollOver, which updates score and state
-          rollover.handleCollision();
-          setBallVelocity(prev => ({ x: prev.x * 0.9, y: prev.y * 0.9 })); // Slight dampening
-        }
-      }
-    });
-
-    // --- Gate Collision ---
-    const gate = gateRef.current;
-    if (gate) {
-      const gateRect = gate.getBoundingClientRect();
-      if (gateRect && isCircleCollidingWithRectangle(ballCircle, gateRect)) {
-        const currentIsOpen = gate.getIsOpen();
-        const passageDirection = gate.props.passageDirection;
-
-        let collisionHandled = false;
-
-        if (currentIsOpen) {
-          // If gate is open, allow passage in the designated direction
-          // Ensure 'velocity' is correctly referenced here, as it's a parameter of handleCollision
-          if (passageDirection === 'right' && velocity.x > 0) { collisionHandled = true; }
-          else if (passageDirection === 'left' && velocity.x < 0) { collisionHandled = true; }
-          else if (passageDirection === 'down' && velocity.y > 0) { collisionHandled = true; }
-          else if (passageDirection === 'up' && velocity.y < 0) { collisionHandled = true; }
-
-          // If trying to go against the open gate or other directions, treat as a normal wall bounce
-          if (!collisionHandled) {
-             setBallVelocity(prev => ({ x: -velocity.x * 0.7, y: -velocity.y * 0.7 })); // Use 'velocity' parameter
-             collisionHandled = true;
-          }
-        } else { // Gate is closed
-          // If gate is closed, block passage against its one-way nature
-          // Ensure 'velocity' is correctly referenced here
-          if (passageDirection === 'right' && velocity.x < 0) { // Trying to pass from right to left (blocked)
-              setBallVelocity(prev => ({ x: -velocity.x * 0.7, y: velocity.y * 0.7 })); // Use 'velocity' parameter
-              collisionHandled = true;
-          } else if (passageDirection === 'left' && velocity.x > 0) { // Trying to pass from left to right (blocked)
-              setBallVelocity(prev => ({ x: -velocity.x * 0.7, y: velocity.y * 0.7 })); // Use 'velocity' parameter
-              collisionHandled = true;
-          } else if (passageDirection === 'down' && velocity.y < 0) { // Trying to pass from bottom to top (blocked)
-              setBallVelocity(prev => ({ x: velocity.x * 0.7, y: -velocity.y * 0.7 })); // Use 'velocity' parameter
-              collisionHandled = true;
-          } else if (passageDirection === 'up' && velocity.y > 0) { // Trying to pass from top to bottom (blocked)
-              setBallVelocity(prev => ({ x: velocity.x * 0.7, y: -velocity.y * 0.7 })); // Use 'velocity' parameter
-              collisionHandled = true;
-          } else {
-              // General bounce for all other cases when the gate is closed
-              setBallVelocity(prev => ({ x: -velocity.x * 0.7, y: -velocity.y * 0.7 })); // Use 'velocity' parameter
-              collisionHandled = true;
-          }
-        }
-        // Important: Nudge the ball slightly out of the gate's collision area if it's blocking
-        if (collisionHandled && !currentIsOpen) { // Only nudge if it acted as a blocker
-            let nudgeX = 0;
-            let nudgeY = 0;
-
-            // Ensure 'ballPosition' and 'radius' are correctly referenced here
-            if (ballPosition.x < gateRect.left + radius && velocity.x > 0) nudgeX = -(COLLISION_NUDGE + radius); // Nudge past the edge
-            else if (ballPosition.x > gateRect.right - radius && velocity.x < 0) nudgeX = (COLLISION_NUDGE + radius);
-
-            if (ballPosition.y < gateRect.top + radius && velocity.y > 0) nudgeY = -(COLLISION_NUDGE + radius);
-            else if (ballPosition.y > gateRect.bottom - radius && velocity.y < 0) nudgeY = (COLLISION_NUDGE + radius);
-
-            // If a nudge was calculated, apply it
-            if (nudgeX !== 0 || nudgeY !== 0) {
-              setBallPosition(prev => ({ x: prev.x + nudgeX, y: prev.y + nudgeY }));
-            }
-        }
-      }
-
-      const mysterySaucer = mysterySaucerRef.current;
-    if (mysterySaucer && mysterySaucer.getIsLit() && !isBallCaptured) { // Only collide if lit and not already captured
-      const saucerRect = mysterySaucer.getBoundingClientRect();
-      if (saucerRect && isCircleCollidingWithRectangle(ballCircle, saucerRect)) {
-        // If it was hit, let the saucer component handle its internal state and call onActivate
-        const scoreAwarded = mysterySaucer.handleCollision();
-        if (scoreAwarded > 0) {
-          // The onActivateMystery callback will handle score and ball capture
-          // No need to set score or velocity here directly, onActivateMystery does it
-        }
-        return; // Prevent other collisions while ball is captured
-      }
-    }
-
-    // --- If ball is captured, prevent further collision logic ---
-    if (isBallCaptured) {
-        setBallPosition(ballCapturePosition.current); // Keep ball at capture point
-        setBallVelocity({ x: 0, y: 0 }); // Keep ball still
-        return; // Skip all other collision checks if ball is captured
-    }
-    }
-
-    const variableTargetRefs = [
-      variableTarget1Ref,
-      variableTarget2Ref,
-      variableTarget3Ref,
-      variableTarget4Ref // Include if using 4th target
-    ];
-    variableTargetRefs.forEach(vtRef => {
-      const variableTarget = vtRef.current;
-      if (variableTarget) {
-        const targetRect = variableTarget.getBoundingClientRect();
-        if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
-          // Call the target's collision handler, which will internally check isHit state
-          // and then call handleVariableTargetHit if not already hit.
-          const scoreAwarded = variableTarget.handleCollision(); // handleCollision now returns score
-          if (scoreAwarded > 0) {
-            // No need to setScore here, handleVariableTargetHit already does
-            // setScore(prev => prev + scoreAwarded);
-            setBallVelocity(prev => ({ x: prev.x * 0.9, y: -prev.y * 0.8 })); // Bounce
-          }
-        }
-      }
-    });
-
-  };
-
-
-  const handleLaneChange = (direction) => {
-    if (!isLaneChangeAllowed) return;
-    setBallPosition(prev => ({ ...prev, x: prev.x + (direction === 'left' ? -LANE_CHANGE_DISTANCE : LANE_CHANGE_DISTANCE) }));
-    setTimeout(() => {}, LANE_CHANGE_COOLDOWN);
-  };
-
-  useEffect(() => {
-    if (!gameOver && ballLaunched && ballRef.current) {
-      const animationFrameId = requestAnimationFrame(() => {
-        setBallPosition(prevPosition => ({
-          x: prevPosition.x + ballVelocity.x,
-          y: prevPosition.y + ballVelocity.y,
-        }));
-        // Decrement bumper cooldowns on each frame
-        if (bumper1HitCooldown.current > 0) {
-          bumper1HitCooldown.current -= 1;
-        }
-        if (bumper2HitCooldown.current > 0) {
-          bumper2HitCooldown.current -= 1;
-        }
-      });
-      return () => cancelAnimationFrame(animationFrameId);
-    }
-  }, [gameOver, ballLaunched, ballVelocity]);
-
-  const handlePlungerRelease = (launchPower) => {
-    console.log(`Launch power: ${launchPower}`);
-    if (!ballLaunched) {
-      const launchForce = launchPower * 15;
-      setBallVelocity({ x: -5, y: -launchForce });
-      setBallLaunched(true);
-    }
-  };
-
- const handleBallDrain = () => {
-    if (lives > 0) {
-      // Check if kickback can save the ball (example: only on the first drain)
-      if (lives === 3 && kickbackLeftRef.current && ballPosition.x < PLAY_AREA_WIDTH * 0.2) {
-        const impulse = kickbackLeftRef.current.handleCollision(ballPosition, radius);
-        if (impulse) {
-          setBallVelocity(impulse);
-          setBallLaunched(true); // Ensure the game loop continues
-          setLives(prev => prev); // Don't decrease life
-          return; // Prevent standard ball drain
-        }
-      }
-      // Standard ball drain logic
-      setLives(prev => prev - 1);
-      setBallLaunched(false);
-      setBallVelocity({ x: 0, y: 0 });
-      setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
-      if (lives <= 0) {
-        setGameOver(true);
-      }
-    }
-  };
-
-
-  const handleTubeEntrance = (x, y, width, height) => {
-    setTubeEntranceX(x);
-    setTubeEntranceY(y);
-    setTubeWidth(width);
-    setTubeHeight(height);
-    setBallIsInTube(true);
-  };
-
-  useEffect(() => {
-    if (ballLaunched && ballIsInTube) {
-      setBallPosition(prev => ({ ...prev, y: prev.y - 5 }));
-      if (ballPosition.y <= tubeEntranceY - tubeHeight) { // Exit at the top
-        setBallIsInTube(false);
-        setBallPosition(prev => ({ ...prev, x: tubeEntranceX + tubeWidth / 2, y: tubeEntranceY - tubeHeight - radius * 2 }));
-        setBallVelocity({ x: 5, y: 10 }); // Example exit velocity
-      }
-    } else if (ballLaunched && ballPosition.x >= tubeEntranceX && ballPosition.x <= tubeEntranceX + tubeWidth && ballPosition.y + radius >= tubeEntranceY && ballPosition.y - radius <= tubeEntranceY + tubeHeight / 2) {
-      setBallIsInTube(true);
-    }
-  }, [ballLaunched, ballPosition, tubeEntranceX, tubeEntranceY, tubeWidth, tubeHeight, ballIsInTube]);
-
- const handleGameStart = () => {
-    console.log('Game started!');
-    setGameOver(false);
-    setScore(0);
-    setLives(3);
-    setBallLaunched(false);
-    setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
-    setBallVelocity({ x: 0, y: 0 });
-    bumper1Ref.current?.resetHitCount();
-    bumper2Ref.current?.resetHitCount();
-    target1Ref.current?.resetTarget(); // Regular targets
-    target2Ref.current?.resetTarget(); // Regular targets
-    skillShotLaneRef.current?.activateSkillShot();
-    dropTarget1Ref.current?.resetTarget();
-    dropTarget2Ref.current?.resetTarget();
-    dropTarget3Ref.current?.resetTarget();
-    setDroppedTargets({});
-    rolloverARef.current?.resetLight();
-    rolloverBRef.current?.resetLight();
-    rolloverCRef.current?.resetLight();
-    setLitRollovers({});
-     mysterySaucerRef.current?.resetSaucer(); // Reset saucer at game start
-    mysterySaucerRef.current?.lightSaucer();
-    gateRef.current?.close();
-    resetBonusMultiplier(); // Ensure reset at game start
-    resetBonusScoreUnits(); // Ensure reset at game start
-    mysterySaucerRef.current?.resetSaucer();
-    mysterySaucerRef.current?.lightSaucer();
-    resetVariableTargetBank();
-
-    // Reset Tilt state on game start
-    setTiltWarnings(0);
-    setIsTilted(false);
-    tiltCooldownCounter.current = 0;
-    nudgeInputX.current = 0;
-    nudgeInputY.current = 0;
-    nudgeResetCounter.current = 0;
-     resetBonusMultiplier();
-    // Reset the variable target bank on game start
-    resetVariableTargetBank();
-
-  };
-
-
-  const handleFlipperAction = (isLeft) => {
-    const angleSpeed = 20;
-    const targetAngle = -45;
-
-    if (isLeft) {
-      setIsLeftFlipperActive(true);
-      if (leftFlipperAngle > targetAngle) {
-        setLeftFlipperAngle(targetAngle);
-        setTimeout(() => setIsLeftFlipperActive(false), 100);
-      }
-    } else {
-      setIsRightFlipperActive(true);
-      if (rightFlipperAngle < -targetAngle) {
-        setRightFlipperAngle(-targetAngle);
-        setTimeout(() => setIsRightFlipperActive(false), 100);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (!isLeftFlipperActive && leftFlipperAngle < 0) {
-      setLeftFlipperAngle(prev => Math.min(0, prev + 5));
-    }
-  }, [isLeftFlipperActive, leftFlipperAngle]);
-
-  useEffect(() => {
-    if (!isRightFlipperActive && rightFlipperAngle > 0) {
-      setRightFlipperAngle(prev => Math.max(0, prev - 5));
-    }
-  }, [isRightFlipperActive, rightFlipperAngle]);
-
-   const gate = gateRef.current;
-    if (gate) {
-      const gateRect = gate.getBoundingClientRect();
-      // Ensure gateRect is valid before proceeding
-      if (gateRect && isCircleCollidingWithRectangle(ballCircle, gateRect)) {
-        const currentIsOpen = gate.getIsOpen();
-        const passageDirection = gate.props.passageDirection; // Access prop directly from ref.props
-
-        let collisionHandled = false;
-
-        if (currentIsOpen) {
-          // If gate is open, allow passage in the designated direction
-          // This typically means no collision response in the allowed direction,
-          // but a bounce if trying to pass against the open gate.
-          if (passageDirection === 'right' && ballVelocity.x > 0) {
-            // Allow passage, no bounce
-            collisionHandled = true;
-          } else if (passageDirection === 'left' && ballVelocity.x < 0) {
-            // Allow passage, no bounce
-            collisionHandled = true;
-          } else if (passageDirection === 'down' && ballVelocity.y > 0) {
-            // Allow passage, no bounce
-            collisionHandled = true;
-          } else if (passageDirection === 'up' && ballVelocity.y < 0) {
-            // Allow passage, no bounce
-            collisionHandled = true;
-          }
-          // If trying to go against the open gate or other directions, treat as a normal wall bounce
-          if (!collisionHandled) {
-             setBallVelocity(prev => ({ x: -prev.x * 0.7, y: -prev.y * 0.7 }));
-             collisionHandled = true;
-          }
-        } else { // Gate is closed
-          // If gate is closed, allow passage only in the designated direction
-          // Otherwise, it's a block/bounce
-          if (passageDirection === 'right' && ballVelocity.x < 0) { // Trying to pass from right to left
-              setBallVelocity(prev => ({ x: -prev.x * 0.7, y: prev.y * 0.7 })); // Bounce horizontally
-              collisionHandled = true;
-          } else if (passageDirection === 'left' && ballVelocity.x > 0) { // Trying to pass from left to right
-              setBallVelocity(prev => ({ x: -prev.x * 0.7, y: prev.y * 0.7 })); // Bounce horizontally
-              collisionHandled = true;
-          } else if (passageDirection === 'down' && ballVelocity.y < 0) { // Trying to pass from bottom to top
-              setBallVelocity(prev => ({ x: prev.x * 0.7, y: -prev.y * 0.7 })); // Bounce vertically
-              collisionHandled = true;
-          } else if (passageDirection === 'up' && ballVelocity.y > 0) { // Trying to pass from top to bottom
-              setBallVelocity(prev => ({ x: prev.x * 0.7, y: -prev.y * 0.7 })); // Bounce vertically
-              collisionHandled = true;
-          } else {
-              // If moving in the allowed direction when closed, or any other direction,
-              // it's a hard bounce as it's a blocking wall.
-              setBallVelocity(prev => ({ x: -prev.x * 0.7, y: -prev.y * 0.7 })); // General bounce
-              collisionHandled = true;
-          }
-        }
-        // Important: Nudge the ball slightly out of the gate's collision area if it's blocking
-        if (collisionHandled && !currentIsOpen) { // Only nudge if it acted as a blocker
-            const nudgeX = ballPosition.x < gateRect.left ? -COLLISION_NUDGE : (ballPosition.x > gateRect.right ? COLLISION_NUDGE : 0);
-            const nudgeY = ballPosition.y < gateRect.top ? -COLLISION_NUDGE : (ballPosition.y > gateRect.bottom ? COLLISION_NUDGE : 0);
-            setBallPosition(prev => ({ x: prev.x + nudgeX, y: prev.y + nudgeY }));
-        }
-      }
-    }
-
-    useEffect(() => {
-    if (score >= 10000 && gateRef.current && !gateRef.current.getIsOpen()) {
-      console.log("Score reached 10000, opening gate!");
-      gateRef.current.open();
-    } else if (score < 10000 && gateRef.current && gateRef.current.getIsOpen()) {
-      // You might want to close it back if the score drops, or keep it open
-      // For this example, let's keep it open once reached
-      // gateRef.current.close();
-    }
-  }, [score]);
-
-
-
-
-   const resetVariableTargetBank = useCallback(() => {
-    console.log("Resetting variable target bank.");
-    clearTimeout(targetBankTimeoutRef.current); // Clear any existing timeout
-
-    const targets = [
-      variableTarget1Ref.current,
-      variableTarget2Ref.current,
-      variableTarget3Ref.current,
-      variableTarget4Ref.current
-    ].filter(Boolean);
-
-    targets.forEach(target => target.dimTarget()); // Dim all targets
-    setActiveTargetInBank(0); // Reset sequence to start
-
-    // Light the first target to begin the sequence again
-    if (targets[0]) {
-      targets[0].lightTarget();
-      setActiveTargetInBank(0); // Set first target as active
-      // Start the timeout again
-      targetBankTimeoutRef.current = setTimeout(resetVariableTargetBank, TARGET_BANK_TIMEOUT);
-    }
-  }, []); // No dependencies as it operates on refs
-
-  // Effect to initialize the target bank when the game starts or component mounts
-  useEffect(() => {
-    // Only initialize if not already active
-    if (!ballLaunched && !gameOver && activeTargetInBank === 0) {
-      resetVariableTargetBank(); // This will light the first target and start the timer
-    }
-
-    // Cleanup function for the timeout
-    return () => {
-      clearTimeout(targetBankTimeoutRef.current);
-    };
-  }, [ballLaunched, gameOver, resetVariableTargetBank]); // Run when game starts/ends or reset callback changes
-
-
- useEffect(() => {
-    let animationFrameId;
-    const GRAVITY = 0.1;
-    const FRICTION = 0.99;
-
-    const gameLoop = () => {
-      if (ballLaunched && !gameOver && !isBallCaptured) { // <-- Add !isBallCaptured here
-        setBallPosition(prevPosition => {
-          let newX = prevPosition.x + ballVelocity.x;
-          let newY = prevPosition.y + ballVelocity.y;
-
-          setBallVelocity(prevVelocity => {
-            let vx = prevVelocity.x * FRICTION;
-            let vy = prevVelocity.y * FRICTION + GRAVITY;
-            if (Math.abs(vx) < 0.1) vx = 0;
-            if (Math.abs(vy) < 0.1 && newY + radius >= PLAY_AREA_HEIGHT) vy = 0;
-            return { x: vx, y: vy };
-          });
-
-          // ... (boundary collisions) ...
-
-          handleCollision({ x: newX, y: newY }, radius, ballVelocity);
-          handleOutOfBounds({ x: newX, y: newY }, radius, ballVelocity);
-
-          if (bumper1HitCooldown.current > 0) bumper1HitCooldown.current -= 1;
-          if (bumper2HitCooldown.current > 0) bumper2HitCooldown.current -= 1;
-
-          return { x: newX, y: newY };
-        });
-      }
-      animationFrameId = requestAnimationFrame(gameLoop);
-    };
-
-    animationFrameId = requestAnimationFrame(gameLoop);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [ballLaunched, gameOver, ballVelocity, tubeExitY, isBallCaptured]); // Add isBallCaptured to dependencies
-
-
-const increaseBonusMultiplier = useCallback(() => {
+  // --- Bonus Multiplier Callbacks ---
+  const increaseBonusMultiplier = useCallback(() => {
     setBonusMultiplier(prev => Math.min(prev + 1, MAX_BONUS_MULTIPLIER));
   }, []);
 
-  // Function to reset the bonus multiplier
   const resetBonusMultiplier = useCallback(() => {
-    setBonusMultiplier(1); // Reset to 1x
+    setBonusMultiplier(1);
   }, []);
 
-  // Function to apply the bonus multiplier to a score
+  const addBonusScoreUnits = useCallback((units) => {
+    setBonusScoreUnits(prev => prev + units);
+  }, []);
+
+  const resetBonusScoreUnits = useCallback(() => {
+    setBonusScoreUnits(0);
+  }, []);
+
   const applyBonusMultiplier = useCallback((score) => {
     return score * bonusMultiplier;
   }, [bonusMultiplier]);
 
+  // --- Component-Specific Callbacks ---
 
+  // Drop Target Bank Callbacks
   const handleDropTargetHit = useCallback((id, score) => {
     const multipliedScore = applyBonusMultiplier(score);
     setScore(prev => prev + multipliedScore);
-    console.log(`Drop Target ${id} hit! Score: ${multipliedScore}`);
     setDroppedTargets(prev => ({ ...prev, [id]: true }));
   }, [applyBonusMultiplier]);
 
+  useEffect(() => {
+    const allTargetsDropped =
+      dropTarget1Ref.current?.getIsDropped() &&
+      dropTarget2Ref.current?.getIsDropped() &&
+      dropTarget3Ref.current?.getIsDropped();
+
+    if (allTargetsDropped) {
+      setScore(prev => prev + applyBonusMultiplier(DROP_TARGET_BONUS_SCORE));
+      setTimeout(() => {
+        dropTarget1Ref.current?.resetTarget();
+        dropTarget2Ref.current?.resetTarget();
+        dropTarget3Ref.current?.resetTarget();
+        setDroppedTargets({});
+      }, 500);
+    }
+  }, [droppedTargets, applyBonusMultiplier]);
+
+  // Rollover Bank Callbacks
   const handleRollover = useCallback((id, score) => {
     const multipliedScore = applyBonusMultiplier(score);
     setScore(prev => prev + multipliedScore);
-    console.log(`Rollover ${id} activated! Score: ${multipliedScore}`);
     setLitRollovers(prev => ({ ...prev, [id]: true }));
-  }, [applyBonusMultiplier]);
+    addBonusScoreUnits(10); // Each rollover hit adds 10 bonus units
+  }, [applyBonusMultiplier, addBonusScoreUnits]);
 
+  useEffect(() => {
+    const allRolloversLit =
+      rolloverARef.current?.getIsLit() &&
+      rolloverBRef.current?.getIsLit() &&
+      rolloverCRef.current?.getIsLit();
+
+    if (allRolloversLit) {
+      setScore(prev => prev + applyBonusMultiplier(ROLLOVER_BANK_BONUS_SCORE));
+      setTimeout(() => {
+        rolloverARef.current?.resetLight();
+        rolloverBRef.current?.resetLight();
+        rolloverCRef.current?.resetLight();
+        setLitRollovers({});
+      }, 500);
+    }
+  }, [litRollovers, applyBonusMultiplier]);
+
+  // Variable Target Bank Callbacks
   const handleVariableTargetHit = useCallback((id, score) => {
-    const multipliedScore = applyBonusMultiplier(score);
-    setScore(prev => prev + multipliedScore);
-    console.log(`Variable Target ${id} hit! Score: ${multipliedScore}`);
-
-    // Logic to advance the bank sequence
     const targets = [
       variableTarget1Ref.current,
       variableTarget2Ref.current,
@@ -827,7 +303,7 @@ const increaseBonusMultiplier = useCallback(() => {
 
     if (hitIndex !== -1) {
       if (hitIndex === activeTargetInBank) {
-        // Correct target hit: advance the sequence
+        setScore(prev => prev + applyBonusMultiplier(score)); // Apply score for individual target
         if (targets[activeTargetInBank]) {
           targets[activeTargetInBank].dimTarget();
         }
@@ -839,39 +315,61 @@ const increaseBonusMultiplier = useCallback(() => {
           clearTimeout(targetBankTimeoutRef.current);
           targetBankTimeoutRef.current = setTimeout(resetVariableTargetBank, TARGET_BANK_TIMEOUT);
         } else {
-          // All targets in the bank completed!
-          const bonusScore = applyBonusMultiplier(TARGET_BANK_BONUS_SCORE);
-          setScore(prev => prev + bonusScore);
-          console.log("Variable Target Bank completed! Awarding bonus and resetting.");
-          resetVariableTargetBank(); // Reset after completion
+          setScore(prev => prev + applyBonusMultiplier(TARGET_BANK_BONUS_SCORE));
+          resetVariableTargetBank();
           increaseBonusMultiplier(); // Award a multiplier increase for completing the bank
         }
       } else {
-        // Wrong target hit or hit an already completed/unlit target in sequence
-        console.log(`Incorrect target ${id} hit. Expected target ${targets[activeTargetInBank]?.id || 'N/A'}`);
+        // Incorrect target hit or hit an already completed/unlit target in sequence
         // Optional: reset the bank if an incorrect target is hit
         // resetVariableTargetBank();
       }
     }
   }, [activeTargetInBank, applyBonusMultiplier, increaseBonusMultiplier]);
 
+  const resetVariableTargetBank = useCallback(() => {
+    clearTimeout(targetBankTimeoutRef.current);
+    const targets = [
+      variableTarget1Ref.current,
+      variableTarget2Ref.current,
+      variableTarget3Ref.current,
+      variableTarget4Ref.current
+    ].filter(Boolean);
+
+    targets.forEach(target => target.dimTarget());
+    setActiveTargetInBank(0);
+
+    if (targets[0]) {
+      targets[0].lightTarget();
+      setActiveTargetInBank(0);
+      targetBankTimeoutRef.current = setTimeout(resetVariableTargetBank, TARGET_BANK_TIMEOUT);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!ballLaunched && !gameOver && activeTargetInBank === 0) {
+      resetVariableTargetBank();
+    }
+    return () => {
+      clearTimeout(targetBankTimeoutRef.current);
+    };
+  }, [ballLaunched, gameOver, resetVariableTargetBank]);
+
+  // Mystery Saucer Callback
   const onActivateMystery = useCallback((baseScore) => {
     const multipliedBaseScore = applyBonusMultiplier(baseScore);
-    setScore(prev => prev + multipliedBaseScore); // Apply multiplier to base score
+    setScore(prev => prev + multipliedBaseScore);
 
-    // Capture the ball immediately
     setIsBallCaptured(true);
-    ballCapturePosition.current = ballPosition;
-    setBallVelocity({ x: 0, y: 0 });
+    ballCapturePosition.current = ballPositionRef.current; // Use ref for current position
+    ballVelocityRef.current = { x: 0, y: 0 }; // Stop the ball
+    setDisplayBallVelocity({ x: 0, y: 0 }); // Update display velocity
 
-    // Determine random prize
     const prizeKeys = Object.keys(MYSTERY_PRIZES);
     const randomPrizeKey = prizeKeys[Math.floor(Math.random() * prizeKeys.length)];
     const prize = MYSTERY_PRIZES[randomPrizeKey];
 
-    console.log(`Mystery activated! You won: ${randomPrizeKey}`);
-
-    let message = "Mystery Prize!"; // Display to user
+    let message = "Mystery Prize!";
 
     if (typeof prize === 'number') {
       const multipliedPrize = applyBonusMultiplier(prize);
@@ -881,15 +379,16 @@ const increaseBonusMultiplier = useCallback(() => {
       switch (prize) {
         case 'extraBall':
           setEarnedExtraBalls(prev => prev + 1);
-          setLives(prev => prev + 1); // Add a life for extra ball
+          setLives(prev => prev + 1);
           message = "Extra Ball!";
           break;
         case 'advanceBonusMultiplier':
-          increaseBonusMultiplier(); // Award a multiplier increase
+          increaseBonusMultiplier();
           message = "Bonus Multiplier Advanced!";
           break;
         case 'lightKickback':
-          kickbackLeftRef.current?.lightKickback();
+          // Assuming Kickback has a lightKickback method
+          // kickbackLeftRef.current?.lightKickback();
           message = "Kickback Lit!";
           break;
         default:
@@ -898,72 +397,588 @@ const increaseBonusMultiplier = useCallback(() => {
       }
     }
 
-    // Display a message (you might want a dedicated UI for this)
-    alert(message); // Simple alert for now, replace with proper UI
+    alert(message); // Replace with proper UI later
 
-    // After a short delay, release the ball
     setTimeout(() => {
       setIsBallCaptured(false);
-      mysterySaucerRef.current?.resetSaucer(); // Allow saucer to be hit again
+      mysterySaucerRef.current?.resetSaucer();
       // Eject the ball with some velocity
-      setBallPosition(prev => ({ x: ballCapturePosition.current.x, y: ballCapturePosition.current.y - radius * 2 })); // Move slightly up
-      setBallVelocity({ x: (Math.random() > 0.5 ? 1 : -1) * 5, y: -10 }); // Random left/right eject
-    }, 2000); // Ball captured for 2 seconds
-  }, [ballPosition, setScore, setEarnedExtraBalls, setLives, increaseBonusMultiplier, applyBonusMultiplier]);
+      ballPositionRef.current = { x: ballCapturePosition.current.x, y: ballCapturePosition.current.y - BALL_RADIUS * 2 };
+      ballVelocityRef.current = { x: (Math.random() > 0.5 ? 1 : -1) * 5, y: -10 };
+      // Update display states to reflect changes
+      setDisplayBallPosition(ballPositionRef.current);
+      setDisplayBallVelocity(ballVelocityRef.current);
+    }, 2000);
+  }, [applyBonusMultiplier, increaseBonusMultiplier]); // Dependencies for useCallback
 
- 
-  // Function to add units to the end-of-ball bonus
-  const addBonusScoreUnits = useCallback((units) => {
-    setBonusScoreUnits(prev => prev + units);
-  }, []);
+  // --- Main Collision Handler ---
+  const handleCollision = useCallback((ballPosition, radius, velocity) => {
+    const ballCircle = { x: ballPosition.x, y: ballPosition.y, radius: radius };
 
-  // Function to reset the accumulated bonus units
-  const resetBonusScoreUnits = useCallback(() => {
-    setBonusScoreUnits(0);
-  }, []);
+    // If ball is captured, prevent further collision logic
+    if (isBallCaptured) {
+        ballPositionRef.current = ballCapturePosition.current;
+        ballVelocityRef.current = { x: 0, y: 0 };
+        return;
+    }
 
-  // Function to apply the bonus multiplier to a score
-  
+    // Mystery Saucer Collision (only if lit and not captured)
+    const mysterySaucer = mysterySaucerRef.current;
+    if (mysterySaucer && mysterySaucer.getIsLit()) {
+      const saucerRect = mysterySaucer.getBoundingClientRect();
+      if (saucerRect && isCircleCollidingWithRectangle(ballCircle, saucerRect)) {
+        mysterySaucer.handleCollision(); // Triggers onActivateMystery
+        return; // Exit early to prevent other collisions while ball is captured
+      }
+    }
 
+    // Bumper Collisions
+    const bumper1 = bumper1Ref.current;
+    if (bumper1) {
+      const bumperRect = bumper1.getBoundingClientRect();
+      if (bumperRect && isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper1HitCooldown.current <= 0) {
+        bumper1.handleCollision();
+        setScore(prev => prev + applyBonusMultiplier(bumper1.getScoreValue()));
+        ballVelocityRef.current = { x: -velocity.x * WALL_BOUNCE_DAMPENING, y: -velocity.y * WALL_BOUNCE_DAMPENING };
+        ballPositionRef.current = {
+          x: ballPosition.x + (ballPosition.x < bumperRect.left ? -COLLISION_NUDGE : (ballPosition.x > bumperRect.right ? COLLISION_NUDGE : 0)),
+          y: ballPosition.y + (ballPosition.y < bumperRect.top ? -COLLISION_NUDGE : (ballPosition.y > bumperRect.bottom ? COLLISION_NUDGE : 0)),
+        };
+        bumper1HitCooldown.current = BUMPER_COOLDOWN_FRAMES;
+      }
+    }
 
-  // MODIFIED: handleOutOfBounds to calculate and award end-of-ball bonus
+    const bumper2 = bumper2Ref.current;
+    if (bumper2) {
+      const bumperRect = bumper2.getBoundingClientRect();
+      if (bumperRect && isCircleCollidingWithRectangle(ballCircle, bumperRect) && bumper2HitCooldown.current <= 0) {
+        bumper2.handleCollision();
+        setScore(prev => prev + applyBonusMultiplier(bumper2.getScoreValue()));
+        ballVelocityRef.current = { x: -velocity.x * WALL_BOUNCE_DAMPENING, y: -velocity.y * WALL_BOUNCE_DAMPENING };
+        ballPositionRef.current = {
+          x: ballPosition.x + (ballPosition.x < bumperRect.left ? -COLLISION_NUDGE : (ballPosition.x > bumperRect.right ? COLLISION_NUDGE : 0)),
+          y: ballPosition.y + (ballPosition.y < bumperRect.top ? -COLLISION_NUDGE : (ballPosition.y > bumperRect.bottom ? COLLISION_NUDGE : 0)),
+        };
+        bumper2HitCooldown.current = BUMPER_COOLDOWN_FRAMES;
+      }
+    }
 
-      // Reset bonus units and multiplier for the next ball
-      resetBonusScoreUnits();
-      resetBonusMultiplier(); // Typically multiplier resets per ball
+    // Target Collisions
+    const target1 = target1Ref.current;
+    if (target1) {
+      const targetRect = target1.getBoundingClientRect();
+      if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
+        target1.handleCollision(); // This calls onHit which applies multiplier
+        ballVelocityRef.current = { ...ballVelocityRef.current, y: -velocity.y * 0.7 };
+      }
+    }
 
-      // ... (rest of your existing handleOutOfBounds logic for kickback and life loss) ...
+    const target2 = target2Ref.current;
+    if (target2) {
+      const targetRect = target2.getBoundingClientRect();
+      if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
+        target2.handleCollision(); // This calls onHit which applies multiplier
+        ballVelocityRef.current = { ...ballVelocityRef.current, y: -velocity.y * 0.7 };
+      }
+    }
 
-      // For kickbackLeftRef.current.handleCollision, it expects ballPosition and radius.
-      if (kickbackLeftRef.current && ballPosition.x < PLAY_AREA_WIDTH * 0.2) { // Use ballPosition.x here
-        const impulse = kickbackLeftRef.current.handleCollision(ballPosition, radius); // Pass ballPosition and radius
+    // Slingshot Collisions
+    const slingshotLeft = slingshotLeftRef.current;
+    if (slingshotLeft) {
+      const impulse = slingshotLeft.handleCollision(ballPosition, radius);
+      if (impulse) {
+        ballVelocityRef.current = { x: ballVelocityRef.current.x + impulse.x, y: ballVelocityRef.current.y + impulse.y };
+        setScore(prev => prev + applyBonusMultiplier(50)); // Slingshot score
+      }
+    }
+
+    const slingshotRight = slingshotRightRef.current;
+    if (slingshotRight) {
+      const impulse = slingshotRight.handleCollision(ballPosition, radius);
+      if (impulse) {
+        ballVelocityRef.current = { x: ballVelocityRef.current.x + impulse.x, y: ballVelocityRef.current.y + impulse.y };
+        setScore(prev => prev + applyBonusMultiplier(50)); // Slingshot score
+      }
+    }
+
+    // Spinner Collision
+    const spinner = spinnerRef.current;
+    if (spinner) {
+      const spinnerRect = spinner.getBoundingClientRect();
+      if (spinnerRect && isCircleCollidingWithRectangle(ballCircle, spinnerRect)) {
+        const baseScore = spinner.handleCollision(velocity);
+        setScore(prev => prev + applyBonusMultiplier(baseScore));
+        ballVelocityRef.current = { x: -velocity.x * 0.6, y: -velocity.y * 0.6 };
+      }
+    }
+
+    // Kickback Collision
+    const kickbackLeft = kickbackLeftRef.current;
+    if (kickbackLeft) {
+      const kickbackRect = kickbackLeft.getBoundingClientRect();
+      if (kickbackRect && isCircleCollidingWithRectangle(ballCircle, kickbackRect)) {
+        const impulse = kickbackLeft.handleCollision(ballPosition, radius);
         if (impulse) {
-          setBallVelocity(impulse);
+          ballVelocityRef.current = impulse;
+          setScore(prev => prev + applyBonusMultiplier(100)); // Kickback score
+        }
+      }
+    }
+
+    // Skill Shot Lane Collision
+    const skillShotLane = skillShotLaneRef.current;
+    if (skillShotLane) {
+      const score = skillShotLane.handleCollision(ballPosition, radius);
+      if (score > 0) {
+        setScore(prev => prev + applyBonusMultiplier(score));
+        ballVelocityRef.current = { ...ballVelocityRef.current, y: ballVelocityRef.current.y * 0.8 };
+      }
+    }
+
+    // Drop Target Collisions
+    const dropTargetRefs = [dropTarget1Ref, dropTarget2Ref, dropTarget3Ref];
+    dropTargetRefs.forEach(dtRef => {
+      const dropTarget = dtRef.current;
+      if (dropTarget) {
+        const dropTargetRect = dropTarget.getBoundingClientRect();
+        if (dropTargetRect && isCircleCollidingWithRectangle(ballCircle, dropTargetRect)) {
+          dropTarget.handleCollision(); // Calls onHit which applies multiplier
+          ballVelocityRef.current = { x: ballVelocityRef.current.x * 0.9, y: -ballVelocityRef.current.y * 0.8 };
+        }
+      }
+    });
+
+    // Rollover Lane Collisions
+    const rolloverRefs = [rolloverARef, rolloverBRef, rolloverCRef];
+    rolloverRefs.forEach(rlRef => {
+      const rollover = rlRef.current;
+      if (rollover) {
+        const rolloverRect = rollover.getBoundingClientRect();
+        if (rolloverRect && isCircleCollidingWithRectangle(ballCircle, rolloverRect)) {
+          rollover.handleCollision(); // Calls onRollOver which applies multiplier
+          ballVelocityRef.current = { x: ballVelocityRef.current.x * 0.9, y: ballVelocityRef.current.y * 0.9 };
+        }
+      }
+    });
+
+    // Gate Collision
+    const gate = gateRef.current;
+    if (gate) {
+      const gateRect = gate.getBoundingClientRect();
+      if (gateRect && isCircleCollidingWithRectangle(ballCircle, gateRect)) {
+        const currentIsOpen = gate.getIsOpen();
+        const passageDirection = gate.props.passageDirection;
+
+        let collisionHandled = false;
+
+        if (currentIsOpen) {
+          if (passageDirection === 'right' && velocity.x > 0) { collisionHandled = true; }
+          else if (passageDirection === 'left' && velocity.x < 0) { collisionHandled = true; }
+          else if (passageDirection === 'down' && velocity.y > 0) { collisionHandled = true; }
+          else if (passageDirection === 'up' && velocity.y < 0) { collisionHandled = true; }
+
+          if (!collisionHandled) {
+             ballVelocityRef.current = { x: -velocity.x * WALL_BOUNCE_DAMPENING, y: -velocity.y * WALL_BOUNCE_DAMPENING };
+             collisionHandled = true;
+          }
+        } else { // Gate is closed
+          if (passageDirection === 'right' && velocity.x < 0) {
+              ballVelocityRef.current = { x: -velocity.x * WALL_BOUNCE_DAMPENING, y: velocity.y * WALL_BOUNCE_DAMPENING };
+              collisionHandled = true;
+          } else if (passageDirection === 'left' && velocity.x > 0) {
+              ballVelocityRef.current = { x: -velocity.x * WALL_BOUNCE_DAMPENING, y: velocity.y * WALL_BOUNCE_DAMPENING };
+              collisionHandled = true;
+          } else if (passageDirection === 'down' && velocity.y < 0) {
+              ballVelocityRef.current = { x: velocity.x * WALL_BOUNCE_DAMPENING, y: -velocity.y * WALL_BOUNCE_DAMPENING };
+              collisionHandled = true;
+          } else if (passageDirection === 'up' && velocity.y > 0) {
+              ballVelocityRef.current = { x: velocity.x * WALL_BOUNCE_DAMPENING, y: -velocity.y * WALL_BOUNCE_DAMPENING };
+              collisionHandled = true;
+          } else {
+              ballVelocityRef.current = { x: -velocity.x * WALL_BOUNCE_DAMPENING, y: -velocity.y * WALL_BOUNCE_DAMPENING };
+              collisionHandled = true;
+          }
+        }
+        if (collisionHandled && !currentIsOpen) {
+            let nudgeX = 0;
+            let nudgeY = 0;
+
+            if (ballPosition.x < gateRect.left + radius && velocity.x > 0) nudgeX = -(COLLISION_NUDGE + radius);
+            else if (ballPosition.x > gateRect.right - radius && velocity.x < 0) nudgeX = (COLLISION_NUDGE + radius);
+
+            if (ballPosition.y < gateRect.top + radius && velocity.y > 0) nudgeY = -(COLLISION_NUDGE + radius);
+            else if (ballPosition.y > gateRect.bottom - radius && velocity.y < 0) nudgeY = (COLLISION_NUDGE + radius);
+
+            if (nudgeX !== 0 || nudgeY !== 0) {
+              ballPositionRef.current = { x: ballPosition.x + nudgeX, y: ballPosition.y + nudgeY };
+            }
+        }
+      }
+    }
+
+    // Variable Target Bank Collisions
+    const variableTargetRefs = [
+      variableTarget1Ref,
+      variableTarget2Ref,
+      variableTarget3Ref,
+      variableTarget4Ref
+    ];
+    variableTargetRefs.forEach(vtRef => {
+      const variableTarget = vtRef.current;
+      if (variableTarget) {
+        const targetRect = variableTarget.getBoundingClientRect();
+        if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
+          const scoreAwarded = variableTarget.handleCollision();
+          if (scoreAwarded > 0) {
+            ballVelocityRef.current = { x: ballVelocityRef.current.x * 0.9, y: -ballVelocityRef.current.y * 0.8 };
+          }
+        }
+      }
+    });
+
+  }, [isBallCaptured, applyBonusMultiplier, isCircleCollidingWithRectangle, mysterySaucerRef, bumper1Ref, bumper2Ref, target1Ref, target2Ref, slingshotLeftRef, slingshotRightRef, spinnerRef, kickbackLeftRef, skillShotLaneRef, dropTarget1Ref, dropTarget2Ref, dropTarget3Ref, rolloverARef, rolloverBRef, rolloverCRef, gateRef, variableTarget1Ref, variableTarget2Ref, variableTarget3Ref, variableTarget4Ref]); // Dependencies for useCallback
+
+  // --- Handle Out of Bounds (Drain) ---
+  const handleOutOfBounds = useCallback((ballPosition, radius, velocity) => {
+    if (ballPosition.y > PLAY_AREA_HEIGHT + radius * 2) {
+      const endOfBallBonus = bonusScoreUnits * END_OF_BALL_BONUS_FACTOR * bonusMultiplier;
+      if (endOfBallBonus > 0) {
+        setScore(prev => prev + endOfBallBonus);
+        alert(`End-of-Ball Bonus: +${endOfBallBonus} points!`); // Simple display
+      }
+
+      resetBonusScoreUnits();
+      resetBonusMultiplier();
+
+      if (kickbackLeftRef.current && ballPosition.x < PLAY_AREA_WIDTH * 0.2) {
+        const impulse = kickbackLeftRef.current.handleCollision(ballPosition, radius);
+        if (impulse) {
+          ballVelocityRef.current = impulse;
           setBallLaunched(true);
-          setBallPosition({ x: impulse.x > 0 ? (PLAY_AREA_WIDTH / 4) : (PLAY_AREA_WIDTH * 3 / 4), y: PLAY_AREA_HEIGHT - 100 });
-          return; // Ball was saved, do not decrease life or reset
+          ballPositionRef.current = { x: impulse.x > 0 ? (PLAY_AREA_WIDTH / 4) : (PLAY_AREA_WIDTH * 3 / 4), y: PLAY_AREA_HEIGHT - 100 };
+          setDisplayBallPosition(ballPositionRef.current); // Update display state
+          setDisplayBallVelocity(ballVelocityRef.current); // Update display state
+          return;
         }
       }
 
-      setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
-      setBallVelocity({ x: 0, y: 0 });
+      ballPositionRef.current = { x: INITIAL_BALL_X, y: INITIAL_BALL_Y };
+      ballVelocityRef.current = { x: 0, y: 0 };
       setBallLaunched(false);
       setLives(prev => prev - 1);
       if (lives <= 0) {
         setGameOver(true);
       }
-    else if (ballPosition.x < -radius * 2 || ballPosition.x > PLAY_AREA_WIDTH + radius * 2) {
-      setBallVelocity(prev => ({ ...prev, x: -prev.x * 0.8 }));
+      setDisplayBallPosition(ballPositionRef.current); // Update display state
+      setDisplayBallVelocity(ballVelocityRef.current); // Update display state
+    } else if (ballPosition.y < -radius) {
+      ballVelocityRef.current = { ...ballVelocityRef.current, y: -ballVelocityRef.current.y * WALL_BOUNCE_DAMPENING };
+      ballPositionRef.current = { ...ballPositionRef.current, y: -radius + COLLISION_NUDGE };
+    } else if (ballPosition.x < -radius || ballPosition.x > PLAY_AREA_WIDTH + radius) {
+      ballVelocityRef.current = { ...ballVelocityRef.current, x: -ballVelocityRef.current.x * WALL_BOUNCE_DAMPENING };
+      ballPositionRef.current = { ...ballPositionRef.current, x: ballPosition.x < -radius ? -radius : PLAY_AREA_WIDTH + radius }; // Nudge back
     }
-  
+  }, [bonusScoreUnits, bonusMultiplier, applyBonusMultiplier, resetBonusScoreUnits, resetBonusMultiplier, kickbackLeftRef, setScore, setBallLaunched, setLives, setGameOver]); // Dependencies for useCallback
+
+  // --- Game Start/Reset Logic ---
+  const handleGameStart = useCallback(() => {
+    setGameOver(false);
+    setScore(0);
+    setLives(3);
+    setBallLaunched(false);
+    setIsTilted(false);
+    setTiltWarnings(0);
+    setIsBallCaptured(false);
+
+    // Reset all refs to initial values
+    ballPositionRef.current = { x: INITIAL_BALL_X, y: INITIAL_BALL_Y };
+    ballVelocityRef.current = { x: 0, y: 0 };
+    bumper1HitCooldown.current = 0;
+    bumper2HitCooldown.current = 0;
+    tiltCooldownCounter.current = 0;
+    nudgeInputX.current = 0;
+    nudgeInputY.current = 0;
+    nudgeResetCounter.current = 0;
+    clearTimeout(targetBankTimeoutRef.current); // Clear any active timeout
+
+    // Update display states
+    setDisplayBallPosition(ballPositionRef.current);
+    setDisplayBallVelocity(ballVelocityRef.current);
+
+    // Reset child components via refs
+    bumper1Ref.current?.resetHitCount();
+    bumper2Ref.current?.resetHitCount();
+    target1Ref.current?.resetTarget();
+    target2Ref.current?.resetTarget();
+    skillShotLaneRef.current?.activateSkillShot();
+    dropTarget1Ref.current?.resetTarget();
+    dropTarget2Ref.current?.resetTarget();
+    dropTarget3Ref.current?.resetTarget();
+    setDroppedTargets({});
+    rolloverARef.current?.resetLight();
+    rolloverBRef.current?.resetLight();
+    rolloverCRef.current?.resetLight();
+    setLitRollovers({});
+    gateRef.current?.close();
+    mysterySaucerRef.current?.resetSaucer();
+    mysterySaucerRef.current?.lightSaucer();
+    resetVariableTargetBank(); // This will light the first target and start its timer
+    resetBonusMultiplier();
+    resetBonusScoreUnits();
+  }, [resetVariableTargetBank, resetBonusMultiplier, resetBonusScoreUnits]); // Dependencies for useCallback
+
+  // --- Ball Launcher Logic ---
+  const handlePlungerRelease = useCallback((launchPower) => {
+    if (!ballLaunched && !isTilted && !gameOver) {
+      const launchForce = launchPower * 15;
+      ballVelocityRef.current = { x: -5, y: -launchForce };
+      setBallLaunched(true);
+      setDisplayBallVelocity(ballVelocityRef.current); // Update display state
+      skillShotLaneRef.current?.activateSkillShot();
+    }
+  }, [ballLaunched, isTilted, gameOver]);
+
+
+  // --- Flipper Action Handling ---
+  const handleFlipperAction = useCallback((isLeft) => {
+    if (isTilted || gameOver || !ballLaunched) return;
+
+    if (isLeft) {
+      setLeftFlipperAngle(-45);
+      setTimeout(() => {
+        setLeftFlipperAngle(0);
+      }, 100);
+    } else {
+      setRightFlipperAngle(45);
+      setTimeout(() => {
+        setRightFlipperAngle(0);
+      }, 100);
+    }
+  }, [isTilted, gameOver, ballLaunched]);
+
+  // --- Tube Entrance Logic ---
+  const handleTubeEntrance = useCallback((entryX, entryY, width, height) => {
+    tubeEntranceX.current = entryX;
+    tubeEntranceY.current = entryY;
+    tubeWidth.current = width;
+    tubeHeight.current = height;
+    setIsBallCaptured(true); // Treat tube entry as a capture for consistent physics
+    ballPositionRef.current = { x: entryX + width / 2, y: entryY + height / 2 }; // Center in tube
+    ballVelocityRef.current = { x: 0, y: 0 }; // Stop ball in tube
+    setDisplayBallPosition(ballPositionRef.current);
+    setDisplayBallVelocity(ballVelocityRef.current);
+  }, []);
+
+  // Effect for ball movement inside the tube (if captured by tube)
+  useEffect(() => {
+    let interval;
+    if (isBallCaptured && mysterySaucerRef.current?.getIsLit() === false) { // Only move in tube if not mystery captured
+      interval = setInterval(() => {
+        // Simple vertical movement down the tube
+        if (ballPositionRef.current.y < tubeExitY) {
+          ballPositionRef.current = { x: tubeEntranceX.current + tubeWidth.current / 2 - BALL_RADIUS, y: ballPositionRef.current.y + 5 };
+          setDisplayBallPosition(ballPositionRef.current); // Update display
+        } else {
+          // Ball exits tube
+          clearInterval(interval);
+          setIsBallCaptured(false); // Release ball
+          ballVelocityRef.current = { x: -10, y: -10 }; // Eject velocity
+          setDisplayBallVelocity(ballVelocityRef.current); // Update display
+        }
+      }, 50); // Move every 50ms
+    }
+    return () => clearInterval(interval);
+  }, [isBallCaptured, tubeExitY]); // Dependencies
+
+  // --- Input Handling for Nudging and Flippers ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (isGameOver || isTilted || !ballLaunched) return;
+
+      // Flipper controls
+      if (e.key === 'ArrowLeft') handleFlipperAction(true);
+      if (e.key === 'ArrowRight') handleFlipperAction(false);
+
+      // Nudge controls
+      if (e.key === 'z') { handleNudge('left'); }
+      if (e.key === 'x') { handleNudge('up'); } // Typically 'x' for up/forward nudge
+      if (e.key === '/') { handleNudge('right'); }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isGameOver, isTilted, ballLaunched, handleFlipperAction, handleNudge]);
+
+  // --- Nudge Logic ---
+  const handleNudge = useCallback((direction) => {
+    if (isTilted || gameOver || !ballLaunched) return;
+
+    setTiltWarnings(prev => {
+      const newWarnings = prev + 1;
+      if (newWarnings > MAX_TILT_WARNINGS) {
+        setIsTilted(true);
+        tiltCooldownCounter.current = TILT_COOLDOWN_FRAMES;
+        ballVelocityRef.current = { x: 0, y: 0 }; // Stop the ball
+        setDisplayBallVelocity(ballVelocityRef.current); // Update display
+        // Optionally, drain the ball immediately here. For now, it will stop.
+        return 0; // Reset warnings
+      }
+      return newWarnings;
+    });
+
+    let impulseX = 0;
+    let impulseY = 0;
+    switch (direction) {
+      case 'left': impulseX = -NUDGE_IMPULSE_STRENGTH; break;
+      case 'right': impulseX = NUDGE_IMPULSE_STRENGTH; break;
+      case 'up': impulseY = -NUDGE_IMPULSE_STRENGTH; break;
+      case 'down': impulseY = NUDGE_IMPULSE_STRENGTH; break;
+      default: break;
+    }
+
+    nudgeInputX.current += impulseX;
+    nudgeInputY.current += impulseY;
+    nudgeResetCounter.current = NUDGE_RESET_FRAMES;
+  }, [isTilted, gameOver, ballLaunched]);
+
+
+  // --- Main Game Loop (Physics and Updates) ---
+  useEffect(() => {
+    let animationFrameId;
+
+    const gameLoop = () => {
+      // Tilt Cooldown Management
+      if (isTilted) {
+        tiltCooldownCounter.current--;
+        if (tiltCooldownCounter.current <= 0) {
+          setIsTilted(false);
+          // Optionally, re-enable flippers here if they were disabled
+        }
+      }
+
+      // Nudge Warning Decay
+      if (tiltWarnings > 0 && nudgeResetCounter.current > 0) {
+        nudgeResetCounter.current--;
+        if (nudgeResetCounter.current <= 0) {
+          setTiltWarnings(0);
+        }
+      }
+
+      // Only run physics if game is active, not over, not captured, and not tilted
+      if (ballLaunched && !gameOver && !isBallCaptured && !isTilted) {
+        // Apply physics to ballVelocityRef
+        ballVelocityRef.current.x *= FRICTION;
+        ballVelocityRef.current.y = ballVelocityRef.current.y * FRICTION + GRAVITY;
+
+        // Apply accumulated nudge impulse
+        ballVelocityRef.current.x += nudgeInputX.current;
+        ballVelocityRef.current.y += nudgeInputY.current;
+
+        // Reset nudge impulses for next frame
+        nudgeInputX.current = 0;
+        nudgeInputY.current = 0;
+
+        // Basic damping to prevent infinite tiny bounces
+        if (Math.abs(ballVelocityRef.current.x) < 0.1) ballVelocityRef.current.x = 0;
+        // Only dampen Y if on floor or near bottom
+        if (Math.abs(ballVelocityRef.current.y) < 0.1 && ballPositionRef.current.y + BALL_RADIUS >= PLAY_AREA_HEIGHT - 5) {
+          ballVelocityRef.current.y = 0;
+        }
+
+
+        // Update ballPositionRef based on new velocity
+        ballPositionRef.current = {
+          x: ballPositionRef.current.x + ballVelocityRef.current.x,
+          y: ballPositionRef.current.y + ballVelocityRef.current.y,
+        };
+
+        // --- Boundary Collisions (Walls) ---
+        // These updates modify ballPositionRef and ballVelocityRef directly
+        if (ballPositionRef.current.x - BALL_RADIUS < 0) {
+          ballVelocityRef.current.x = -ballVelocityRef.current.x * WALL_BOUNCE_DAMPENING;
+          ballPositionRef.current.x = BALL_RADIUS;
+        } else if (ballPositionRef.current.x + BALL_RADIUS > PLAY_AREA_WIDTH) {
+          ballVelocityRef.current.x = -ballVelocityRef.current.x * WALL_BOUNCE_DAMPENING;
+          ballPositionRef.current.x = PLAY_AREA_WIDTH - BALL_RADIUS;
+        }
+
+        if (ballPositionRef.current.y - BALL_RADIUS < 0) {
+          ballVelocityRef.current.y = -ballVelocityRef.current.y * WALL_BOUNCE_DAMPENING;
+          ballPositionRef.current.y = BALL_RADIUS;
+        }
+
+        // --- Call main collision handler for interactive elements ---
+        // Pass the current ref values to the collision handler
+        handleCollision(ballPositionRef.current, BALL_RADIUS, ballVelocityRef.current);
+
+        // --- Handle Out of Bounds (Drain) ---
+        handleOutOfBounds(ballPositionRef.current, BALL_RADIUS, ballVelocityRef.current);
+
+        // --- Update Cooldowns for Bumpers ---
+        if (bumper1HitCooldown.current > 0) bumper1HitCooldown.current -= 1;
+        if (bumper2HitCooldown.current > 0) bumper2HitCooldown.current -= 1;
+
+        // --- Update React State for Rendering (ONLY ONCE PER FRAME) ---
+        // This is the crucial part to prevent re-render loops.
+        // We update the display state *after* all physics and collisions for the frame are done.
+        setDisplayBallPosition({ ...ballPositionRef.current });
+        setDisplayBallVelocity({ ...ballVelocityRef.current }); // Optional, for debugging display
+      }
+
+      animationFrameId = requestAnimationFrame(gameLoop);
+    };
+
+    // Start the game loop
+    animationFrameId = requestAnimationFrame(gameLoop);
+
+    // Cleanup function for useEffect
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [ballLaunched, gameOver, isBallCaptured, isTilted, tiltWarnings, handleCollision, handleOutOfBounds]); // Dependencies for the game loop.
+  // Dependencies should only be states/props that *change the behavior* of the loop,
+  // not values that are updated *within* the loop itself (like ballPositionRef).
 
 
   return (
     <Container>
-      <PinballGame onKeyDown={(e) => {
-        if (e.key === 'ArrowLeft') handleFlipperAction(true);
-        if (e.key === 'ArrowRight') handleFlipperAction(false);
-      }} tabIndex={0}> {/* Added tabIndex for focus */}
+      <PinballGame tabIndex={0}>
+        {/* Consolidated Scoreboard */}
+        <ConsolidatedScoreboard>
+          <div>
+            <span>SCORE:</span>
+            <span>{score}</span>
+          </div>
+          <div>
+            <span>LIVES:</span>
+            <span>{lives}</span>
+          </div>
+          <div>
+            <span>BONUS MULT:</span>
+            <span>{bonusMultiplier}x</span>
+          </div>
+          <div>
+            <span>BONUS UNITS:</span>
+            <span>{bonusScoreUnits}</span>
+          </div>
+        </ConsolidatedScoreboard>
+
+        {/* Nudge/Tilt Warning Display */}
+        <NudgeDisplay
+          currentWarnings={tiltWarnings}
+          maxWarnings={MAX_TILT_WARNINGS}
+        />
+
+        {/* Game Over Overlay */}
+        {gameOver && (
+          <GameOverOverlay>
+            Game Over! Final Score: {score}
+            <RestartButton onClick={handleGameStart}>Restart Game</RestartButton>
+          </GameOverOverlay>
+        )}
+
         {/* Bottom Right Launcher and Tube */}
         <BallLauncher onLaunch={handlePlungerRelease} right={20} bottom={20} />
         <Tube
@@ -972,7 +987,20 @@ const increaseBonusMultiplier = useCallback(() => {
           x={PLAY_AREA_WIDTH - 70}
           y={50}
           width={40}
-          height={PLAY_AREA_HEIGHT - 220}
+          height={PLAY_AREA_HEIGHT - 120}
+        />
+
+        {/* Skill Shot Lane */}
+        <SkillShotLane
+          ref={skillShotLaneRef}
+          top={PLAY_AREA_HEIGHT - 200}
+          left={PLAY_AREA_WIDTH - 100}
+          width={40}
+          height={150}
+          scoreValue={SKILL_SHOT_SCORE}
+          onSkillShotHit={(score) => setScore(prev => prev + score)}
+          isActiveInitially={false}
+          deactivationDelay={2000}
         />
 
         {/* Middle Area Components with refs */}
@@ -996,27 +1024,129 @@ const increaseBonusMultiplier = useCallback(() => {
           glowColor="#cc3366"
           scoreValue={200}
         />
-         <PinballTarget
+        <PinballTarget
           ref={target1Ref}
           id="target1"
           size={40}
           initialTop={100}
           initialLeft={300}
-          onClick={(score) => setScore(prev => prev + score)} // Get score from target
-          scoreValue={250} // Set a specific score value
-          resetDelay={5000} // Reset after 5 seconds
+          onHit={(id, score) => setScore(prev => prev + score)} // Use onHit for ball collision
+          scoreValue={250}
+          resetDelay={5000}
         />
-       <PinballTarget
+        <PinballTarget
+          ref={target2Ref}
+          id="target2"
+          size={40}
+          initialTop={100}
+          initialLeft={500}
+          onHit={(id, score) => setScore(prev => prev + score)} // Use onHit for ball collision
+          scoreValue={300}
+          resetDelay={3000}
+        />
+        <Slingshot ref={slingshotLeftRef} top={400} left={100} armLength={70} angle={30} onCollision={(impulse) => setScore(prev => prev + applyBonusMultiplier(50))} />
+        <Slingshot ref={slingshotRightRef} top={400} left={600} armLength={70} angle={-30} onCollision={(impulse) => setScore(prev => prev + applyBonusMultiplier(50))} />
+        <Spinner ref={spinnerRef} top={200} left={350} type="left" scorePerRotation={75} />
+        <Ramp ref={rampRef} width={180} height={50} top={300} left={50} angle={15} />
+        <LoopShot size="50px" top="250px" left="650px" speed="2s" />
+        <PopBumper top={250} left={400} />
+        <DropTarget
+          ref={dropTarget1Ref}
+          id="DT1"
+          top={150}
+          left={650}
+          width={30}
+          height={50}
+          scoreValue={200}
+          onHit={handleDropTargetHit}
+        />
+        <DropTarget
+          ref={dropTarget2Ref}
+          id="DT2"
+          top={150}
+          left={685}
+          width={30}
+          height={50}
+          scoreValue={200}
+          onHit={handleDropTargetHit}
+        />
+        <DropTarget
+          ref={dropTarget3Ref}
+          id="DT3"
+          top={150}
+          left={720}
+          width={30}
+          height={50}
+          scoreValue={200}
+          onHit={handleDropTargetHit}
+        />
+        <Magnet top={100} left={150} />
+        <Outlane onDrain={handleOutOfBounds} left={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} ref={outlaneLeftRef} />
+        <Outlane onDrain={handleOutOfBounds} right={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} ref={outlaneRightRef} />
+        <Kickback ref={kickbackLeftRef} bottom={PLAY_AREA_HEIGHT - 120} left={20} angle={30} onKickback={() => setScore(prev => prev + applyBonusMultiplier(100))} />
+        <LaneChange onClick={() => console.log('Lane Change clicked')} left={120} top={PLAY_AREA_HEIGHT - 100} />
+        <LaneChange onClick={() => console.log('Lane Change clicked')} left={580} top={PLAY_AREA_HEIGHT - 100} />
+        <Rollover
+          ref={rolloverARef}
+          id="A"
+          top={50}
+          left={200}
+          width={60}
+          height={20}
+          scoreValue={50}
+          onRollOver={handleRollover}
+        />
+        <Rollover
+          ref={rolloverBRef}
+          id="B"
+          top={50}
+          left={300}
+          width={60}
+          height={20}
+          scoreValue={50}
+          onRollOver={handleRollover}
+        />
+        <Rollover
+          ref={rolloverCRef}
+          id="C"
+          top={50}
+          left={400}
+          width={60}
+          height={20}
+          scoreValue={50}
+          onRollOver={handleRollover}
+        />
+        <Gate
+          ref={gateRef}
+          top={350}
+          left={150}
+          width={5}
+          height={40}
+          pivotX={0}
+          pivotY={0}
+          initialIsOpen={false}
+          passageDirection="right"
+        />
+        <MysterySaucer
+          ref={mysterySaucerRef}
+          top={80}
+          left={650}
+          size={50}
+          onActivate={onActivateMystery}
+          initialIsLit={true}
+          scoreValue={1000}
+        />
+        <PinballTarget
           ref={variableTarget1Ref}
           id="VT1"
           size={40}
           initialTop={200}
           initialLeft={500}
           scoreValue={200}
-          onHit={handleVariableTargetHit} // Use the new handler
-          initialIsLit={false} // Will be lit by resetVariableTargetBank
+          onHit={handleVariableTargetHit}
+          initialIsLit={false}
         />
-          <PinballTarget
+        <PinballTarget
           ref={variableTarget2Ref}
           id="VT2"
           size={40}
@@ -1025,9 +1155,8 @@ const increaseBonusMultiplier = useCallback(() => {
           scoreValue={200}
           onHit={handleVariableTargetHit}
           initialIsLit={false}
-          />
-
-          <PinballTarget
+        />
+        <PinballTarget
           ref={variableTarget3Ref}
           id="VT3"
           size={40}
@@ -1037,7 +1166,6 @@ const increaseBonusMultiplier = useCallback(() => {
           onHit={handleVariableTargetHit}
           initialIsLit={false}
         />
-        {/* Optional: Add a fourth target */}
         <PinballTarget
           ref={variableTarget4Ref}
           id="VT4"
@@ -1049,93 +1177,11 @@ const increaseBonusMultiplier = useCallback(() => {
           initialIsLit={false}
         />
 
-        <Slingshot ref={slingshotLeftRef} top={400} left={100} armLength={70} angle={30} onCollision={(impulse) => setScore(prev => prev + 50)} />
-        <Slingshot ref={slingshotRightRef} top={400} left={600} armLength={70} angle={-30} onCollision={(impulse) => setScore(prev => prev + 50)} />
-      
-        <Spinner ref={spinnerRef} top={200} left={350} type="left" scorePerRotation={75} />
-        <Ramp ref={rampRef} width={180} height={50} top={300} left={50} angle={15} />
-        <LoopShot size="50px" top="250px" left="650px" speed="2s" />
-        <PopBumper top={250} left={400} />
-        <DropTarget top={150} left={650} />
-        <Magnet top={100} left={150} />
-        <Outlane onDrain={handleBallDrain} left={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} />
-        <Outlane onDrain={handleBallDrain} right={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} />
-        <LaneChange onClick={() => handleLaneChange('left')} left={120} top={PLAY_AREA_HEIGHT - 100} />
-        <LaneChange onClick={() => handleLaneChange('right')} left={580} top={PLAY_AREA_HEIGHT - 100} />
-
+        {/* The Ball component now receives its position from displayBallPosition */}
         <Ball
-          position={ballPosition}
-          radius={radius}
+          position={displayBallPosition}
+          radius={BALL_RADIUS}
           ref={ballRef}
-          velocity={ballVelocity}
-          updateBallPosition={setBallPosition}
-          onCollision={handleCollision}
-          playAreaWidth={PLAY_AREA_WIDTH}
-          playAreaHeight={PLAY_AREA_HEIGHT}
-          friction={0.01}
-          gravity={0.1}
-        />
-
-        {/* UI Elements */}
-        <Scoreboard score={score} lives={lives} bonus={activeBonus} extraBalls={earnedExtraBalls} top={20} left={20}>
-          
-          <div>
-            <span>SCORE:</span>
-            <span>{score}</span>
-          </div>
-          <div>
-            <span>LIVES:</span>
-            <span>{lives}</span>
-          </div>
-          <div>
-            <span>BONUS MULT:</span>
-            <span>{bonusMultiplier}x</span>
-          </div>
-          <div>
-            <span>BONUS UNITS:</span>
-            <span>{bonusScoreUnits}</span>
-          </div>
-        </Scoreboard>
-        <ScoreDisplay score={score} top={60} left={20} />
-        {activeBonus > 1 && <BonusDisplay bonus={activeBonus} duration={3000} top={100} left={20} />}
-        <ExtraBallIndicator earnedExtraBalls={earnedExtraBalls} top={140} left={20} />
-        {gameOver && <GameOverMessage score={score} />}
-        <GameStartButton onStartGame={handleGameStart} top={20} left={PLAY_AREA_WIDTH - 150} />
-        <Kickback ref={kickbackLeftRef} bottom={PLAY_AREA_HEIGHT - 120} left={20} angle={30} onKickback={() => setScore(prev => prev + 100)} />
-        {/* You might have a kickback on the other side as well */}
-         <Kickback ref={kickbackRightRef} bottom={PLAY_AREA_HEIGHT - 120} left={PLAY_AREA_WIDTH - 40} angle={-30} onKickback={() => setScore(prev => prev + 100)} />
-          <Gate
-          ref={gateRef}
-          top={350} // Adjust position as needed
-          left={150} // Adjust position as needed
-          width={5} // Thin bar
-          height={40} // Vertical bar
-          pivotX={0} // Hinge at the left edge
-          pivotY={0} // Hinge at the top
-          initialIsOpen={false}
-          passageDirection="right" // Ball can pass right-to-left when open, blocked otherwise
-        />
-        <MysterySaucer
-          ref={mysterySaucerRef}
-          top={80} // Adjust position as needed
-          left={650} // Adjust position as needed
-          size={50}
-          onActivate={onActivateMystery} // The main callback
-          initialIsLit={true} // Start lit, or activate via game logic later
-          scoreValue={1000} // Base score for hitting it
-        />
-         <MultiplierDisplay>
-          Bonus Multiplier: {bonusMultiplier}x
-        </MultiplierDisplay>
-        {gameOver && (
-          <GameOverMessage>
-            Game Over! Final Score: {score}
-            <RestartButton onClick={handleGameStart}>Restart</RestartButton>
-          </GameOverMessage>
-        )}
-        <NudgeDisplay
-          currentWarnings={tiltWarnings}
-          maxWarnings={MAX_TILT_WARNINGS}
         />
 
       </PinballGame>
