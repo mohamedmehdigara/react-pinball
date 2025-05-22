@@ -59,7 +59,8 @@ const COLLISION_NUDGE = 5;
 const BUMPER_COOLDOWN_FRAMES = 10;
 const TARGET_BANK_BONUS_SCORE = 10000; // Bonus for completing the target bank
 const TARGET_BANK_TIMEOUT = 10000; 
-const MAX_BONUS_MULTIPLIER = 10; // Maximum multiplier value
+const MAX_BONUS_MULTIPLIER = 10;
+const END_OF_BALL_BONUS_FACTOR = 100; 
 
 const MYSTERY_PRIZES = {
     SCORE_SMALL: 5000,
@@ -102,6 +103,8 @@ const MultiplierDisplay = styled.div`
 `;
 
 
+
+
 const Pinball = () => {
   const [ballPosition, setBallPosition] = useState({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
   const [ballVelocity, setBallVelocity] = useState({ x: 0, y: 0 });
@@ -125,7 +128,8 @@ const Pinball = () => {
   const [litRollovers, setLitRollovers] = useState({});
   const [activeTargetInBank, setActiveTargetInBank] = useState(0);
   const [isBallCaptured, setIsBallCaptured] = useState(false);
-    const [bonusMultiplier, setBonusMultiplier] = useState(1); // Start with 1x multiplier
+const [bonusMultiplier, setBonusMultiplier] = useState(1);
+  const [bonusScoreUnits, setBonusScoreUnits] = useState(0);
 
   const bumper1HitCooldown = useRef(0);
   const bumper2HitCooldown = useRef(0);
@@ -563,9 +567,23 @@ const bumper1Ref = useRef(null);
      mysterySaucerRef.current?.resetSaucer(); // Reset saucer at game start
     mysterySaucerRef.current?.lightSaucer();
     gateRef.current?.close();
+    resetBonusMultiplier(); // Ensure reset at game start
+    resetBonusScoreUnits(); // Ensure reset at game start
+    mysterySaucerRef.current?.resetSaucer();
+    mysterySaucerRef.current?.lightSaucer();
+    resetVariableTargetBank();
+
+    // Reset Tilt state on game start
+    setTiltWarnings(0);
+    setIsTilted(false);
+    tiltCooldownCounter.current = 0;
+    nudgeInputX.current = 0;
+    nudgeInputY.current = 0;
+    nudgeResetCounter.current = 0;
      resetBonusMultiplier();
     // Reset the variable target bank on game start
     resetVariableTargetBank();
+
   };
 
 
@@ -885,6 +903,52 @@ const increaseBonusMultiplier = useCallback(() => {
     }, 2000); // Ball captured for 2 seconds
   }, [ballPosition, setScore, setEarnedExtraBalls, setLives, increaseBonusMultiplier, applyBonusMultiplier]);
 
+ 
+  // Function to add units to the end-of-ball bonus
+  const addBonusScoreUnits = useCallback((units) => {
+    setBonusScoreUnits(prev => prev + units);
+  }, []);
+
+  // Function to reset the accumulated bonus units
+  const resetBonusScoreUnits = useCallback(() => {
+    setBonusScoreUnits(0);
+  }, []);
+
+  // Function to apply the bonus multiplier to a score
+  
+
+
+  // MODIFIED: handleOutOfBounds to calculate and award end-of-ball bonus
+
+      // Reset bonus units and multiplier for the next ball
+      resetBonusScoreUnits();
+      resetBonusMultiplier(); // Typically multiplier resets per ball
+
+      // ... (rest of your existing handleOutOfBounds logic for kickback and life loss) ...
+
+      // For kickbackLeftRef.current.handleCollision, it expects ballPosition and radius.
+      if (kickbackLeftRef.current && ballPosition.x < PLAY_AREA_WIDTH * 0.2) { // Use ballPosition.x here
+        const impulse = kickbackLeftRef.current.handleCollision(ballPosition, radius); // Pass ballPosition and radius
+        if (impulse) {
+          setBallVelocity(impulse);
+          setBallLaunched(true);
+          setBallPosition({ x: impulse.x > 0 ? (PLAY_AREA_WIDTH / 4) : (PLAY_AREA_WIDTH * 3 / 4), y: PLAY_AREA_HEIGHT - 100 });
+          return; // Ball was saved, do not decrease life or reset
+        }
+      }
+
+      setBallPosition({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
+      setBallVelocity({ x: 0, y: 0 });
+      setBallLaunched(false);
+      setLives(prev => prev - 1);
+      if (lives <= 0) {
+        setGameOver(true);
+      }
+    else if (ballPosition.x < -radius * 2 || ballPosition.x > PLAY_AREA_WIDTH + radius * 2) {
+      setBallVelocity(prev => ({ ...prev, x: -prev.x * 0.8 }));
+    }
+  
+
 
   return (
     <Container>
@@ -1005,7 +1069,25 @@ const increaseBonusMultiplier = useCallback(() => {
         />
 
         {/* UI Elements */}
-        <Scoreboard score={score} lives={lives} bonus={activeBonus} extraBalls={earnedExtraBalls} top={20} left={20} />
+        <Scoreboard score={score} lives={lives} bonus={activeBonus} extraBalls={earnedExtraBalls} top={20} left={20}>
+          
+          <div>
+            <span>SCORE:</span>
+            <span>{score}</span>
+          </div>
+          <div>
+            <span>LIVES:</span>
+            <span>{lives}</span>
+          </div>
+          <div>
+            <span>BONUS MULT:</span>
+            <span>{bonusMultiplier}x</span>
+          </div>
+          <div>
+            <span>BONUS UNITS:</span>
+            <span>{bonusScoreUnits}</span>
+          </div>
+        </Scoreboard>
         <ScoreDisplay score={score} top={60} left={20} />
         {activeBonus > 1 && <BonusDisplay bonus={activeBonus} duration={3000} top={100} left={20} />}
         <ExtraBallIndicator earnedExtraBalls={earnedExtraBalls} top={140} left={20} />
@@ -1037,6 +1119,17 @@ const increaseBonusMultiplier = useCallback(() => {
          <MultiplierDisplay>
           Bonus Multiplier: {bonusMultiplier}x
         </MultiplierDisplay>
+        {gameOver && (
+          <GameOverOverlay>
+            Game Over! Final Score: {score}
+            <RestartButton onClick={handleGameStart}>Restart</RestartButton>
+          </GameOverOverlay>
+        )}
+        <NudgeDisplay
+          currentWarnings={tiltWarnings}
+          maxWarnings={MAX_TILT_WARNINGS}
+        />
+
       </PinballGame>
     </Container>
   );
