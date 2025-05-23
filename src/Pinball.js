@@ -27,6 +27,7 @@ import Rollover from './components/Rollover';
 import BallSaveDisplay from './components/BallSaveDisplay';
 import GameOverOverlay from './components/GameOverMessage';
 import VUK from './components/VUK';
+import Scoop from './components/Scoop';
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -223,6 +224,8 @@ const Pinball = () => {
   const variableTarget2Ref = useRef(null);
   const variableTarget3Ref = useRef(null);
   const variableTarget4Ref = useRef(null);
+    const scoopRef = useRef(null);
+
 
 
   // Derived state (from refs, so it's always up-to-date in logic)
@@ -421,6 +424,24 @@ const Pinball = () => {
     setLitRollovers(prev => ({ ...prev, [id]: true }));
     addBonusScoreUnits(10);
   }, [applyBonusMultiplier, addBonusScoreUnits]);
+
+  const handleScoopCapture = useCallback((scoopId) => {
+    setIsBallCaptured(true);
+    ballCapturePosition.current = { ...ballPositionRef.current };
+    ballVelocityRef.current = { x: 0, y: 0 };
+    setDisplayBallVelocity({ x: 0, y: 0 });
+    setScore(prev => prev + applyBonusMultiplier(750)); // Example score for Scoop capture
+  }, [applyBonusMultiplier, setIsBallCaptured, setDisplayBallVelocity, setScore]);
+
+  const handleScoopEject = useCallback((scoopId, newBallPosition, newBallVelocity) => {
+    setIsBallCaptured(false);
+    ballPositionRef.current = newBallPosition;
+    ballVelocityRef.current = newBallVelocity;
+    setDisplayBallPosition(newBallPosition);
+    setDisplayBallVelocity(newBallVelocity);
+    setBallLaunched(true);
+  }, [setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setBallLaunched]);
+
 
   useEffect(() => {
     const allRolloversLit =
@@ -765,6 +786,24 @@ const Pinball = () => {
             }
         }
       }
+
+      const scoop = scoopRef.current;
+    if (scoop) {
+      const scoopRect = scoop.getBoundingClientRect();
+      if (scoopRect && isCircleCollidingWithRectangle(ballCircle, scoopRect)) {
+        const scoreAwarded = scoop.handleCollision(ballPosition, radius);
+        if (scoreAwarded > 0) {
+          // Score is handled by Scoop's handleCollision, which calls onCapture
+          // No direct velocity change here, as Scoop will handle ejection
+        }
+        return; // Ball is captured, prevent further collisions this frame
+      }
+    }
+
+// ... (inside handleGameStart function)
+
+    scoopRef.current?.resetScoop(); // NEW: Reset Scoop state
+
     }
 
     const variableTargetRefs = [
@@ -1350,6 +1389,20 @@ const Pinball = () => {
           position={displayBallPosition}
           radius={BALL_RADIUS}
           ref={ballRef}
+        />
+
+        <Scoop
+          ref={scoopRef}
+          id="scoop1"
+          top={300}
+          left={350}
+          size={60}
+          ejectStrength={10}
+          captureDelay={700}
+          scoreValue={750}
+          onCapture={handleScoopCapture}
+          onEject={handleVUKEject} // Re-using handleVUKEject as it has similar signature
+          initialIsLit={false}
         />
 
       </PinballGame>
