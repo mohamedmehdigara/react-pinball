@@ -31,6 +31,7 @@ import Scoop from './components/Scoop';
 import StandupTarget from './components/StandupTarget';
 import Rotor from './components/Rotor';
 import SubwayEntrance from './components/SubwayEntrance';
+import SubwayExit from './components/SubwayExit';
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -231,6 +232,8 @@ const Pinball = () => {
       const standupTargetRef = useRef(null);
         const rotorRef = useRef(null);
           const subwayEntranceRef = useRef(null);
+            const subwayExitRef = useRef(null);
+
 
 
 
@@ -867,6 +870,8 @@ const Pinball = () => {
       }
     }
 
+   
+
     }
 
     const variableTargetRefs = [
@@ -1008,6 +1013,7 @@ const Pinball = () => {
     rotorRef.current?.resetRotor(); // NEW: Reset Rotor state
     scoopRef.current?.resetScoop(); // NEW: Reset Scoop state
     subwayEntranceRef.current?.resetEntrance(); // NEW: Reset SubwayEntrance state
+    subwayExitRef.current?.resetExit(); // NEW: Reset SubwayExit state
 
 
 
@@ -1132,6 +1138,16 @@ const Pinball = () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [gameOver, isTilted, ballLaunched, handleFlipperAction, handleNudge]);
+
+  const handleSubwayExit = useCallback((id, newBallPosition, newBallVelocity) => {
+    setIsBallCaptured(false); // Release the ball
+    ballPositionRef.current = newBallPosition;
+    ballVelocityRef.current = newBallVelocity;
+    setDisplayBallPosition(newBallPosition);
+    setDisplayBallVelocity(newBallVelocity);
+    setBallLaunched(true); // Ensure ball is considered launched after eject
+  }, [setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setBallLaunched]);
+
 
 
   // --- Main Game Loop (Physics and Updates) ---
@@ -1522,6 +1538,19 @@ const Pinball = () => {
           scoreValue={500}
           captureDelay={100}
           onEnter={handleSubwayEntrance}
+          initialIsLit={false}
+        />
+
+         <SubwayExit
+          ref={subwayExitRef}
+          id="subwayExit1"
+          top={400}
+          left={650}
+          width={60}
+          height={30}
+          ejectStrength={12}
+          ejectDirection="up"
+          onEject={handleSubwayExit}
           initialIsLit={false}
         />
 
