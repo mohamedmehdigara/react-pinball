@@ -28,6 +28,7 @@ import BallSaveDisplay from './components/BallSaveDisplay';
 import GameOverOverlay from './components/GameOverMessage';
 import VUK from './components/VUK';
 import Scoop from './components/Scoop';
+import StandupTarget from './components/StandupTarget';
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -225,6 +226,8 @@ const Pinball = () => {
   const variableTarget3Ref = useRef(null);
   const variableTarget4Ref = useRef(null);
     const scoopRef = useRef(null);
+      const standupTargetRef = useRef(null);
+
 
 
 
@@ -441,6 +444,13 @@ const Pinball = () => {
     setDisplayBallVelocity(newBallVelocity);
     setBallLaunched(true);
   }, [setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setBallLaunched]);
+
+  const handleStandupTargetHit = useCallback((id, score) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    addBonusScoreUnits(5); // Example: add bonus units for hitting a standup target
+  }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
+
 
 
   useEffect(() => {
@@ -804,6 +814,22 @@ const Pinball = () => {
 
     scoopRef.current?.resetScoop(); // NEW: Reset Scoop state
 
+    const standupTarget = standupTargetRef.current;
+    if (standupTarget) {
+      const standupTargetRect = standupTarget.getBoundingClientRect();
+      if (standupTargetRect && isCircleCollidingWithRectangle(ballCircle, standupTargetRect)) {
+        const scoreAwarded = standupTarget.handleCollision();
+        if (scoreAwarded > 0) {
+          // Score is handled by StandupTarget's handleCollision, which calls onHit
+          // No direct velocity change here, as it's a static target
+        }
+        // Apply a small bounce effect
+        ballVelocityRef.current = { x: -velocity.x * 0.7, y: -velocity.y * 0.7 };
+        return; // Prevent further collisions this frame if hit
+      }
+    }
+
+
     }
 
     const variableTargetRefs = [
@@ -928,6 +954,8 @@ const Pinball = () => {
     gateRef.current?.close();
     mysterySaucerRef.current?.resetSaucer();
     mysterySaucerRef.current?.lightSaucer();
+    standupTargetRef.current?.resetTarget(); // NEW: Reset StandupTarget state
+
     resetVariableTargetBank();
     resetBonusMultiplier();
     resetBonusScoreUnits();
@@ -1403,6 +1431,20 @@ const Pinball = () => {
           onCapture={handleScoopCapture}
           onEject={handleVUKEject} // Re-using handleVUKEject as it has similar signature
           initialIsLit={false}
+        />
+
+        <StandupTarget
+          ref={standupTargetRef}
+          id="ST1"
+          top={250}
+          left={200}
+          width={30}
+          height={50}
+          baseColor="#ff00ff"
+          borderColor="#cc00cc"
+          scoreValue={100}
+          hitCooldown={200}
+          onHit={handleStandupTargetHit}
         />
 
       </PinballGame>
