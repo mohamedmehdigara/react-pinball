@@ -30,6 +30,7 @@ import VUK from './components/VUK';
 import Scoop from './components/Scoop';
 import StandupTarget from './components/StandupTarget';
 import Rotor from './components/Rotor';
+import SubwayEntrance from './components/SubwayEntrance';
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -229,6 +230,8 @@ const Pinball = () => {
     const scoopRef = useRef(null);
       const standupTargetRef = useRef(null);
         const rotorRef = useRef(null);
+          const subwayEntranceRef = useRef(null);
+
 
 
 
@@ -852,6 +855,18 @@ const Pinball = () => {
     }
 
 
+    const subwayEntrance = subwayEntranceRef.current;
+    if (subwayEntrance) {
+      const entranceRect = subwayEntrance.getBoundingClientRect();
+      if (entranceRect && isCircleCollidingWithRectangle(ballCircle, entranceRect)) {
+        const scoreAwarded = subwayEntrance.handleCollision();
+        if (scoreAwarded > 0) {
+          // Score and ball capture handled by subwayEntrance.handleCollision, which calls onEnter
+        }
+        return; // Ball is captured, prevent further collisions this frame
+      }
+    }
+
     }
 
     const variableTargetRefs = [
@@ -931,6 +946,17 @@ const Pinball = () => {
     }
   }, [ballSaveActive, bonusScoreUnits, bonusMultiplier, applyBonusMultiplier, resetBonusScoreUnits, resetBonusMultiplier, kickbackLeftRef, setScore, setBallLaunched, setLives, setGameOver, setBallSaveActive, setBallSaveTimer, setDisplayBallPosition, setDisplayBallVelocity]);
 
+ const handleSubwayEntrance = useCallback((id, score) => {
+    setIsBallCaptured(true); // Capture the ball
+    ballCapturePosition.current = { ...ballPositionRef.current }; // Store current position
+    ballVelocityRef.current = { x: 0, y: 0 }; // Stop the ball
+    setDisplayBallVelocity({ x: 0, y: 0 }); // Update display
+    setScore(prev => prev + applyBonusMultiplier(score)); // Award score
+    // In a full game, you'd likely then move the ball to a SubwayExit after a delay
+    // or trigger a mode. For now, it just stops.
+  }, [applyBonusMultiplier, setIsBallCaptured, setDisplayBallVelocity, setScore]);
+
+
   // --- Game Start/Reset Logic ---
   const handleGameStart = useCallback(() => {
     setGameOver(false);
@@ -981,6 +1007,7 @@ const Pinball = () => {
     standupTargetRef.current?.resetTarget(); // NEW: Reset StandupTarget state
     rotorRef.current?.resetRotor(); // NEW: Reset Rotor state
     scoopRef.current?.resetScoop(); // NEW: Reset Scoop state
+    subwayEntranceRef.current?.resetEntrance(); // NEW: Reset SubwayEntrance state
 
 
 
@@ -1483,6 +1510,19 @@ const Pinball = () => {
           spinDuration={0.5}
           spinCooldown={500}
           onSpin={handleRotorSpin}
+        />
+
+        <SubwayEntrance
+          ref={subwayEntranceRef}
+          id="subway1"
+          top={50}
+          left={500}
+          width={60}
+          height={30}
+          scoreValue={500}
+          captureDelay={100}
+          onEnter={handleSubwayEntrance}
+          initialIsLit={false}
         />
 
       </PinballGame>
