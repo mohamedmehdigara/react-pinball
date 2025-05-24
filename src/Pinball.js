@@ -29,6 +29,7 @@ import GameOverOverlay from './components/GameOverMessage';
 import VUK from './components/VUK';
 import Scoop from './components/Scoop';
 import StandupTarget from './components/StandupTarget';
+import Rotor from './components/Rotor';
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -227,6 +228,8 @@ const Pinball = () => {
   const variableTarget4Ref = useRef(null);
     const scoopRef = useRef(null);
       const standupTargetRef = useRef(null);
+        const rotorRef = useRef(null);
+
 
 
 
@@ -402,6 +405,12 @@ const Pinball = () => {
     setScore(prev => prev + multipliedScore);
     setDroppedTargets(prev => ({ ...prev, [id]: true }));
   }, [applyBonusMultiplier]);
+
+   const handleRotorSpin = useCallback((id, score) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    addBonusScoreUnits(15); // Example: add more bonus units for hitting a rotor
+  }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
 
   useEffect(() => {
     const allTargetsDropped =
@@ -812,7 +821,6 @@ const Pinball = () => {
 
 // ... (inside handleGameStart function)
 
-    scoopRef.current?.resetScoop(); // NEW: Reset Scoop state
 
     const standupTarget = standupTargetRef.current;
     if (standupTarget) {
@@ -825,6 +833,20 @@ const Pinball = () => {
         }
         // Apply a small bounce effect
         ballVelocityRef.current = { x: -velocity.x * 0.7, y: -velocity.y * 0.7 };
+        return; // Prevent further collisions this frame if hit
+      }
+    }
+
+ const rotor = rotorRef.current;
+    if (rotor) {
+      const rotorRect = rotor.getBoundingClientRect();
+      if (rotorRect && isCircleCollidingWithRectangle(ballCircle, rotorRect)) {
+        const scoreAwarded = rotor.handleCollision();
+        if (scoreAwarded > 0) {
+          // Score is handled by Rotor's handleCollision, which calls onSpin
+        }
+        // Apply a bounce effect suitable for a spinning object
+        ballVelocityRef.current = { x: -velocity.x * 0.8, y: -velocity.y * 0.8 };
         return; // Prevent further collisions this frame if hit
       }
     }
@@ -954,12 +976,17 @@ const Pinball = () => {
     gateRef.current?.close();
     mysterySaucerRef.current?.resetSaucer();
     mysterySaucerRef.current?.lightSaucer();
+    vukRef.current?.resetVUK(); // Reset VUK state
+
     standupTargetRef.current?.resetTarget(); // NEW: Reset StandupTarget state
+    rotorRef.current?.resetRotor(); // NEW: Reset Rotor state
+    scoopRef.current?.resetScoop(); // NEW: Reset Scoop state
+
+
 
     resetVariableTargetBank();
     resetBonusMultiplier();
     resetBonusScoreUnits();
-    vukRef.current?.resetVUK(); // Reset VUK state
 
     activateBallSave(); // Activate ball save at the start of a new game/ball
   }, [resetVariableTargetBank, resetBonusMultiplier, resetBonusScoreUnits, setGameOver, setScore, setLives, setBallLaunched, setIsTilted, setTiltWarnings, setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setDroppedTargets, setLitRollovers, activateBallSave, vukRef]);
@@ -1445,6 +1472,17 @@ const Pinball = () => {
           scoreValue={100}
           hitCooldown={200}
           onHit={handleStandupTargetHit}
+        />
+        <Rotor
+          ref={rotorRef}
+          id="rotor1"
+          top={200}
+          left={250}
+          size={70}
+          scoreValue={250}
+          spinDuration={0.5}
+          spinCooldown={500}
+          onSpin={handleRotorSpin}
         />
 
       </PinballGame>
