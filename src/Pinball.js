@@ -32,6 +32,7 @@ import StandupTarget from './components/StandupTarget';
 import Rotor from './components/Rotor';
 import SubwayEntrance from './components/SubwayEntrance';
 import SubwayExit from './components/SubwayExit';
+import BallLock from './components/BallLock';
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -233,6 +234,8 @@ const Pinball = () => {
         const rotorRef = useRef(null);
           const subwayEntranceRef = useRef(null);
             const subwayExitRef = useRef(null);
+              const ballLockRef = useRef(null);
+
 
 
 
@@ -417,6 +420,40 @@ const Pinball = () => {
     setScore(prev => prev + multipliedScore);
     addBonusScoreUnits(15); // Example: add more bonus units for hitting a rotor
   }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
+
+  const handleBallLocked = useCallback((id, lockedCount, scoreAwarded) => {
+    setScore(prev => prev + applyBonusMultiplier(scoreAwarded));
+    setIsBallCaptured(true); // Ball is captured when locked
+    ballVelocityRef.current = { x: 0, y: 0 }; // Stop the ball
+    setDisplayBallVelocity({ x: 0, y: 0 }); // Update display
+    // You might want to move the ball visually to the lock position here
+    // ballPositionRef.current = { x: ballLockRef.current.getBoundingClientRect().left + ballLockRef.current.getBoundingClientRect().width / 2, y: ballLockRef.current.getBoundingClientRect().top + ballLockRef.current.getBoundingClientRect().height / 2 };
+    // setDisplayBallPosition(ballPositionRef.current);
+    console.log(`Ball ${lockedCount} locked in ${id}! Score: ${scoreAwarded}`);
+  }, [applyBonusMultiplier, setScore, setIsBallCaptured, setDisplayBallVelocity]);
+
+  const handleAllBallsLocked = useCallback((id) => {
+    console.log(`All balls locked in ${id}! Multiball ready!`);
+    // Here you would typically trigger a multiball mode, e.g.,
+    // setTimeout(() => {
+    //   ballLockRef.current?.releaseBalls(); // Release balls for multiball
+    // }, 1000);
+  }, []);
+
+  const handleBallsReleased = useCallback((id, releasedCount, releasePositions, releaseVelocities) => {
+    console.log(`${releasedCount} balls released from ${id}!`);
+    // If releasing multiple balls, you'd need to manage them as an array of balls
+    // For now, assuming only one ball is released at a time, or the game handles multiple balls.
+    if (releasedCount > 0) {
+        setIsBallCaptured(false); // Release the primary ball
+        ballPositionRef.current = releasePositions[0]; // Set primary ball to first released position
+        ballVelocityRef.current = releaseVelocities[0]; // Set primary ball to first released velocity
+        setDisplayBallPosition(releasePositions[0]);
+        setDisplayBallVelocity(releaseVelocities[0]);
+        setBallLaunched(true);
+    }
+  }, [setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setBallLaunched]);
+
 
   useEffect(() => {
     const allTargetsDropped =
@@ -871,6 +908,18 @@ const Pinball = () => {
     }
 
    
+const ballLock = ballLockRef.current;
+    if (ballLock) {
+      const lockRect = ballLock.getBoundingClientRect();
+      if (lockRect && isCircleCollidingWithRectangle(ballCircle, lockRect)) {
+        const scoreAwarded = ballLock.handleCollision();
+        if (scoreAwarded > 0) {
+          // Score and ball capture handled by ballLock.handleCollision, which calls onBallLocked
+        }
+        return; // Ball is captured, prevent further collisions this frame
+      }
+    }
+
 
     }
 
@@ -1014,6 +1063,7 @@ const Pinball = () => {
     scoopRef.current?.resetScoop(); // NEW: Reset Scoop state
     subwayEntranceRef.current?.resetEntrance(); // NEW: Reset SubwayEntrance state
     subwayExitRef.current?.resetExit(); // NEW: Reset SubwayExit state
+    ballLockRef.current?.resetBallLock(); // NEW: Reset BallLock state
 
 
 
@@ -1551,6 +1601,23 @@ const Pinball = () => {
           ejectStrength={12}
           ejectDirection="up"
           onEject={handleSubwayExit}
+          initialIsLit={false}
+        />
+
+        <BallLock
+          ref={ballLockRef}
+          id="ballLock1"
+          top={300}
+          left={50}
+          width={100}
+          height={80}
+          capacity={2}
+          ballRadius={BALL_RADIUS} // Use the global BALL_RADIUS
+          scoreValue={1000}
+          captureDelay={100}
+          onBallLocked={handleBallLocked}
+          onAllBallsLocked={handleAllBallsLocked}
+          onBallsReleased={handleBallsReleased}
           initialIsLit={false}
         />
 
