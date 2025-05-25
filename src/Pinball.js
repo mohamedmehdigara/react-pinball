@@ -33,6 +33,7 @@ import Rotor from './components/Rotor';
 import SubwayEntrance from './components/SubwayEntrance';
 import SubwayExit from './components/SubwayExit';
 import BallLock from './components/BallLock';
+import BonusLaneLight from './components/BonusLaneLight';
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -229,12 +230,16 @@ const Pinball = () => {
   const variableTarget2Ref = useRef(null);
   const variableTarget3Ref = useRef(null);
   const variableTarget4Ref = useRef(null);
-    const scoopRef = useRef(null);
-      const standupTargetRef = useRef(null);
-        const rotorRef = useRef(null);
-          const subwayEntranceRef = useRef(null);
-            const subwayExitRef = useRef(null);
-              const ballLockRef = useRef(null);
+  const scoopRef = useRef(null);
+  const standupTargetRef = useRef(null);
+  const rotorRef = useRef(null);
+  const subwayEntranceRef = useRef(null);
+  const subwayExitRef = useRef(null);
+  const ballLockRef = useRef(null);
+  const bonusLaneLight1Ref = useRef(null);
+  const bonusLaneLight2Ref = useRef(null);
+  const bonusLaneLight3Ref = useRef(null);
+
 
 
 
@@ -1064,6 +1069,10 @@ const ballLock = ballLockRef.current;
     subwayEntranceRef.current?.resetEntrance(); // NEW: Reset SubwayEntrance state
     subwayExitRef.current?.resetExit(); // NEW: Reset SubwayExit state
     ballLockRef.current?.resetBallLock(); // NEW: Reset BallLock state
+    bonusLaneLight1Ref.current?.resetLight(); // NEW: Reset BonusLaneLight state
+    bonusLaneLight2Ref.current?.resetLight();
+    bonusLaneLight3Ref.current?.resetLight();
+
 
 
 
@@ -1618,6 +1627,37 @@ const ballLock = ballLockRef.current;
           onBallLocked={handleBallLocked}
           onAllBallsLocked={handleAllBallsLocked}
           onBallsReleased={handleBallsReleased}
+          initialIsLit={false}
+        />
+
+        <BonusLaneLight
+          ref={bonusLaneLight1Ref}
+          id="bonusLightA"
+          top={80}
+          left={200}
+          size={15}
+          litColor="#00ff00" // Green light
+          dimColor="#003300"
+          initialIsLit={false}
+        />
+        <BonusLaneLight
+          ref={bonusLaneLight2Ref}
+          id="bonusLightB"
+          top={80}
+          left={220}
+          size={15}
+          litColor="#00ff00"
+          dimColor="#003300"
+          initialIsLit={false}
+        />
+        <BonusLaneLight
+          ref={bonusLaneLight3Ref}
+          id="bonusLightC"
+          top={80}
+          left={240}
+          size={15}
+          litColor="#00ff00"
+          dimColor="#003300"
           initialIsLit={false}
         />
 
