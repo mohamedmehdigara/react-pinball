@@ -34,6 +34,7 @@ import SubwayEntrance from './components/SubwayEntrance';
 import SubwayExit from './components/SubwayExit';
 import BallLock from './components/BallLock';
 import BonusLaneLight from './components/BonusLaneLight';
+import DisplaySegment from './components/DisplaySegment';
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -239,6 +240,13 @@ const Pinball = () => {
   const bonusLaneLight1Ref = useRef(null);
   const bonusLaneLight2Ref = useRef(null);
   const bonusLaneLight3Ref = useRef(null);
+  const segmentARef = useRef(null);
+  const segmentBRef = useRef(null);
+  const segmentCRef = useRef(null);
+  const segmentDRef = useRef(null);
+  const segmentERef = useRef(null);
+  const segmentFRef = useRef(null);
+  const segmentGRef = useRef(null);
 
 
 
@@ -1072,7 +1080,13 @@ const ballLock = ballLockRef.current;
     bonusLaneLight1Ref.current?.resetLight(); // NEW: Reset BonusLaneLight state
     bonusLaneLight2Ref.current?.resetLight();
     bonusLaneLight3Ref.current?.resetLight();
-
+    segmentARef.current?.resetSegment(); // NEW: Reset DisplaySegment states
+    segmentBRef.current?.resetSegment();
+    segmentCRef.current?.resetSegment();
+    segmentDRef.current?.resetSegment();
+    segmentERef.current?.resetSegment();
+    segmentFRef.current?.resetSegment();
+    segmentGRef.current?.resetSegment();
 
 
 
@@ -1660,6 +1674,23 @@ const ballLock = ballLockRef.current;
           dimColor="#003300"
           initialIsLit={false}
         />
+
+        <div style={{ position: 'absolute', top: 20, right: 100, zIndex: 100 }}>
+          {/* Segment A (top horizontal) */}
+          <DisplaySegment ref={segmentARef} id="segA" top={0} left={5} length={30} thickness={5} orientation="horizontal" onColor="#ff6600" offColor="#331a00" />
+          {/* Segment B (top right vertical) */}
+          <DisplaySegment ref={segmentBRef} id="segB" top={5} left={35} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
+          {/* Segment C (bottom right vertical) */}
+          <DisplaySegment ref={segmentCRef} id="segC" top={40} left={35} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
+          {/* Segment D (bottom horizontal) */}
+          <DisplaySegment ref={segmentDRef} id="segD" top={70} left={5} length={30} thickness={5} orientation="horizontal" onColor="#ff6600" offColor="#331a00" />
+          {/* Segment E (bottom left vertical) */}
+          <DisplaySegment ref={segmentERef} id="segE" top={40} left={0} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
+          {/* Segment F (top left vertical) */}
+          <DisplaySegment ref={segmentFRef} id="segF" top={5} left={0} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
+          {/* Segment G (middle horizontal) */}
+          <DisplaySegment ref={segmentGRef} id="segG" top={35} left={5} length={30} thickness={5} orientation="horizontal" onColor="#ff6600" offColor="#331a00" />
+        </div>
 
       </PinballGame>
     </Container>
