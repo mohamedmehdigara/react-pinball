@@ -35,6 +35,7 @@ import SubwayExit from './components/SubwayExit';
 import BallLock from './components/BallLock';
 import BonusLaneLight from './components/BonusLaneLight';
 import DisplaySegment from './components/DisplaySegment';
+import Diverter from './components/Diverter';
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -247,6 +248,8 @@ const Pinball = () => {
   const segmentERef = useRef(null);
   const segmentFRef = useRef(null);
   const segmentGRef = useRef(null);
+    const diverterRef = useRef(null);
+
 
 
 
@@ -657,6 +660,20 @@ const Pinball = () => {
 
   // --- Main Collision Handler ---
   const handleCollision = useCallback((ballPosition, radius, velocity) => {
+
+    const diverter = diverterRef.current;
+    if (diverter) {
+      const diverterRect = diverter.getBoundingClientRect();
+      if (diverterRect && isCircleCollidingWithRectangle(ballCircle, diverterRect)) {
+        // Diverter logic: if hit, it might toggle or just deflect.
+        // For simplicity, let's say hitting it just deflects the ball and we don't call toggleDiverter here.
+        // The toggle action would likely be triggered by a specific target or button elsewhere.
+        // If you want hitting it to toggle, you'd call diverter.toggleDiverter() here.
+        ballVelocityRef.current = { x: -velocity.x * 0.8, y: -velocity.y * 0.8 }; // Simple bounce
+        return; // Prevent further collisions this frame
+      }
+    }
+
     const ballCircle = { x: ballPosition.x, y: ballPosition.y, radius: radius };
 
     if (isBallCaptured) {
@@ -957,6 +974,10 @@ const ballLock = ballLockRef.current;
 
   }, [isBallCaptured, applyBonusMultiplier, isCircleCollidingWithRectangle, mysterySaucerRef, bumper1Ref, bumper2Ref, target1Ref, target2Ref, slingshotLeftRef, slingshotRightRef, spinnerRef, kickbackLeftRef, skillShotLaneRef, dropTarget1Ref, dropTarget2Ref, dropTarget3Ref, rolloverARef, rolloverBRef, rolloverCRef, gateRef, variableTarget1Ref, variableTarget2Ref, variableTarget3Ref, variableTarget4Ref, vukRef]);
 
+
+
+
+
   // --- Handle Out of Bounds (Drain) ---
   const handleOutOfBounds = useCallback((ballPosition, radius, velocity) => {
     if (ballPosition.y > PLAY_AREA_HEIGHT + radius * 2) {
@@ -1087,6 +1108,8 @@ const ballLock = ballLockRef.current;
     segmentERef.current?.resetSegment();
     segmentFRef.current?.resetSegment();
     segmentGRef.current?.resetSegment();
+    diverterRef.current?.resetDiverter(); // NEW: Reset Diverter state
+
 
 
 
@@ -1294,6 +1317,12 @@ const ballLock = ballLockRef.current;
       cancelAnimationFrame(animationFrameId);
     };
   }, [ballLaunched, gameOver, isBallCaptured, isTilted, tiltWarnings, handleCollision, handleOutOfBounds, setDisplayBallPosition, setDisplayBallVelocity]);
+
+const handleDiverterToggle = useCallback((id, isOpen) => {
+    console.log(`Diverter ${id} is now ${isOpen ? 'OPEN' : 'CLOSED'}`);
+    // You might add score or game logic here based on diverter state
+  }, []);
+
 
   return (
     <Container>
@@ -1690,6 +1719,20 @@ const ballLock = ballLockRef.current;
           <DisplaySegment ref={segmentFRef} id="segF" top={5} left={0} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
           {/* Segment G (middle horizontal) */}
           <DisplaySegment ref={segmentGRef} id="segG" top={35} left={5} length={30} thickness={5} orientation="horizontal" onColor="#ff6600" offColor="#331a00" />
+          <Diverter
+          ref={diverterRef}
+          id="diverter1"
+          top={350}
+          left={200}
+          length={60}
+          thickness={8}
+          initialAngle={0}
+          activeAngle={45} // Opens to 45 degrees
+          pivotX={0} // Rotates from its left edge
+          pivotY={50} // Rotates from its vertical center
+          initialIsOpen={false}
+          onToggle={handleDiverterToggle}
+        />
         </div>
 
       </PinballGame>
