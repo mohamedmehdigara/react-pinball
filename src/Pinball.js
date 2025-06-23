@@ -37,6 +37,8 @@ import BonusLaneLight from './components/BonusLaneLight';
 import DisplaySegment from './components/DisplaySegment';
 import Diverter from './components/Diverter';
 import PopUpPost from './components/PopUpPost';
+import ScoreReel from './components/ScoreReel';
+
 
 
 // Firebase Imports (REMOVED)
@@ -250,8 +252,16 @@ const Pinball = () => {
   const segmentERef = useRef(null);
   const segmentFRef = useRef(null);
   const segmentGRef = useRef(null);
-    const diverterRef = useRef(null);
-     const popUpPostRef = useRef(null);
+  const diverterRef = useRef(null);
+  const popUpPostRef = useRef(null);
+  const scoreReel1Ref = useRef(null); // Hundreds of thousands
+  const scoreReel2Ref = useRef(null); // Tens of thousands
+  const scoreReel3Ref = useRef(null); // Thousands
+  const scoreReel4Ref = useRef(null); // Hundreds
+  const scoreReel5Ref = useRef(null); // Tens
+  const scoreReel6Ref = useRef(null); // Units
+
+
 
 
 
@@ -1142,7 +1152,13 @@ const ballLock = ballLockRef.current;
     segmentFRef.current?.resetSegment();
     segmentGRef.current?.resetSegment();
     diverterRef.current?.resetDiverter(); // NEW: Reset Diverter state
-        popUpPostRef.current?.resetPost(); // NEW: Reset PopUpPost state
+    popUpPostRef.current?.resetPost(); // NEW: Reset PopUpPost state
+    scoreReel1Ref.current?.resetReel();
+    scoreReel2Ref.current?.resetReel();
+    scoreReel3Ref.current?.resetReel();
+    scoreReel4Ref.current?.resetReel();
+    scoreReel5Ref.current?.resetReel();
+    scoreReel6Ref.current?.resetReel();
 
 
 
@@ -1782,6 +1798,14 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           onHit={handlePopUpHit}
           initialIsUp={false} // Starts hidden
         />
+
+        <DisplaySegment ref={segmentARef} id="segA" top={0} left={5} length={30} thickness={5} orientation="horizontal" onColor="#ff6600" offColor="#331a00" />
+          <DisplaySegment ref={segmentBRef} id="segB" top={5} left={35} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
+          <DisplaySegment ref={segmentCRef} id="segC" top={40} left={35} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
+          <DisplaySegment ref={segmentDRef} id="segD" top={70} left={5} length={30} thickness={5} orientation="horizontal" onColor="#ff6600" offColor="#331a00" />
+          <DisplaySegment ref={segmentERef} id="segE" top={40} left={0} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
+          <DisplaySegment ref={segmentFRef} id="segF" top={5} left={0} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
+          <DisplaySegment ref={segmentGRef} id="segG" top={35} left={5} length={30} thickness={5} orientation="horizontal" onColor="#ff6600" offColor="#331a00" />
         </div>
 
       </PinballGame>
