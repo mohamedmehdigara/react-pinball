@@ -36,6 +36,8 @@ import BallLock from './components/BallLock';
 import BonusLaneLight from './components/BonusLaneLight';
 import DisplaySegment from './components/DisplaySegment';
 import Diverter from './components/Diverter';
+import PopUpPost from './components/PopUpPost';
+
 
 // Firebase Imports (REMOVED)
 // import { initializeApp } from 'firebase/app';
@@ -249,6 +251,7 @@ const Pinball = () => {
   const segmentFRef = useRef(null);
   const segmentGRef = useRef(null);
     const diverterRef = useRef(null);
+     const popUpPostRef = useRef(null);
 
 
 
@@ -470,6 +473,22 @@ const Pinball = () => {
     }
   }, [setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setBallLaunched]);
 
+   const handlePopUp = useCallback((id) => {
+    console.log(`PopUpPost ${id} popped up!`);
+  }, []);
+
+  const handlePopDown = useCallback((id) => {
+    console.log(`PopUpPost ${id} popped down!`);
+  }, []);
+
+  const handlePopUpHit = useCallback((id, score) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    addBonusScoreUnits(20); // Example: high bonus units for hitting a pop-up post
+    console.log(`PopUpPost ${id} hit for ${score} points!`);
+  }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
+
+
 
   useEffect(() => {
     const allTargetsDropped =
@@ -660,6 +679,20 @@ const Pinball = () => {
 
   // --- Main Collision Handler ---
   const handleCollision = useCallback((ballPosition, radius, velocity) => {
+
+    const popUpPost = popUpPostRef.current;
+    if (popUpPost) {
+      const postRect = popUpPost.getBoundingClientRect();
+      if (postRect && postRect.height > 0 && isCircleCollidingWithRectangle(ballCircle, postRect)) {
+        const scoreAwarded = popUpPost.handleCollision();
+        if (scoreAwarded > 0) {
+          // Score is handled by PopUpPost's handleCollision, which calls onHit
+        }
+        // Apply a bounce effect
+        ballVelocityRef.current = { x: -velocity.x * 0.9, y: -velocity.y * 0.9 };
+        return; // Prevent further collisions this frame if hit
+      }
+    }
 
     const diverter = diverterRef.current;
     if (diverter) {
@@ -1109,6 +1142,8 @@ const ballLock = ballLockRef.current;
     segmentFRef.current?.resetSegment();
     segmentGRef.current?.resetSegment();
     diverterRef.current?.resetDiverter(); // NEW: Reset Diverter state
+        popUpPostRef.current?.resetPost(); // NEW: Reset PopUpPost state
+
 
 
 
@@ -1732,6 +1767,20 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           pivotY={50} // Rotates from its vertical center
           initialIsOpen={false}
           onToggle={handleDiverterToggle}
+        />
+
+        <PopUpPost
+          ref={popUpPostRef}
+          id="post1"
+          top={PLAY_AREA_HEIGHT - 200}
+          left={PLAY_AREA_WIDTH / 2 - 10}
+          size={20}
+          scoreValue={50}
+          hitCooldown={100}
+          onPopUp={handlePopUp}
+          onPopDown={handlePopDown}
+          onHit={handlePopUpHit}
+          initialIsUp={false} // Starts hidden
         />
         </div>
 
