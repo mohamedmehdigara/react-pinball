@@ -38,6 +38,8 @@ import DisplaySegment from './components/DisplaySegment';
 import Diverter from './components/Diverter';
 import PopUpPost from './components/PopUpPost';
 import ScoreReel from './components/ScoreReel';
+import FlashLamp from './components/FlashLamp';
+
 
 
 
@@ -260,6 +262,8 @@ const Pinball = () => {
   const scoreReel4Ref = useRef(null); // Hundreds
   const scoreReel5Ref = useRef(null); // Tens
   const scoreReel6Ref = useRef(null); // Units
+    const flashLampRef = useRef(null);
+
 
 
 
@@ -1159,6 +1163,8 @@ const ballLock = ballLockRef.current;
     scoreReel4Ref.current?.resetReel();
     scoreReel5Ref.current?.resetReel();
     scoreReel6Ref.current?.resetReel();
+    flashLampRef.current?.resetLamp(); // NEW: Reset FlashLamp state
+
 
 
 
@@ -1807,6 +1813,49 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           <DisplaySegment ref={segmentFRef} id="segF" top={5} left={0} length={30} thickness={5} orientation="vertical" onColor="#ff6600" offColor="#331a00" />
           <DisplaySegment ref={segmentGRef} id="segG" top={35} left={5} length={30} thickness={5} orientation="horizontal" onColor="#ff6600" offColor="#331a00" />
         </div>
+
+        <div style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          display: 'flex',
+          backgroundColor: '#000',
+          padding: '5px',
+          borderRadius: '5px',
+          border: '2px solid #555',
+          boxShadow: '0 0 10px rgba(0,0,0,0.5)',
+          zIndex: 1000,
+        }}>
+          {/* Convert score to string and pad with leading zeros if needed */}
+          {String(score).padStart(6, '0').split('').map((digitChar, index) => (
+            <ScoreReel
+              key={index}
+              ref={eval(`scoreReel${index + 1}Ref`)} // Dynamically assign ref based on index
+              id={`scoreDigit${index}`}
+              digit={parseInt(digitChar, 10)}
+              top={0} // Relative to its flex container
+              left={0} // Relative to its flex container
+              width={40}
+              height={60}
+              color="#FF0000"
+              backgroundColor="#222222"
+              style={{ marginRight: index < 5 ? '2px' : '0' }} // Add margin between digits
+            />
+          ))}
+        </div>
+        <FlashLamp
+          ref={flashLampRef}
+          id="flash1"
+          top={150}
+          left={400}
+          size={30}
+          flashColor="#ff0000" // Red flash
+          borderColor="#cc0000"
+          flashDuration={0.8}
+        />
+
+
+
 
       </PinballGame>
     </Container>
