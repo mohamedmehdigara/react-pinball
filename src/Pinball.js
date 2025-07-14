@@ -39,6 +39,7 @@ import Diverter from './components/Diverter';
 import PopUpPost from './components/PopUpPost';
 import ScoreReel from './components/ScoreReel';
 import FlashLamp from './components/FlashLamp';
+import TimedTarget from './components/TimedTarget';
 
 
 
@@ -263,6 +264,7 @@ const Pinball = () => {
   const scoreReel5Ref = useRef(null); // Tens
   const scoreReel6Ref = useRef(null); // Units
     const flashLampRef = useRef(null);
+    const timedTargetRef = useRef(null);
 
 
 
@@ -501,6 +503,19 @@ const Pinball = () => {
     addBonusScoreUnits(20); // Example: high bonus units for hitting a pop-up post
     console.log(`PopUpPost ${id} hit for ${score} points!`);
   }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
+
+  const handleTimedTargetHit = useCallback((id, score) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    addBonusScoreUnits(50); // High bonus units for hitting a timed target
+    console.log(`TimedTarget ${id} hit for ${score} points!`);
+  }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
+
+  const handleTimedTargetEnd = useCallback((id) => {
+    console.log(`TimedTarget ${id} timer ended.`);
+    // You might trigger other game logic here, like dimming lights or starting a new sequence.
+  }, []);
+
 
 
 
@@ -997,6 +1012,20 @@ const ballLock = ballLockRef.current;
       }
     }
 
+const timedTarget = timedTargetRef.current;
+    if (timedTarget) {
+      const targetRect = timedTarget.getBoundingClientRect();
+      if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
+        const scoreAwarded = timedTarget.handleCollision();
+        if (scoreAwarded > 0) {
+          // Score is handled by TimedTarget's handleCollision, which calls onHit
+        }
+        // Apply a bounce effect
+        ballVelocityRef.current = { x: -velocity.x * 0.8, y: -velocity.y * 0.8 };
+        return; // Prevent further collisions this frame if hit
+      }
+    }
+
 
     }
 
@@ -1091,6 +1120,8 @@ const ballLock = ballLockRef.current;
     // or trigger a mode. For now, it just stops.
   }, [applyBonusMultiplier, setIsBallCaptured, setDisplayBallVelocity, setScore]);
 
+ 
+
 
   // --- Game Start/Reset Logic ---
   const handleGameStart = useCallback(() => {
@@ -1164,6 +1195,7 @@ const ballLock = ballLockRef.current;
     scoreReel5Ref.current?.resetReel();
     scoreReel6Ref.current?.resetReel();
     flashLampRef.current?.resetLamp(); // NEW: Reset FlashLamp state
+    timedTargetRef.current?.resetTarget();
 
 
 
@@ -1852,6 +1884,20 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           flashColor="#ff0000" // Red flash
           borderColor="#cc0000"
           flashDuration={0.8}
+        />
+
+        <TimedTarget
+          ref={timedTargetRef}
+          id="timedTarget1"
+          top={150}
+          left={PLAY_AREA_WIDTH / 2 - 25} // Centered horizontally
+          size={50}
+          baseScoreValue={200}
+          timeLimitMs={5000} // Active for 5 seconds
+          warningTimeMs={2000} // Warning starts at 2 seconds left
+          hitCooldown={100}
+          onHit={handleTimedTargetHit}
+          onTimerEnd={handleTimedTargetEnd}
         />
 
 
