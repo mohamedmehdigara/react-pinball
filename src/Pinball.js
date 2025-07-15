@@ -40,6 +40,7 @@ import PopUpPost from './components/PopUpPost';
 import ScoreReel from './components/ScoreReel';
 import FlashLamp from './components/FlashLamp';
 import TimedTarget from './components/TimedTarget';
+import MovingTarget from './components/MovingTarget';
 
 
 
@@ -265,6 +266,8 @@ const Pinball = () => {
   const scoreReel6Ref = useRef(null); // Units
     const flashLampRef = useRef(null);
     const timedTargetRef = useRef(null);
+      const movingTargetRef = useRef(null);
+
 
 
 
@@ -722,6 +725,22 @@ const Pinball = () => {
         return; // Prevent further collisions this frame if hit
       }
     }
+    const movingTarget = movingTargetRef.current;
+    if (movingTarget) {
+      // Get the dynamic bounding client rect from the MovingTarget component
+      const targetRect = movingTarget.getBoundingClientRect();
+      if (targetRect && isCircleCollidingWithRectangle(ballCircle, targetRect)) {
+        const scoreAwarded = movingTarget.handleCollision();
+        if (scoreAwarded > 0) {
+          // Score is handled by MovingTarget's handleCollision, which calls onHit
+        }
+        // Apply a bounce effect
+        ballVelocityRef.current = { x: -velocity.x * 0.9, y: -velocity.y * 0.9 };
+        return; // Prevent further collisions this frame if hit
+      }
+    }
+
+   
 
     const diverter = diverterRef.current;
     if (diverter) {
@@ -1051,6 +1070,12 @@ const timedTarget = timedTargetRef.current;
   }, [isBallCaptured, applyBonusMultiplier, isCircleCollidingWithRectangle, mysterySaucerRef, bumper1Ref, bumper2Ref, target1Ref, target2Ref, slingshotLeftRef, slingshotRightRef, spinnerRef, kickbackLeftRef, skillShotLaneRef, dropTarget1Ref, dropTarget2Ref, dropTarget3Ref, rolloverARef, rolloverBRef, rolloverCRef, gateRef, variableTarget1Ref, variableTarget2Ref, variableTarget3Ref, variableTarget4Ref, vukRef]);
 
 
+ const handleMovingTargetHit = useCallback((id, score) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    addBonusScoreUnits(30); // Example: good bonus units for hitting a moving target
+    console.log(`MovingTarget ${id} hit for ${score} points!`);
+  }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
 
 
 
@@ -1196,6 +1221,8 @@ const timedTarget = timedTargetRef.current;
     scoreReel6Ref.current?.resetReel();
     flashLampRef.current?.resetLamp(); // NEW: Reset FlashLamp state
     timedTargetRef.current?.resetTarget();
+        movingTargetRef.current?.resetTarget(); // NEW: Reset MovingTarget state
+
 
 
 
@@ -1900,7 +1927,22 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           onTimerEnd={handleTimedTargetEnd}
         />
 
-
+<MovingTarget
+          ref={movingTargetRef}
+          id="movingTarget1"
+          top={300}
+          left={250}
+          size={30}
+          direction="horizontal"
+          trackLength={200}
+          moveDuration={4} // 4 seconds for one full traverse
+          baseColor="#00ff00"
+          borderColor="#00cc00"
+          scoreValue={150}
+          hitCooldown={100}
+          onHit={handleMovingTargetHit}
+          initialIsMoving={true} // Starts moving
+        />
 
 
       </PinballGame>
