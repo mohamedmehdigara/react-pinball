@@ -41,6 +41,8 @@ import ScoreReel from './components/ScoreReel';
 import FlashLamp from './components/FlashLamp';
 import TimedTarget from './components/TimedTarget';
 import MovingTarget from './components/MovingTarget';
+import Kicker from './components/Kicker';
+
 
 
 
@@ -267,6 +269,8 @@ const Pinball = () => {
     const flashLampRef = useRef(null);
     const timedTargetRef = useRef(null);
       const movingTargetRef = useRef(null);
+        const kickerRef = useRef(null);
+
 
 
 
@@ -285,92 +289,7 @@ const Pinball = () => {
   const tubeExitY = tubeEntranceY.current + tubeHeight.current;
   const isLaneChangeAllowed = true;
 
-  // --- Firebase Initialization and Auth (REMOVED) ---
-  // useEffect(() => {
-  //   const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-  //   const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-  //   const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-  //   if (!firebaseConfig) {
-  //     console.error("Firebase config is not available. High scores will not be saved.");
-  //     setIsAuthReady(true);
-  //     return;
-  //   }
-
-  //   const app = initializeApp(firebaseConfig);
-  //   appRef.current = app;
-  //   dbRef.current = getFirestore(app);
-  //   authRef.current = getAuth(app);
-
-  //   const authenticate = async () => {
-  //     try {
-  //       if (initialAuthToken) {
-  //         await signInWithCustomToken(authRef.current, initialAuthToken);
-  //       } else {
-  //         await signInAnonymously(authRef.current);
-  //       }
-  //     } catch (error) {
-  //       console.error("Firebase authentication failed:", error);
-  //     } finally {
-  //       setIsAuthReady(true);
-  //     }
-  //   };
-
-  //   const unsubscribe = onAuthStateChanged(authRef.current, (user) => {
-  //     if (user) {
-  //       setUserId(user.uid);
-  //     } else {
-  //       setUserId(crypto.randomUUID());
-  //     }
-  //     setIsAuthReady(true);
-  //   });
-
-  //   authenticate();
-  //   return () => unsubscribe();
-  // }, []);
-
-  // --- High Score Fetching (REMOVED) ---
-  // useEffect(() => {
-  //   if (!isAuthReady || !dbRef.current || !userId) {
-  //     return;
-  //   }
-
-  //   const highScoresCollectionRef = collection(dbRef.current, `artifacts/${__app_id}/public/data/highscores`);
-  //   const q = query(highScoresCollectionRef, orderBy("score", "desc"), limit(10));
-
-  //   const unsubscribe = onSnapshot(q, (snapshot) => {
-  //     const scores = snapshot.docs.map(doc => ({
-  //       id: doc.id,
-  //       ...doc.data()
-  //     }));
-  //     setHighScores(scores);
-  //   }, (error) => {
-  //     console.error("Error fetching high scores:", error);
-  //   });
-
-  //   return () => unsubscribe();
-  // }, [isAuthReady, userId]);
-
-  // --- Submit High Score (REMOVED) ---
-  // const submitHighScore = useCallback(async (playerName) => {
-  //   if (!dbRef.current || !userId || score === 0) {
-  //     console.error("Cannot submit high score: Firebase not ready, no user ID, or score is zero.");
-  //     return;
-  //   }
-
-  //   try {
-  //     const highScoresCollectionRef = collection(dbRef.current, `artifacts/${__app_id}/public/data/highscores`);
-  //     await addDoc(highScoresCollectionRef, {
-  //       name: playerName,
-  //       score: score,
-  //       timestamp: serverTimestamp(),
-  //       userId: userId
-  //     });
-  //     console.log("High score submitted successfully!");
-  //   } catch (error) {
-  //     console.error("Error submitting high score:", error);
-  //   }
-  // }, [score, userId]);
+  
 
 
   // --- Utility Functions ---
@@ -1045,6 +964,18 @@ const timedTarget = timedTargetRef.current;
       }
     }
 
+    const kicker = kickerRef.current;
+    if (kicker) {
+      const kickerRect = kicker.getBoundingClientRect();
+      if (kickerRect && isCircleCollidingWithRectangle(ballCircle, kickerRect)) {
+        const scoreAwarded = kicker.activateKicker(); // This calls onKick which updates score and ball velocity
+        if (scoreAwarded > 0) {
+          // Score and ball velocity update handled by kicker.activateKicker
+        }
+        return; // Prevent further collisions this frame if kicked
+      }
+    }
+
 
     }
 
@@ -1076,6 +1007,18 @@ const timedTarget = timedTargetRef.current;
     addBonusScoreUnits(30); // Example: good bonus units for hitting a moving target
     console.log(`MovingTarget ${id} hit for ${score} points!`);
   }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
+
+  const handleKickerKick = useCallback((id, score, newBallVelocity) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    addBonusScoreUnits(10); // Example: add bonus units for kicking
+    console.log(`Kicker ${id} activated for ${score} points!`);
+
+    // Apply the new velocity to the ball from the kicker
+    ballVelocityRef.current = newBallVelocity;
+    setDisplayBallVelocity(newBallVelocity);
+  }, [applyBonusMultiplier, setScore, addBonusScoreUnits, setDisplayBallVelocity]);
+
 
 
 
@@ -1222,6 +1165,8 @@ const timedTarget = timedTargetRef.current;
     flashLampRef.current?.resetLamp(); // NEW: Reset FlashLamp state
     timedTargetRef.current?.resetTarget();
         movingTargetRef.current?.resetTarget(); // NEW: Reset MovingTarget state
+            kickerRef.current?.resetKicker(); // NEW: Reset Kicker state
+
 
 
 
@@ -1942,6 +1887,20 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           hitCooldown={100}
           onHit={handleMovingTargetHit}
           initialIsMoving={true} // Starts moving
+        />
+
+        <Kicker
+          ref={kickerRef}
+          id="kicker1"
+          top={400}
+          left={300}
+          width={40}
+          height={25}
+          kickStrength={10}
+          kickDirection="right" // Kicks the ball to the right
+          scoreValue={100}
+          kickCooldown={200}
+          onKick={handleKickerKick}
         />
 
 
