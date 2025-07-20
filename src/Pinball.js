@@ -42,6 +42,8 @@ import FlashLamp from './components/FlashLamp';
 import TimedTarget from './components/TimedTarget';
 import MovingTarget from './components/MovingTarget';
 import Kicker from './components/Kicker';
+import BumperGroup from './components/BumperGroup';
+
 
 
 
@@ -270,6 +272,8 @@ const Pinball = () => {
     const timedTargetRef = useRef(null);
       const movingTargetRef = useRef(null);
         const kickerRef = useRef(null);
+          const bumperGroupRef = useRef(null);
+
 
 
 
@@ -1166,6 +1170,8 @@ const timedTarget = timedTargetRef.current;
     timedTargetRef.current?.resetTarget();
         movingTargetRef.current?.resetTarget(); // NEW: Reset MovingTarget state
             kickerRef.current?.resetKicker(); // NEW: Reset Kicker state
+                bumperGroupRef.current?.resetGroup(); // NEW: Reset BumperGroup state (which also resets its children)
+
 
 
 
@@ -1475,24 +1481,7 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
         {/* Middle Area Components with refs */}
         <LeftFlipper ref={leftFlipperRef} top={450} left={150} angle={leftFlipperAngle} />
         <RightFlipper ref={rightFlipperRef} top={450} left={400} angle={rightFlipperAngle} />
-        <Bumper
-          ref={bumper1Ref}
-          x={250}
-          y={150}
-          radius={30}
-          color="#00ffcc"
-          glowColor="#00aacc"
-          scoreValue={150}
-        />
-        <Bumper
-          ref={bumper2Ref}
-          x={550}
-          y={150}
-          radius={30}
-          color="#ff6699"
-          glowColor="#cc3366"
-          scoreValue={200}
-        />
+        
         <PinballTarget
           ref={target1Ref}
           id="target1"
@@ -1902,7 +1891,40 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           kickCooldown={200}
           onKick={handleKickerKick}
         />
-
+        <BumperGroup
+          ref={bumperGroupRef}
+          id="mainBumperGroup"
+          top={100} // Position the group's top-left corner
+          left={200}
+          // You might set a fixed width/height for the group if it's a defined zone
+          // For now, let it flex based on content and padding
+          activeBgColor="rgba(255, 0, 255, 0.1)"
+          inactiveBgColor="rgba(0, 0, 0, 0.1)"
+          activeBorderColor="#ff00ff"
+          inactiveBorderColor="#555555"
+          initialIsActive={false}
+        >
+          {/* Existing Bumper components, now rendered as children of BumperGroup */}
+          {/* Their 'x' and 'y' props are still absolute coordinates within PinballGame */}
+          <Bumper
+            ref={bumper1Ref}
+            x={250}
+            y={150}
+            radius={30}
+            color="#00ffcc"
+            glowColor="#00aacc"
+            scoreValue={150}
+          />
+          <Bumper
+            ref={bumper2Ref}
+            x={550}
+            y={150}
+            radius={30}
+            color="#ff6699"
+            glowColor="#cc3366"
+            scoreValue={200}
+          />
+        </BumperGroup>
 
       </PinballGame>
     </Container>
