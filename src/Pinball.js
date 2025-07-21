@@ -43,6 +43,8 @@ import TimedTarget from './components/TimedTarget';
 import MovingTarget from './components/MovingTarget';
 import Kicker from './components/Kicker';
 import BumperGroup from './components/BumperGroup';
+import SpinnerGate from './components/SpinnerGate';
+
 
 
 
@@ -268,11 +270,13 @@ const Pinball = () => {
   const scoreReel4Ref = useRef(null); // Hundreds
   const scoreReel5Ref = useRef(null); // Tens
   const scoreReel6Ref = useRef(null); // Units
-    const flashLampRef = useRef(null);
-    const timedTargetRef = useRef(null);
-      const movingTargetRef = useRef(null);
-        const kickerRef = useRef(null);
-          const bumperGroupRef = useRef(null);
+  const flashLampRef = useRef(null);
+  const timedTargetRef = useRef(null);
+  const movingTargetRef = useRef(null);
+  const kickerRef = useRef(null);
+  const bumperGroupRef = useRef(null);
+  const spinnerGateRef = useRef(null);
+
 
 
 
@@ -980,6 +984,21 @@ const timedTarget = timedTargetRef.current;
       }
     }
 
+    const spinnerGate = spinnerGateRef.current;
+    if (spinnerGate) {
+      const gateRect = spinnerGate.getBoundingClientRect();
+      if (gateRect && isCircleCollidingWithRectangle(ballCircle, gateRect)) {
+        const scoreAwarded = spinnerGate.handleCollision(); // This calls onToggle which updates score
+        if (scoreAwarded > 0) {
+          // Score is handled by SpinnerGate's handleCollision
+        }
+        // Apply a bounce effect
+        ballVelocityRef.current = { x: -velocity.x * 0.8, y: -velocity.y * 0.8 };
+        return; // Prevent further collisions this frame if hit
+      }
+    }
+
+
 
     }
 
@@ -1022,6 +1041,18 @@ const timedTarget = timedTargetRef.current;
     ballVelocityRef.current = newBallVelocity;
     setDisplayBallVelocity(newBallVelocity);
   }, [applyBonusMultiplier, setScore, addBonusScoreUnits, setDisplayBallVelocity]);
+
+  const handleSpinnerGateToggle = useCallback((id, isOpen, scoreAwarded) => {
+    if (scoreAwarded > 0) {
+      const multipliedScore = applyBonusMultiplier(scoreAwarded);
+      setScore(prev => prev + multipliedScore);
+      addBonusScoreUnits(25); // Example: good bonus units for toggling a spinner gate
+      console.log(`SpinnerGate ${id} toggled to ${isOpen ? 'OPEN' : 'CLOSED'} for ${scoreAwarded} points!`);
+    } else {
+      console.log(`SpinnerGate ${id} toggled to ${isOpen ? 'OPEN' : 'CLOSED'} (no score awarded).`);
+    }
+  }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
+
 
 
 
@@ -1168,9 +1199,10 @@ const timedTarget = timedTargetRef.current;
     scoreReel6Ref.current?.resetReel();
     flashLampRef.current?.resetLamp(); // NEW: Reset FlashLamp state
     timedTargetRef.current?.resetTarget();
-        movingTargetRef.current?.resetTarget(); // NEW: Reset MovingTarget state
-            kickerRef.current?.resetKicker(); // NEW: Reset Kicker state
-                bumperGroupRef.current?.resetGroup(); // NEW: Reset BumperGroup state (which also resets its children)
+    movingTargetRef.current?.resetTarget(); // NEW: Reset MovingTarget state
+    kickerRef.current?.resetKicker(); // NEW: Reset Kicker state
+    bumperGroupRef.current?.resetGroup(); // NEW: Reset BumperGroup state (which also resets its children)
+    spinnerGateRef.current?.resetGate(); // NEW: Reset SpinnerGate state
 
 
 
@@ -1925,6 +1957,23 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
             scoreValue={200}
           />
         </BumperGroup>
+        <SpinnerGate
+          ref={spinnerGateRef}
+          id="spinnerGate1"
+          top={350}
+          left={450}
+          length={50}
+          thickness={5}
+          closedAngle={0}
+          openAngle={90}
+          pivotX={0} // Rotates from its left edge
+          pivotY={50} // Rotates from its vertical center
+          initialIsOpen={false}
+          scoreValue={100}
+          hitCooldown={300}
+          onToggle={handleSpinnerGateToggle}
+          initialIsLit={false}
+        />
 
       </PinballGame>
     </Container>
