@@ -44,6 +44,8 @@ import MovingTarget from './components/MovingTarget';
 import Kicker from './components/Kicker';
 import BumperGroup from './components/BumperGroup';
 import SpinnerGate from './components/SpinnerGate';
+import MiniPlayfieldEntrance from './components/MiniPlayfieldEntrance';
+
 
 
 
@@ -276,6 +278,8 @@ const Pinball = () => {
   const kickerRef = useRef(null);
   const bumperGroupRef = useRef(null);
   const spinnerGateRef = useRef(null);
+  const miniPlayfieldEntranceRef = useRef(null);
+
 
 
 
@@ -998,6 +1002,18 @@ const timedTarget = timedTargetRef.current;
       }
     }
 
+    const miniPlayfieldEntrance = miniPlayfieldEntranceRef.current;
+    if (miniPlayfieldEntrance) {
+      const entranceRect = miniPlayfieldEntrance.getBoundingClientRect();
+      if (entranceRect && isCircleCollidingWithRectangle(ballCircle, entranceRect)) {
+        const scoreAwarded = miniPlayfieldEntrance.handleCollision(); // This calls onEnter which updates score and captures ball
+        if (scoreAwarded > 0) {
+          // Score and ball capture handled by miniPlayfieldEntrance.handleCollision
+        }
+        return; // Ball is captured, prevent further collisions this frame
+      }
+    }
+
 
 
     }
@@ -1053,6 +1069,19 @@ const timedTarget = timedTargetRef.current;
     }
   }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
 
+
+
+  const handleMiniPlayfieldEntrance = useCallback((id, score) => {
+    setScore(prev => prev + applyBonusMultiplier(score));
+    setIsBallCaptured(true); // Ball is captured when it enters the mini-playfield
+    ballCapturePosition.current = { ...ballPositionRef.current }; // Store current position
+    ballVelocityRef.current = { x: 0, y: 0 }; // Stop the ball
+    setDisplayBallVelocity({ x: 0, y: 0 }); // Update display
+    console.log(`Ball entered MiniPlayfield via ${id}! Score: ${score}`);
+    // In a full game, you'd then transition to a mini-playfield state,
+    // potentially move the ball to a specific mini-playfield starting point,
+    // and change the physics/camera for that area.
+  }, [applyBonusMultiplier, setScore, setIsBallCaptured, setDisplayBallVelocity]);
 
 
 
@@ -1203,6 +1232,8 @@ const timedTarget = timedTargetRef.current;
     kickerRef.current?.resetKicker(); // NEW: Reset Kicker state
     bumperGroupRef.current?.resetGroup(); // NEW: Reset BumperGroup state (which also resets its children)
     spinnerGateRef.current?.resetGate(); // NEW: Reset SpinnerGate state
+    miniPlayfieldEntranceRef.current?.resetEntrance(); // NEW: Reset MiniPlayfieldEntrance state
+
 
 
 
@@ -1972,6 +2003,19 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           scoreValue={100}
           hitCooldown={300}
           onToggle={handleSpinnerGateToggle}
+          initialIsLit={false}
+        />
+
+        <MiniPlayfieldEntrance
+          ref={miniPlayfieldEntranceRef}
+          id="miniEntrance1"
+          top={50}
+          left={50}
+          width={80}
+          height={40}
+          scoreValue={1000}
+          captureDelay={100}
+          onEnter={handleMiniPlayfieldEntrance}
           initialIsLit={false}
         />
 
