@@ -45,6 +45,8 @@ import Kicker from './components/Kicker';
 import BumperGroup from './components/BumperGroup';
 import SpinnerGate from './components/SpinnerGate';
 import MiniPlayfieldEntrance from './components/MiniPlayfieldEntrance';
+import PlungerLaneLight from './components/PlungerLaneLight';
+
 
 
 
@@ -279,6 +281,8 @@ const Pinball = () => {
   const bumperGroupRef = useRef(null);
   const spinnerGateRef = useRef(null);
   const miniPlayfieldEntranceRef = useRef(null);
+  const plungerLaneLightRef = useRef(null);
+
 
 
 
@@ -1014,6 +1018,23 @@ const timedTarget = timedTargetRef.current;
       }
     }
 
+    const plungerLaneLight = plungerLaneLightRef.current;
+    if (plungerLaneLight) {
+      // Define the area of the plunger lane where the light should be active
+      const plungerLaneArea = {
+        left: PLAY_AREA_WIDTH - 100, // Example left boundary of plunger lane
+        top: PLAY_AREA_HEIGHT - 250, // Example top boundary
+        right: PLAY_AREA_WIDTH - 20, // Example right boundary
+        bottom: PLAY_AREA_HEIGHT - 20, // Example bottom boundary
+      };
+
+      if (isCircleCollidingWithRectangle(ballCircle, plungerLaneArea)) {
+        plungerLaneLight.lightOn();
+      } else {
+        plungerLaneLight.lightOff();
+      }
+    }
+
 
 
     }
@@ -1233,6 +1254,7 @@ const timedTarget = timedTargetRef.current;
     bumperGroupRef.current?.resetGroup(); // NEW: Reset BumperGroup state (which also resets its children)
     spinnerGateRef.current?.resetGate(); // NEW: Reset SpinnerGate state
     miniPlayfieldEntranceRef.current?.resetEntrance(); // NEW: Reset MiniPlayfieldEntrance state
+    plungerLaneLightRef.current?.resetLight(); // NEW: Reset PlungerLaneLight state
 
 
 
@@ -2016,6 +2038,18 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           scoreValue={1000}
           captureDelay={100}
           onEnter={handleMiniPlayfieldEntrance}
+          initialIsLit={false}
+        />
+
+        <PlungerLaneLight
+          ref={plungerLaneLightRef}
+          id="plungerLight1"
+          top={PLAY_AREA_HEIGHT - 100} // Example position within the plunger lane
+          left={PLAY_AREA_WIDTH - 60}
+          width={20}
+          height={10}
+          litColor="#ffff00"
+          dimColor="#333300"
           initialIsLit={false}
         />
 
