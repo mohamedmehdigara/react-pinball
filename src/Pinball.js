@@ -46,6 +46,8 @@ import BumperGroup from './components/BumperGroup';
 import SpinnerGate from './components/SpinnerGate';
 import MiniPlayfieldEntrance from './components/MiniPlayfieldEntrance';
 import PlungerLaneLight from './components/PlungerLaneLight';
+import DropTargetBank from './components/DropTargetBank';
+
 
 
 
@@ -282,6 +284,8 @@ const Pinball = () => {
   const spinnerGateRef = useRef(null);
   const miniPlayfieldEntranceRef = useRef(null);
   const plungerLaneLightRef = useRef(null);
+  const dropTargetBankRef = useRef(null);
+
 
 
 
@@ -1173,6 +1177,15 @@ const timedTarget = timedTargetRef.current;
     // or trigger a mode. For now, it just stops.
   }, [applyBonusMultiplier, setIsBallCaptured, setDisplayBallVelocity, setScore]);
 
+  const handleDropTargetBankCleared = useCallback((id, bonus) => {
+    const multipliedBonus = applyBonusMultiplier(bonus);
+    setScore(prev => prev + multipliedBonus);
+    increaseBonusMultiplier(); // Example: increase multiplier for clearing a bank
+    addBonusScoreUnits(100); // Significant bonus units for clearing a bank
+    console.log(`DropTargetBank ${id} cleared! Bonus: ${multipliedBonus} points!`);
+  }, [applyBonusMultiplier, setScore, increaseBonusMultiplier, addBonusScoreUnits]);
+
+
  
 
 
@@ -1210,9 +1223,9 @@ const timedTarget = timedTargetRef.current;
     target1Ref.current?.resetTarget();
     target2Ref.current?.resetTarget();
     skillShotLaneRef.current?.activateSkillShot();
-    dropTarget1Ref.current?.resetTarget();
-    dropTarget2Ref.current?.resetTarget();
-    dropTarget3Ref.current?.resetTarget();
+    //dropTarget1Ref.current?.resetTarget();
+    //dropTarget2Ref.current?.resetTarget();
+    //dropTarget3Ref.current?.resetTarget();
     setDroppedTargets({});
     rolloverARef.current?.resetLight();
     rolloverBRef.current?.resetLight();
@@ -1255,6 +1268,7 @@ const timedTarget = timedTargetRef.current;
     spinnerGateRef.current?.resetGate(); // NEW: Reset SpinnerGate state
     miniPlayfieldEntranceRef.current?.resetEntrance(); // NEW: Reset MiniPlayfieldEntrance state
     plungerLaneLightRef.current?.resetLight(); // NEW: Reset PlungerLaneLight state
+    dropTargetBankRef.current?.resetBank(); // NEW: Reset DropTargetBank state (which also resets its children)
 
 
 
@@ -1593,36 +1607,51 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
         <Ramp ref={rampRef} width={180} height={50} top={300} left={50} angle={15} />
         <LoopShot size="50px" top="250px" left="650px" speed="2s" />
         <PopBumper top={250} left={400} />
-        <DropTarget
-          ref={dropTarget1Ref}
-          id="DT1"
+      <DropTargetBank
+          ref={dropTargetBankRef}
+          id="mainDropTargetBank"
           top={150}
           left={650}
-          width={30}
-          height={50}
-          scoreValue={200}
-          onHit={handleDropTargetHit}
-        />
-        <DropTarget
-          ref={dropTarget2Ref}
-          id="DT2"
-          top={150}
-          left={685}
-          width={30}
-          height={50}
-          scoreValue={200}
-          onHit={handleDropTargetHit}
-        />
-        <DropTarget
-          ref={dropTarget3Ref}
-          id="DT3"
-          top={150}
-          left={720}
-          width={30}
-          height={50}
-          scoreValue={200}
-          onHit={handleDropTargetHit}
-        />
+          gap={5}
+          activeBgColor="rgba(255, 140, 0, 0.1)"
+          inactiveBgColor="rgba(0, 0, 0, 0.1)"
+          activeBorderColor="#ff8c00"
+          inactiveBorderColor="#555555"
+          bankClearBonus={DROP_TARGET_BONUS_SCORE} // Use the constant
+          resetDelay={500}
+          onBankCleared={handleDropTargetBankCleared}
+          initialIsActive={false}
+        >
+          {/* Existing DropTarget components, now rendered as children of DropTargetBank */}
+          {/* Their 'top' and 'left' props are relative to the DropTargetBank's position */}
+          <DropTarget
+            id="DT1"
+            top={0} // Relative to DropTargetBank's top
+            left={0} // Relative to DropTargetBank's left
+            width={30}
+            height={50}
+            scoreValue={200}
+            // onHit prop is now handled by DropTargetBank's internal logic
+            // and then passed through if the original onHit is needed elsewhere.
+            // For now, we rely on DropTargetBank's internal handleChildDropTargetHit.
+          />
+          <DropTarget
+            id="DT2"
+            top={0}
+            left={35} // Positioned next to DT1 with gap
+            width={30}
+            height={50}
+            scoreValue={200}
+          />
+          <DropTarget
+            id="DT3"
+            top={0}
+            left={70} // Positioned next to DT2 with gap
+            width={30}
+            height={50}
+            scoreValue={200}
+          />
+        </DropTargetBank>
         <Magnet top={100} left={150} />
         <Outlane onDrain={handleOutOfBounds} left={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} ref={outlaneLeftRef} />
         <Outlane onDrain={handleOutOfBounds} right={0} top={PLAY_AREA_HEIGHT - 80} width={100} height={80} ref={outlaneRightRef} />
