@@ -1226,7 +1226,7 @@ const timedTarget = timedTargetRef.current;
     //dropTarget1Ref.current?.resetTarget();
     //dropTarget2Ref.current?.resetTarget();
     //dropTarget3Ref.current?.resetTarget();
-    setDroppedTargets({});
+    // setDroppedTargets({});
     rolloverARef.current?.resetLight();
     rolloverBRef.current?.resetLight();
     rolloverCRef.current?.resetLight();
