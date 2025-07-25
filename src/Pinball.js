@@ -47,6 +47,8 @@ import SpinnerGate from './components/SpinnerGate';
 import MiniPlayfieldEntrance from './components/MiniPlayfieldEntrance';
 import PlungerLaneLight from './components/PlungerLaneLight';
 import DropTargetBank from './components/DropTargetBank';
+import RolloverLane from './components/RolloverLane';
+
 
 
 
@@ -285,6 +287,9 @@ const Pinball = () => {
   const miniPlayfieldEntranceRef = useRef(null);
   const plungerLaneLightRef = useRef(null);
   const dropTargetBankRef = useRef(null);
+  const rolloverLaneRef = useRef(null);
+
+
 
 
 
@@ -526,7 +531,7 @@ const Pinball = () => {
         setLitRollovers({});
       }, 500);
     }
-  }, [litRollovers, applyBonusMultiplier]);
+  }, [litRollovers, applyBonusMultiplier]); 
 
   // Variable Target Bank Callbacks
   const handleVariableTargetHit = useCallback((id, score) => {
@@ -844,7 +849,7 @@ const Pinball = () => {
           ballVelocityRef.current = { x: ballVelocityRef.current.x * 0.9, y: ballVelocityRef.current.y * 0.9 };
         }
       }
-    });
+    }); 
 
     const gate = gateRef.current;
     if (gate) {
@@ -1040,6 +1045,21 @@ const timedTarget = timedTargetRef.current;
     }
 
 
+     const rolloverLane = rolloverLaneRef.current;
+    if (rolloverLane) {
+      const laneRect = rolloverLane.getBoundingClientRect();
+      if (laneRect && isCircleCollidingWithRectangle(ballCircle, laneRect)) {
+        const scoreAwarded = rolloverLane.handleCollision(ballPosition, radius);
+        if (scoreAwarded > 0) {
+          // Score is handled by RolloverLane's handleCollision, which calls onPointLit
+        }
+        // Apply a slight dampening effect as the ball rolls over
+        ballVelocityRef.current = { x: ballVelocityRef.current.x * 0.95, y: ballVelocityRef.current.y * 0.95 };
+        return; // Prevent further collisions this frame if hit
+      }
+    }
+
+
 
     }
 
@@ -1062,7 +1082,7 @@ const timedTarget = timedTargetRef.current;
       }
     });
 
-  }, [isBallCaptured, applyBonusMultiplier, isCircleCollidingWithRectangle, mysterySaucerRef, bumper1Ref, bumper2Ref, target1Ref, target2Ref, slingshotLeftRef, slingshotRightRef, spinnerRef, kickbackLeftRef, skillShotLaneRef, dropTarget1Ref, dropTarget2Ref, dropTarget3Ref, rolloverARef, rolloverBRef, rolloverCRef, gateRef, variableTarget1Ref, variableTarget2Ref, variableTarget3Ref, variableTarget4Ref, vukRef]);
+  }, [isBallCaptured, applyBonusMultiplier, isCircleCollidingWithRectangle, mysterySaucerRef, bumper1Ref, bumper2Ref, target1Ref, target2Ref, slingshotLeftRef, slingshotRightRef, spinnerRef, kickbackLeftRef, skillShotLaneRef, dropTarget1Ref, dropTarget2Ref, dropTarget3Ref, rolloverARef, rolloverBRef, rolloverCRef, gateRef, variableTarget1Ref, variableTarget2Ref, variableTarget3Ref, variableTarget4Ref, vukRef]); 
 
 
  const handleMovingTargetHit = useCallback((id, score) => {
@@ -1186,6 +1206,23 @@ const timedTarget = timedTargetRef.current;
   }, [applyBonusMultiplier, setScore, increaseBonusMultiplier, addBonusScoreUnits]);
 
 
+
+const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
+    const multipliedScore = applyBonusMultiplier(score);
+    setScore(prev => prev + multipliedScore);
+    addBonusScoreUnits(10); // Example: add bonus units for lighting a point
+    console.log(`RolloverLane ${laneId} point ${pointIndex} lit for ${score} points!`);
+  }, [applyBonusMultiplier, setScore, addBonusScoreUnits]);
+
+  const handleRolloverLaneCleared = useCallback((laneId, bonus) => {
+    const multipliedBonus = applyBonusMultiplier(bonus);
+    setScore(prev => prev + multipliedBonus);
+    increaseBonusMultiplier(); // Example: increase multiplier for clearing a lane
+    addBonusScoreUnits(50); // Significant bonus units for clearing a lane
+    console.log(`RolloverLane ${laneId} cleared! Bonus: ${multipliedBonus} points!`);
+  }, [applyBonusMultiplier, setScore, increaseBonusMultiplier, addBonusScoreUnits]);
+
+
  
 
 
@@ -1269,6 +1306,7 @@ const timedTarget = timedTargetRef.current;
     miniPlayfieldEntranceRef.current?.resetEntrance(); // NEW: Reset MiniPlayfieldEntrance state
     plungerLaneLightRef.current?.resetLight(); // NEW: Reset PlungerLaneLight state
     dropTargetBankRef.current?.resetBank(); // NEW: Reset DropTargetBank state (which also resets its children)
+    rolloverLaneRef.current?.resetLane(); // NEW: Reset RolloverLane state
 
 
 
@@ -1658,6 +1696,27 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
         <Kickback ref={kickbackLeftRef} bottom={PLAY_AREA_HEIGHT - 120} left={20} angle={30} onKickback={() => setScore(prev => prev + applyBonusMultiplier(100))} />
         <LaneChange onClick={() => console.log('Lane Change clicked')} left={120} top={PLAY_AREA_HEIGHT - 100} />
         <LaneChange onClick={() => console.log('Lane Change clicked')} left={580} top={PLAY_AREA_HEIGHT - 100} />
+        
+        <RolloverLane
+          ref={rolloverLaneRef}
+          id="topRolloverLane"
+          top={50}
+          left={200}
+          width={260} // Adjusted width to fit 3 points with spacing
+          height={30}
+          numPoints={3}
+          orientation="horizontal"
+          pointSize={15}
+          litColor="#00ffff"
+          dimColor="#003333"
+          scorePerPoint={50}
+          laneClearBonus={ROLLOVER_BANK_BONUS_SCORE} // Use the constant
+          onPointLit={handleRolloverPointLit}
+          onLaneCleared={handleRolloverLaneCleared}
+          initialPointsLit={[false, false, false]}
+        >
+
+        
         <Rollover
           ref={rolloverARef}
           id="A"
@@ -1688,6 +1747,8 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           scoreValue={50}
           onRollOver={handleRollover}
         />
+
+        </RolloverLane>
         <Gate
           ref={gateRef}
           top={350}
