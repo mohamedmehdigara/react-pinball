@@ -2159,6 +2159,13 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           canPulse={true}
         />
 
+
+
+
+
+
+
+
       </PinballGame>
     </Container>
   );
