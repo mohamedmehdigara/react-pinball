@@ -48,6 +48,8 @@ import MiniPlayfieldEntrance from './components/MiniPlayfieldEntrance';
 import PlungerLaneLight from './components/PlungerLaneLight';
 import DropTargetBank from './components/DropTargetBank';
 import RolloverLane from './components/RolloverLane';
+import FeatureLight from './components/FeatureLight';
+
 
 
 
@@ -288,7 +290,7 @@ const Pinball = () => {
   const plungerLaneLightRef = useRef(null);
   const dropTargetBankRef = useRef(null);
   const rolloverLaneRef = useRef(null);
-
+  const featureLightRef = useRef(null);
 
 
 
@@ -1307,6 +1309,7 @@ const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
     plungerLaneLightRef.current?.resetLight(); // NEW: Reset PlungerLaneLight state
     dropTargetBankRef.current?.resetBank(); // NEW: Reset DropTargetBank state (which also resets its children)
     rolloverLaneRef.current?.resetLane(); // NEW: Reset RolloverLane state
+    featureLightRef.current?.resetLight(); // NEW: Reset FeatureLight state
 
 
 
@@ -2141,6 +2144,19 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           litColor="#ffff00"
           dimColor="#333300"
           initialIsLit={false}
+        />
+
+        <FeatureLight
+          ref={featureLightRef}
+          id="multiballReady"
+          top={100}
+          left={PLAY_AREA_WIDTH / 2} // Centered horizontally
+          size={35}
+          labelText="MULTIBALL"
+          litColor="#ff00ff" // Magenta for multiball
+          dimColor="#330033"
+          initialIsLit={false}
+          canPulse={true}
         />
 
       </PinballGame>
