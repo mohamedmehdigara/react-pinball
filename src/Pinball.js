@@ -49,6 +49,7 @@ import PlungerLaneLight from './components/PlungerLaneLight';
 import DropTargetBank from './components/DropTargetBank';
 import RolloverLane from './components/RolloverLane';
 import FeatureLight from './components/FeatureLight';
+import BallDrainSensor from './components/BallDrainSensor';
 
 
 
@@ -291,6 +292,8 @@ const Pinball = () => {
   const dropTargetBankRef = useRef(null);
   const rolloverLaneRef = useRef(null);
   const featureLightRef = useRef(null);
+  const ballDrainSensorRef = useRef(null);
+
 
 
 
@@ -1062,6 +1065,15 @@ const timedTarget = timedTargetRef.current;
     }
 
 
+     const ballDrainSensor = ballDrainSensorRef.current;
+    if (ballDrainSensor) {
+      const drainRect = ballDrainSensor.getBoundingClientRect();
+      if (drainRect && isCircleCollidingWithRectangle(ballCircle, drainRect)) {
+        ballDrainSensor.triggerDrain(); // This calls onDrain which handles score, lives, etc.
+        return; // Ball is drained, prevent further collisions this frame
+      }
+    }
+
 
     }
 
@@ -1131,64 +1143,76 @@ const timedTarget = timedTargetRef.current;
   }, [applyBonusMultiplier, setScore, setIsBallCaptured, setDisplayBallVelocity]);
 
 
+const handleBallDrain = useCallback((id) => {
+    // This logic was previously directly in handleOutOfBounds for the bottom drain.
+    // Now it's encapsulated here, triggered by the BallDrainSensor.
+    const endOfBallBonus = bonusScoreUnits * END_OF_BALL_BONUS_FACTOR * bonusMultiplier;
+    if (endOfBallBonus > 0) {
+      setScore(prev => prev + endOfBallBonus);
+      alert(`End-of-Ball Bonus: +${endOfBallBonus} points!`); // Simple display
+    }
+
+    resetBonusScoreUnits();
+    resetBonusMultiplier();
+
+    // Check for kickback activation (if ball drained on kickback side)
+    if (kickbackLeftRef.current && ballPositionRef.current.x < PLAY_AREA_WIDTH * 0.2 && kickbackLeftRef.current.getIsLit()) { // Assuming kickback has an `getIsLit` method
+      const impulse = kickbackLeftRef.current.handleCollision(ballPositionRef.current, BALL_RADIUS); // Re-use handleCollision to trigger kickback logic
+      if (impulse) {
+        ballVelocityRef.current = impulse;
+        setBallLaunched(true);
+        ballPositionRef.current = { x: impulse.x > 0 ? (PLAY_AREA_WIDTH / 4) : (PLAY_AREA_WIDTH * 3 / 4), y: PLAY_AREA_HEIGHT - 100 };
+        setDisplayBallPosition(ballPositionRef.current);
+        setDisplayBallVelocity(ballVelocityRef.current);
+        return; // Ball was kicked back, do not proceed with drain logic
+      }
+    }
+
+    // If ball save is active, return the ball
+    if (ballSaveActive) {
+      alert("BALL SAVED!");
+      setBallSaveActive(false);
+      clearInterval(ballSaveIntervalRef.current); // Clear the ball save timer
+      setBallSaveTimer(0);
+
+      ballPositionRef.current = { x: PLAY_AREA_WIDTH / 2, y: PLAY_AREA_HEIGHT - 100 }; // Return to plunger lane or center
+      ballVelocityRef.current = { x: BALL_SAVE_RETURN_VELOCITY_X, y: BALL_SAVE_RETURN_VELOCITY_Y };
+      setDisplayBallPosition(ballPositionRef.current);
+      setDisplayBallVelocity(ballVelocityRef.current);
+      setBallLaunched(true);
+      return;
+    }
+
+    // Standard drain logic
+    ballPositionRef.current = { x: INITIAL_BALL_X, y: INITIAL_BALL_Y };
+    ballVelocityRef.current = { x: 0, y: 0 };
+    setBallLaunched(false);
+    setLives(prev => prev - 1);
+    if (lives <= 0) {
+      setGameOver(true);
+    }
+    setDisplayBallPosition(ballPositionRef.current);
+    setDisplayBallVelocity(ballVelocityRef.current);
+  }, [bonusScoreUnits, bonusMultiplier, applyBonusMultiplier, resetBonusScoreUnits, resetBonusMultiplier, kickbackLeftRef, setScore, setBallLaunched, setLives, setGameOver, ballSaveActive, setBallSaveActive, setBallSaveTimer, setDisplayBallPosition, setDisplayBallVelocity]);
 
 
   // --- Handle Out of Bounds (Drain) ---
-  const handleOutOfBounds = useCallback((ballPosition, radius, velocity) => {
-    if (ballPosition.y > PLAY_AREA_HEIGHT + radius * 2) {
-      if (ballSaveActive) {
-        alert("BALL SAVED!");
-        setBallSaveActive(false);
-        clearInterval(ballSaveIntervalRef.current);
-        setBallSaveTimer(0);
-
-        ballPositionRef.current = { x: PLAY_AREA_WIDTH / 2, y: PLAY_AREA_HEIGHT - 100 };
-        ballVelocityRef.current = { x: BALL_SAVE_RETURN_VELOCITY_X, y: BALL_SAVE_RETURN_VELOCITY_Y };
-        setDisplayBallPosition(ballPositionRef.current);
-        setDisplayBallVelocity(ballVelocityRef.current);
-        setBallLaunched(true);
-        return;
-      }
-
-      const endOfBallBonus = bonusScoreUnits * END_OF_BALL_BONUS_FACTOR * bonusMultiplier;
-      if (endOfBallBonus > 0) {
-        setScore(prev => prev + endOfBallBonus);
-        alert(`End-of-Ball Bonus: +${endOfBallBonus} points!`);
-      }
-
-      resetBonusScoreUnits();
-      resetBonusMultiplier();
-
-      if (kickbackLeftRef.current && ballPosition.x < PLAY_AREA_WIDTH * 0.2) {
-        const impulse = kickbackLeftRef.current.handleCollision(ballPosition, radius);
-        if (impulse) {
-          ballVelocityRef.current = impulse;
-          setBallLaunched(true);
-          ballPositionRef.current = { x: impulse.x > 0 ? (PLAY_AREA_WIDTH / 4) : (PLAY_AREA_WIDTH * 3 / 4), y: PLAY_AREA_HEIGHT - 100 };
-          setDisplayBallPosition(ballPositionRef.current);
-          setDisplayBallVelocity(ballVelocityRef.current);
-          return;
-        }
-      }
-
-      ballPositionRef.current = { x: INITIAL_BALL_X, y: INITIAL_BALL_Y };
-      ballVelocityRef.current = { x: 0, y: 0 };
-      setBallLaunched(false);
-      setLives(prev => prev - 1);
-      if (lives <= 0) {
-        setGameOver(true);
-      }
-      setDisplayBallPosition(ballPositionRef.current);
-      setDisplayBallVelocity(ballVelocityRef.current);
-    } else if (ballPosition.y < -radius) {
+const handleOutOfBounds = useCallback((ballPosition, radius, velocity) => {
+    // This function now ONLY handles collisions with the top, left, and right walls.
+    // The bottom drain detection is handled by the BallDrainSensor component.
+    if (ballPosition.y < -radius) {
       ballVelocityRef.current = { ...ballVelocityRef.current, y: -ballVelocityRef.current.y * WALL_BOUNCE_DAMPENING };
       ballPositionRef.current = { ...ballPositionRef.current, y: -radius + COLLISION_NUDGE };
-    } else if (ballPosition.x < -radius || ballPosition.x > PLAY_AREA_WIDTH + radius) {
+    } else if (ballPosition.x < -radius) { // Left wall
       ballVelocityRef.current = { ...ballVelocityRef.current, x: -ballVelocityRef.current.x * WALL_BOUNCE_DAMPENING };
-      ballPositionRef.current = { ...ballPositionRef.current, x: ballPosition.x < -radius ? -radius : PLAY_AREA_WIDTH + radius };
+      ballPositionRef.current = { ...ballPositionRef.current, x: -radius + COLLISION_NUDGE };
+    } else if (ballPosition.x > PLAY_AREA_WIDTH + radius) { // Right wall
+      ballVelocityRef.current = { ...ballVelocityRef.current, x: -ballVelocityRef.current.x * WALL_BOUNCE_DAMPENING };
+      ballPositionRef.current = { ...ballPositionRef.current, x: PLAY_AREA_WIDTH + radius - COLLISION_NUDGE };
     }
-  }, [ballSaveActive, bonusScoreUnits, bonusMultiplier, applyBonusMultiplier, resetBonusScoreUnits, resetBonusMultiplier, kickbackLeftRef, setScore, setBallLaunched, setLives, setGameOver, setBallSaveActive, setBallSaveTimer, setDisplayBallPosition, setDisplayBallVelocity]);
+  }, []); // Dependencies are now empty as it only uses refs and constants, which don't need to be in the array.
 
+  
  const handleSubwayEntrance = useCallback((id, score) => {
     setIsBallCaptured(true); // Capture the ball
     ballCapturePosition.current = { ...ballPositionRef.current }; // Store current position
@@ -2159,7 +2183,15 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           canPulse={true}
         />
 
-
+          <BallDrainSensor
+          ref={ballDrainSensorRef}
+          id="mainDrain"
+          top={PLAY_AREA_HEIGHT - 20} // Position at the very bottom of the play area
+          left={0}
+          width={PLAY_AREA_WIDTH}
+          height={20} // A thin strip at the bottom
+          onDrain={handleBallDrain}
+          />
 
 
 
