@@ -1418,15 +1418,15 @@ const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
     if (ballPositionRef.current.x - BALL_RADIUS < 0 || ballPositionRef.current.x + BALL_RADIUS > GAME_WIDTH) {
       ballVelocityRef.current.x *= -1;
       if (ballPositionRef.current.x - BALL_RADIUS < 0) ballPositionRef.current.x = ballRadius;
-      if (ballPositionRef.current.x + BALL_RADIUS > GAME_WIDTH) ballPositionRef.current.x = GAME_WIDTH - ballRadius;
+      if (ballPositionRef.current.x + BALL_RADIUS > GAME_WIDTH) ballPositionRef.current.x = GAME_WIDTH - BALL_RADIUS;
     }
-    if (ballPositionRef.current.y - ballRadius < 0) {
+    if (ballPositionRef.current.y - BALL_RADIUS < 0) {
       ballVelocityRef.current.y *= -1;
-      ballPositionRef.current.y = ballRadius;
+      ballPositionRef.current.y = BALL_RADIUS;
     }
 
     // Check for drain
-    if (ballPositionRef.current.y + ballRadius > GAME_HEIGHT) {
+    if (ballPositionRef.current.y + BALL_RADIUS > GAME_HEIGHT) {
       // Reset ball
       ballPositionRef.current = { x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2 };
       ballVelocityRef.current = { x: 0, y: 0 };
@@ -2273,7 +2273,7 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
 
 // The main ball is now conditionally rendered
 {!isMiniPlayfieldActive && (
-  <StyledBall x={ballPosition.x} y={ballPosition.y} size={ballRadius} />
+  <StyledBall x={ballPosition.x} y={ballPosition.y} size={BALL_RADIUS} />
 )}
 
 
