@@ -50,6 +50,7 @@ import DropTargetBank from './components/DropTargetBank';
 import RolloverLane from './components/RolloverLane';
 import FeatureLight from './components/FeatureLight';
 import BallDrainSensor from './components/BallDrainSensor';
+import MiniPlayfield from './components/MiniPlayfield';
 
 
 
@@ -199,6 +200,7 @@ const Pinball = () => {
   const [rightFlipperAngle, setRightFlipperAngle] = useState(0);
   const [ballSaveActive, setBallSaveActive] = useState(false);
   const [ballSaveTimer, setBallSaveTimer] = useState(0);
+  const [isMiniPlayfieldActive, setIsMiniPlayfieldActive] = useState(false);
   // const [highScores, setHighScores] = useState([]); // REMOVED: Firebase related state
   // const [userId, setUserId] = useState(null); // REMOVED: Firebase related state
   // const [isAuthReady, setIsAuthReady] = useState(false); // REMOVED: Firebase related state
@@ -293,6 +295,8 @@ const Pinball = () => {
   const rolloverLaneRef = useRef(null);
   const featureLightRef = useRef(null);
   const ballDrainSensorRef = useRef(null);
+  const miniPlayfieldRef = useRef(null);
+
 
 
 
@@ -1249,7 +1253,12 @@ const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
   }, [applyBonusMultiplier, setScore, increaseBonusMultiplier, addBonusScoreUnits]);
 
 
- 
+ const handleMiniPlayfieldExit = useCallback(({ x, y }, { x: velX, y: velY }) => {
+    // Reset the main ball's position and velocity from the mini-playfield's exit
+    ballPositionRef.current = { x: x, y: y };
+    ballVelocityRef.current = { x: velX, y: velY };
+    setIsMiniPlayfieldActive(false);
+  }, []);
 
 
   // --- Game Start/Reset Logic ---
@@ -1394,25 +1403,84 @@ const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
   }, [setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity]);
 
   // Effect for ball movement inside the tube (if captured by tube)
-  useEffect(() => {
-    let interval;
-    const isMysterySaucerLit = mysterySaucerRef.current?.getIsLit ? mysterySaucerRef.current.getIsLit() : false;
+ useEffect(() => {
+  let animationFrameId;
 
-    if (isBallCaptured && !isMysterySaucerLit) {
-      interval = setInterval(() => {
-        if (ballPositionRef.current.y < tubeExitY) {
-          ballPositionRef.current = { x: tubeEntranceX.current + tubeWidth.current / 2 - BALL_RADIUS, y: ballPositionRef.current.y + 5 };
-          setDisplayBallPosition(ballPositionRef.current);
-        } else {
-          clearInterval(interval);
-          setIsBallCaptured(false);
-          ballVelocityRef.current = { x: -10, y: -10 };
-          setDisplayBallVelocity(ballVelocityRef.current);
-        }
-      }, 50);
+  const gameLoop = () => {
+    // Apply gravity
+    ballVelocityRef.current.y += GRAVITY;
+
+    // Update position
+    ballPositionRef.current.x += ballVelocityRef.current.x;
+    ballPositionRef.current.y += ballVelocityRef.current.y;
+
+    // Wall collision detection
+    if (ballPositionRef.current.x - BALL_RADIUS < 0 || ballPositionRef.current.x + BALL_RADIUS > GAME_WIDTH) {
+      ballVelocityRef.current.x *= -1;
+      if (ballPositionRef.current.x - BALL_RADIUS < 0) ballPositionRef.current.x = ballRadius;
+      if (ballPositionRef.current.x + BALL_RADIUS > GAME_WIDTH) ballPositionRef.current.x = GAME_WIDTH - ballRadius;
     }
-    return () => clearInterval(interval);
-  }, [isBallCaptured, tubeExitY, setDisplayBallPosition, setDisplayBallVelocity]);
+    if (ballPositionRef.current.y - ballRadius < 0) {
+      ballVelocityRef.current.y *= -1;
+      ballPositionRef.current.y = ballRadius;
+    }
+
+    // Check for drain
+    if (ballPositionRef.current.y + ballRadius > GAME_HEIGHT) {
+      // Reset ball
+      ballPositionRef.current = { x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2 };
+      ballVelocityRef.current = { x: 0, y: 0 };
+      scoreRef.current = 0;
+      setScore(0);
+    }
+
+    // Bumper collision detection
+    for (const bumper of bumpers) {
+      const dx = ballPositionRef.current.x - (bumper.x + BUMPER_RADIUS / 2);
+      const dy = ballPositionRef.current.y - (bumper.y + BUMPER_RADIUS / 2);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < ballRadius + BUMPER_RADIUS / 2) {
+        const angle = Math.atan2(dy, dx);
+        ballVelocityRef.current.x = Math.cos(angle) * BUMPER_BOUNCE_FACTOR * Math.sqrt(ballVelocityRef.current.x ** 2 + ballVelocityRef.current.y ** 2);
+        ballVelocityRef.current.y = Math.sin(angle) * BUMPER_BOUNCE_FACTOR * Math.sqrt(ballVelocityRef.current.x ** 2 + ballVelocityRef.current.y ** 2);
+        updateScore(100);
+      }
+    }
+
+    // --- New code for Mini-Playfield interaction ---
+    if (!isMiniPlayfieldActive && miniPlayfieldRef.current?.checkEntranceCollision(ballPositionRef.current, ballRadius)) {
+      setIsMiniPlayfieldActive(true);
+      miniPlayfieldRef.current.activate(ballPositionRef.current, ballVelocityRef.current);
+      return; // Exit the main game loop, as the mini-playfield is now active
+    }
+    // --- End new code ---
+
+    setBallPosition({ ...ballPositionRef.current });
+    setBallVelocity({ ...ballVelocityRef.current });
+
+    animationFrameId = requestAnimationFrame(gameLoop);
+  };
+
+  // Only run the main game loop if the mini-playfield is not active
+  if (!isMiniPlayfieldActive) {
+    animationFrameId = requestAnimationFrame(gameLoop);
+  }
+
+  return () => cancelAnimationFrame(animationFrameId);
+}, [
+  isMiniPlayfieldActive,
+  handleMiniPlayfieldExit,
+  updateScore,
+  ballRadius,
+  bumpers,
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  GRAVITY,
+  BUMPER_RADIUS,
+  BUMPER_BOUNCE_FACTOR,
+  FLIPPER_BOUNCE_FACTOR,
+]);
 
 
   // --- Nudge Logic ---
@@ -2192,6 +2260,21 @@ const handleDiverterToggle = useCallback((id, isOpen) => {
           height={20} // A thin strip at the bottom
           onDrain={handleBallDrain}
           />
+
+          <MiniPlayfield
+  ref={miniPlayfieldRef}
+  top={100}
+  left={500}
+  width={200}
+  height={200}
+  onExit={handleMiniPlayfieldExit}
+  scoreCallback={updateScore}
+/>
+
+// The main ball is now conditionally rendered
+{!isMiniPlayfieldActive && (
+  <StyledBall x={ballPosition.x} y={ballPosition.y} size={ballRadius} />
+)}
 
 
 
