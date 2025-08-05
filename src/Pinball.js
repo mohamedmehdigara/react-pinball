@@ -1415,10 +1415,10 @@ const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
     ballPositionRef.current.y += ballVelocityRef.current.y;
 
     // Wall collision detection
-    if (ballPositionRef.current.x - BALL_RADIUS < 0 || ballPositionRef.current.x + BALL_RADIUS > GAME_WIDTH) {
+    if (ballPositionRef.current.x - BALL_RADIUS < 0 || ballPositionRef.current.x + BALL_RADIUS > PLAY_AREA_WIDTH) {
       ballVelocityRef.current.x *= -1;
-      if (ballPositionRef.current.x - BALL_RADIUS < 0) ballPositionRef.current.x = ballRadius;
-      if (ballPositionRef.current.x + BALL_RADIUS > GAME_WIDTH) ballPositionRef.current.x = GAME_WIDTH - BALL_RADIUS;
+      if (ballPositionRef.current.x - BALL_RADIUS < 0) ballPositionRef.current.x = BALL_RADIUS;
+      if (ballPositionRef.current.x + BALL_RADIUS > PLAY_AREA_WIDTH) ballPositionRef.current.x = PLAY_AREA_WIDTH - BALL_RADIUS;
     }
     if (ballPositionRef.current.y - BALL_RADIUS < 0) {
       ballVelocityRef.current.y *= -1;
@@ -1426,9 +1426,9 @@ const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
     }
 
     // Check for drain
-    if (ballPositionRef.current.y + BALL_RADIUS > GAME_HEIGHT) {
+    if (ballPositionRef.current.y + BALL_RADIUS > PLAY_AREA_HEIGHT) {
       // Reset ball
-      ballPositionRef.current = { x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2 };
+      ballPositionRef.current = { x: PLAY_AREA_WIDTH / 2, y: PLAY_AREA_HEIGHT / 2 };
       ballVelocityRef.current = { x: 0, y: 0 };
       scoreRef.current = 0;
       setScore(0);
@@ -1440,7 +1440,7 @@ const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
       const dy = ballPositionRef.current.y - (bumper.y + BUMPER_RADIUS / 2);
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance < ballRadius + BUMPER_RADIUS / 2) {
+      if (distance < BALL_RADIUS + BUMPER_RADIUS / 2) {
         const angle = Math.atan2(dy, dx);
         ballVelocityRef.current.x = Math.cos(angle) * BUMPER_BOUNCE_FACTOR * Math.sqrt(ballVelocityRef.current.x ** 2 + ballVelocityRef.current.y ** 2);
         ballVelocityRef.current.y = Math.sin(angle) * BUMPER_BOUNCE_FACTOR * Math.sqrt(ballVelocityRef.current.x ** 2 + ballVelocityRef.current.y ** 2);
@@ -1449,7 +1449,7 @@ const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
     }
 
     // --- New code for Mini-Playfield interaction ---
-    if (!isMiniPlayfieldActive && miniPlayfieldRef.current?.checkEntranceCollision(ballPositionRef.current, ballRadius)) {
+    if (!isMiniPlayfieldActive && miniPlayfieldRef.current?.checkEntranceCollision(ballPositionRef.current, BALL_RADIUS)) {
       setIsMiniPlayfieldActive(true);
       miniPlayfieldRef.current.activate(ballPositionRef.current, ballVelocityRef.current);
       return; // Exit the main game loop, as the mini-playfield is now active
@@ -1472,7 +1472,7 @@ const handleRolloverPointLit = useCallback((laneId, pointIndex, score) => {
   isMiniPlayfieldActive,
   handleMiniPlayfieldExit,
   updateScore,
-  ballRadius,
+  BALL_RADIUS,
   bumpers,
   GAME_WIDTH,
   GAME_HEIGHT,
