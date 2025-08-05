@@ -2103,6 +2103,9 @@ const Pinball = () => {
           />
         )}
 
+         <LeftFlipper ref={leftFlipperRef} top={450} left={150} angle={leftFlipperAngle} />
+        <RightFlipper ref={rightFlipperRef} top={450} left={400} angle={rightFlipperAngle} />
+
       </PinballGame>
     </Container>
   );
