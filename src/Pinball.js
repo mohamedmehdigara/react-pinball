@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import styled, { keyframes, css } from 'styled-components';
+import styled from 'styled-components';
 import Ball from './components/Ball';
 import LeftFlipper from './components/LeftFlipper';
 import RightFlipper from './components/RightFlipper';
@@ -25,7 +25,7 @@ import NudgeDisplay from './components/NudgeDisplay';
 import RestartButton from './components/RestartButton';
 import Rollover from './components/Rollover';
 import BallSaveDisplay from './components/BallSaveDisplay';
-import GameOverMessage from "./components/GameOverMessage";
+import GameOverMessage from './components/GameOverMessage';
 import VUK from './components/VUK';
 import Scoop from './components/Scoop';
 import StandupTarget from './components/StandupTarget';
@@ -50,7 +50,8 @@ import DropTargetBank from './components/DropTargetBank';
 import RolloverLane from './components/RolloverLane';
 import FeatureLight from './components/FeatureLight';
 import BallDrainSensor from './components/BallDrainSensor';
-import MiniPlayfield from './components/MiniPlayfield'; // New import
+import MiniPlayfield from './components/MiniPlayfield';
+import Post from './components/Post'; // NEW: Import Post component
 
 // Constants
 const BALL_RADIUS = 10;
@@ -279,6 +280,8 @@ const Pinball = () => {
   const dropTargetBankRef = useRef(null);
   const rolloverLaneRef = useRef(null);
   const featureLightRef = useRef(null);
+  const post1Ref = useRef(null); // NEW: Ref for Post 1
+  const post2Ref = useRef(null); // NEW: Ref for Post 2
 
 
   // Derived state (from refs, so it's always up-to-date in logic)
@@ -888,37 +891,27 @@ const Pinball = () => {
     if (bonusLaneLight1) {
       const lightRect = bonusLaneLight1.getBoundingClientRect();
       if (lightRect && isCircleCollidingWithRectangle(ballCircle, lightRect)) {
-        const scoreAwarded = bonusLaneLight1.handleCollision();
-        if (scoreAwarded > 0) {
-          // Score is handled by BonusLaneLight's handleCollision, which calls onHit
-        }
-        // Apply a slight dampening effect as the ball rolls over
-        ballVelocityRef.current = { x: ballVelocityRef.current.x * 0.95, y: ballVelocityRef.current.y * 0.95 };
-        return; // Prevent further collisions this frame if hit
+        // BonusLaneLight does not have handleCollision method, it's controlled imperatively
+        // The parent (Pinball.js) would decide to call lightOn/lightOff based on ball position.
+        // If you want it to behave like a rollover, you'd add a handleCollision to BonusLaneLight.
+        // For now, removing this direct call as it's not defined in BonusLaneLight.js.
+        // If you want it to light up on collision, you'd call bonusLaneLight1.lightOn() here.
+        // ballVelocityRef.current = { x: ballVelocityRef.current.x * 0.95, y: ballVelocityRef.current.y * 0.95 };
+        // return;
       }
     }
     const bonusLaneLight2 = bonusLaneLight2Ref.current;
     if (bonusLaneLight2) {
       const lightRect = bonusLaneLight2.getBoundingClientRect();
       if (lightRect && isCircleCollidingWithRectangle(ballCircle, lightRect)) {
-        const scoreAwarded = bonusLaneLight2.handleCollision();
-        if (scoreAwarded > 0) {
-          // Score is handled by BonusLaneLight's handleCollision, which calls onHit
-        }
-        ballVelocityRef.current = { x: ballVelocityRef.current.x * 0.95, y: ballVelocityRef.current.y * 0.95 };
-        return;
+        // Same as above for bonusLaneLight1
       }
     }
     const bonusLaneLight3 = bonusLaneLight3Ref.current;
     if (bonusLaneLight3) {
       const lightRect = bonusLaneLight3.getBoundingClientRect();
       if (lightRect && isCircleCollidingWithRectangle(ballCircle, lightRect)) {
-        const scoreAwarded = bonusLaneLight3.handleCollision();
-        if (scoreAwarded > 0) {
-          // Score is handled by BonusLaneLight's handleCollision, which calls onHit
-        }
-        ballVelocityRef.current = { x: ballVelocityRef.current.x * 0.95, y: ballVelocityRef.current.y * 0.95 };
-        return;
+        // Same as above for bonusLaneLight1
       }
     }
 
@@ -1273,7 +1266,39 @@ const Pinball = () => {
       }
     });
 
-  }, [isBallCaptured, applyBonusMultiplier, isCircleCollidingWithRectangle, mysterySaucerRef, bumper1Ref, bumper2Ref, target1Ref, target2Ref, slingshotLeftRef, slingshotRightRef, spinnerRef, kickbackLeftRef, skillShotLaneRef, dropTarget1Ref, dropTarget2Ref, dropTarget3Ref, rolloverARef, rolloverBRef, rolloverCRef, gateRef, variableTarget1Ref, variableTarget2Ref, variableTarget3Ref, variableTarget4Ref, vukRef, scoopRef, standupTargetRef, rotorRef, subwayEntranceRef, ballLockRef, bonusLaneLight1Ref, bonusLaneLight2Ref, bonusLaneLight3Ref, diverterRef, popUpPostRef, timedTargetRef, movingTargetRef, kickerRef, spinnerGateRef, miniPlayfieldEntranceRef, plungerLaneLightRef, rolloverLaneRef, ballDrainSensorRef]);
+    // NEW: Post Collisions
+    const posts = [post1Ref.current, post2Ref.current].filter(Boolean);
+    posts.forEach(post => {
+      const postRect = post.getBoundingClientRect();
+      if (postRect && isCircleCollidingWithRectangle(ballCircle, postRect)) {
+        // Simple elastic collision for a static post
+        // Calculate vector from post center to ball center
+        const postCenterX = postRect.left + postRect.width / 2;
+        const postCenterY = postRect.top + postRect.height / 2;
+        const dx = ballPosition.x - postCenterX;
+        const dy = ballPosition.y - postCenterY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Normalize collision normal
+        const normalX = dx / distance;
+        const normalY = dy / distance;
+
+        // Reflect velocity along the normal
+        const dotProduct = velocity.x * normalX + velocity.y * normalY;
+        ballVelocityRef.current.x = (velocity.x - 2 * dotProduct * normalX) * WALL_BOUNCE_DAMPENING;
+        ballVelocityRef.current.y = (velocity.y - 2 * dotProduct * normalY) * WALL_BOUNCE_DAMPENING;
+
+        // Nudge ball out to prevent sticking
+        const overlap = (radius + postRect.width / 2) - distance;
+        if (overlap > 0) {
+          ballPositionRef.current.x += normalX * overlap;
+          ballPositionRef.current.y += normalY * overlap;
+        }
+      }
+    });
+
+
+  }, [isBallCaptured, applyBonusMultiplier, isCircleCollidingWithRectangle, mysterySaucerRef, bumper1Ref, bumper2Ref, target1Ref, target2Ref, slingshotLeftRef, slingshotRightRef, spinnerRef, kickbackLeftRef, skillShotLaneRef, dropTarget1Ref, dropTarget2Ref, dropTarget3Ref, rolloverARef, rolloverBRef, rolloverCRef, gateRef, variableTarget1Ref, variableTarget2Ref, variableTarget3Ref, variableTarget4Ref, vukRef, scoopRef, standupTargetRef, rotorRef, subwayEntranceRef, ballLockRef, bonusLaneLight1Ref, bonusLaneLight2Ref, bonusLaneLight3Ref, diverterRef, popUpPostRef, timedTargetRef, movingTargetRef, kickerRef, spinnerGateRef, miniPlayfieldEntranceRef, plungerLaneLightRef, rolloverLaneRef, ballDrainSensorRef, post1Ref, post2Ref]);
 
   // --- Handle Out of Bounds (Walls Only) ---
   const handleOutOfBounds = useCallback((ballPosition, radius, velocity) => {
@@ -1351,16 +1376,18 @@ const Pinball = () => {
     bonusLaneLight1Ref.current?.resetLight();
     bonusLaneLight2Ref.current?.resetLight();
     bonusLaneLight3Ref.current?.resetLight();
-    segmentARef.current?.resetSegments(); // Assuming a reset method
-    segmentBRef.current?.resetSegments();
-    segmentCRef.current?.resetSegments();
-    segmentDRef.current?.resetSegments();
-    segmentERef.current?.resetSegments();
-    segmentFRef.current?.resetSegments();
-    segmentGRef.current?.resetSegments();
+    // DisplaySegment components don't have a common reset method, assuming individual resets
+    segmentARef.current?.resetSegment();
+    segmentBRef.current?.resetSegment();
+    segmentCRef.current?.resetSegment();
+    segmentDRef.current?.resetSegment();
+    segmentERef.current?.resetSegment();
+    segmentFRef.current?.resetSegment();
+    segmentGRef.current?.resetSegment();
     diverterRef.current?.resetDiverter();
     popUpPostRef.current?.resetPost();
-    scoreReel1Ref.current?.resetReel(); // Assuming a reset method
+    // ScoreReel components don't have a common reset method, assuming individual resets
+    scoreReel1Ref.current?.resetReel();
     scoreReel2Ref.current?.resetReel();
     scoreReel3Ref.current?.resetReel();
     scoreReel4Ref.current?.resetReel();
@@ -1377,10 +1404,10 @@ const Pinball = () => {
     dropTargetBankRef.current?.resetBank();
     rolloverLaneRef.current?.resetLane();
     featureLightRef.current?.resetLight();
-    ballDrainSensorRef.current?.resetDrain(); // Assuming resetDrain exists or no-op
-
-    activateBallSave(); // Activate ball save at the start of a new game/ball
-  }, [resetVariableTargetBank, resetBonusMultiplier, resetBonusScoreUnits, setGameOver, setScore, setLives, setBallLaunched, setIsTilted, setTiltWarnings, setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setDroppedTargets, setLitRollovers, activateBallSave, vukRef, scoopRef, standupTargetRef, rotorRef, subwayEntranceRef, subwayExitRef, ballLockRef, bonusLaneLight1Ref, bonusLaneLight2Ref, bonusLaneLight3Ref, diverterRef, popUpPostRef, scoreReel1Ref, scoreReel2Ref, scoreReel3Ref, scoreReel4Ref, scoreReel5Ref, scoreReel6Ref, flashLampRef, timedTargetRef, movingTargetRef, kickerRef, bumperGroupRef, spinnerGateRef, miniPlayfieldEntranceRef, plungerLaneLightRef, dropTargetBankRef, rolloverLaneRef, featureLightRef, ballDrainSensorRef]);
+    // BallDrainSensor doesn't have a reset method, as it's a passive sensor.
+    // miniPlayfieldRef.current?.resetMiniPlayfield(); // Assuming reset method for MiniPlayfield
+    // Post components are static, no reset method needed
+  }, [resetVariableTargetBank, resetBonusMultiplier, resetBonusScoreUnits, setGameOver, setScore, setLives, setBallLaunched, setIsTilted, setTiltWarnings, setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity, setDroppedTargets, setLitRollovers, activateBallSave, vukRef, scoopRef, standupTargetRef, rotorRef, subwayEntranceRef, subwayExitRef, ballLockRef, bonusLaneLight1Ref, bonusLaneLight2Ref, bonusLaneLight3Ref, diverterRef, popUpPostRef, scoreReel1Ref, scoreReel2Ref, scoreReel3Ref, scoreReel4Ref, scoreReel5Ref, scoreReel6Ref, flashLampRef, timedTargetRef, movingTargetRef, kickerRef, bumperGroupRef, spinnerGateRef, miniPlayfieldEntranceRef, plungerLaneLightRef, dropTargetBankRef, rolloverLaneRef, featureLightRef, ballDrainSensorRef, segmentARef, segmentBRef, segmentCRef, segmentDRef, segmentERef, segmentFRef, segmentGRef]);
 
   // --- Ball Launcher Logic ---
   const handlePlungerRelease = useCallback((launchPower) => {
@@ -1766,45 +1793,30 @@ const Pinball = () => {
           id="BL1"
           top={50}
           left={500}
-          width={20}
-          height={10}
-          scoreValue={50}
-          onHit={handleBonusLaneLightHit}
-          onLaneCleared={handleBonusLaneCleared}
+          size={20} // Use size prop for circular lights
+          litColor="#00ff00"
+          dimColor="#003300"
           initialIsLit={false}
-          laneId="bonusLaneTop" // Group ID
-          lanePosition={0} // Index in group
-          numLightsInLane={3} // Total lights in group
         />
         <BonusLaneLight
           ref={bonusLaneLight2Ref}
           id="BL2"
           top={50}
           left={530}
-          width={20}
-          height={10}
-          scoreValue={50}
-          onHit={handleBonusLaneLightHit}
-          onLaneCleared={handleBonusLaneCleared}
+          size={20}
+          litColor="#00ff00"
+          dimColor="#003300"
           initialIsLit={false}
-          laneId="bonusLaneTop"
-          lanePosition={1}
-          numLightsInLane={3}
         />
         <BonusLaneLight
           ref={bonusLaneLight3Ref}
           id="BL3"
           top={50}
           left={560}
-          width={20}
-          height={10}
-          scoreValue={50}
-          onHit={handleBonusLaneLightHit}
-          onLaneCleared={handleBonusLaneCleared}
+          size={20}
+          litColor="#00ff00"
+          dimColor="#003300"
           initialIsLit={false}
-          laneId="bonusLaneTop"
-          lanePosition={2}
-          numLightsInLane={3}
         />
 
         {/* DisplaySegment (Example for a single digit, e.g., '0') */}
@@ -1861,6 +1873,10 @@ const Pinball = () => {
           {String(score).padStart(6, '0').split('').map((digitChar, index) => (
             <ScoreReel
               key={index}
+              // Removed eval for dynamic ref assignment, using direct ref or a ref array is safer
+              // For simplicity in this example, assuming fixed refs for each reel
+              // In a real app, you'd manage an array of refs or a single ref for a ScoreDisplay component
+              ref={index === 0 ? scoreReel1Ref : index === 1 ? scoreReel2Ref : index === 2 ? scoreReel3Ref : index === 3 ? scoreReel4Ref : index === 4 ? scoreReel5Ref : scoreReel6Ref}
               id={`scoreDigit${index}`}
               digit={parseInt(digitChar, 10)}
               top={0} // Relative to its flex container
@@ -2093,6 +2109,11 @@ const Pinball = () => {
           scoreCallback={(points) => setScore(prev => prev + points)} // Direct score update for mini-game
         />
 
+        {/* NEW: Post Components */}
+        <Post ref={post1Ref} id="post1" top={400} left={250} size={15} />
+        <Post ref={post2Ref} id="post2" top={400} left={550} size={15} />
+
+
         {/* The Ball component now receives its position from displayBallPosition */}
         {/* It is conditionally rendered based on whether the mini-playfield is active */}
         {!isMiniPlayfieldActive && (
@@ -2103,7 +2124,8 @@ const Pinball = () => {
           />
         )}
 
-         <LeftFlipper ref={leftFlipperRef} top={450} left={150} angle={leftFlipperAngle} />
+        {/* LEFT AND RIGHT FLIPPERS - ADDED BACK */}
+        <LeftFlipper ref={leftFlipperRef} top={450} left={150} angle={leftFlipperAngle} />
         <RightFlipper ref={rightFlipperRef} top={450} left={400} angle={rightFlipperAngle} />
 
       </PinballGame>
