@@ -52,6 +52,7 @@ import FeatureLight from './components/FeatureLight';
 import BallDrainSensor from './components/BallDrainSensor';
 import MiniPlayfield from './components/MiniPlayfield';
 import Post from './components/Post'; // NEW: Import Post component
+import HighScoreTable from './components/HighScoreTable';
 
 // Constants
 const BALL_RADIUS = 10;
@@ -188,6 +189,13 @@ const Pinball = () => {
   // const [highScores, setHighScores] = useState([]); // REMOVED: Firebase related state
   // const [userId, setUserId] = useState(null); // REMOVED: Firebase related state
   // const [isAuthReady, setIsAuthReady] = useState(false); // REMOVED: Firebase related state
+const [highScores, setHighScores] = useState([
+    { name: 'KJS', score: 100000 },
+    { name: 'ABC', score: 75000 },
+    { name: 'XYZ', score: 50000 },
+  ]);
+  const [isHighScore, setIsHighScore] = useState(false);
+  const [showHighScores, setShowHighScores] = useState(false);
 
 
   // --- REFS FOR GAME LOGIC (do NOT trigger re-renders by themselves) ---
@@ -1451,6 +1459,29 @@ const Pinball = () => {
     setDisplayBallVelocity(ballVelocityRef.current);
   }, [setIsBallCaptured, setDisplayBallPosition, setDisplayBallVelocity]);
 
+   const resetGame = useCallback(() => {
+    // Check if the current score is a new high score
+    const isNewHighScore = score > highScores[highScores.length - 1].score;
+
+    if (isNewHighScore) {
+      setIsHighScore(true);
+      setShowHighScores(true);
+    } else {
+      // Proceed with the normal game reset
+      setGameOver(false);
+      setLives(MAX_LIVES);
+      setScore(0);
+      setCanPlunge(true);
+      setTilt(false);
+      tiltRef.current = false;
+      setNudgeCount(0);
+      nudgeRef.current = 0;
+      ballPositionRef.current = { x: INITIAL_BALL_X, y: INITIAL_BALL_Y };
+      ballVelocityRef.current = { x: 0, y: 0 };
+    }
+  }, [score, highScores]);
+
+
   // Effect for ball movement inside the tube (if captured by tube)
   useEffect(() => {
     let interval;
@@ -1654,14 +1685,12 @@ const Pinball = () => {
         <BallSaveDisplay active={ballSaveActive} timer={ballSaveTimer} />
 
         {/* Game Over Overlay */}
-        {gameOver && (
-          <GameOverMessage
-            finalScore={score}
-            highScores={[]} // Placeholder for high scores
-            onSubmitHighScore={() => {}} // Placeholder for submit function
-            onRestartGame={handleGameStart}
-          />
-        )}
+       gameOver ? (
+        showHighScores ? (
+          <HighScoreTable scores={highScores} />
+        ) : (
+          <GameOverMessage finalScore={score} onRestart={resetGame} />
+        )
 
         {/* Bottom Right Launcher and Tube */}
         <BallLauncher onLaunch={handlePlungerRelease} right={20} bottom={20} />
