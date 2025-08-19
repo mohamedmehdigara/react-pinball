@@ -52,9 +52,11 @@ import FeatureLight from './components/FeatureLight';
 import BallDrainSensor from './components/BallDrainSensor';
 import MiniPlayfield from './components/MiniPlayfield';
 import Post from './components/Post'; // NEW: Import Post component
-import HighScoreTable from './components/HighScoreTable';
 
 // Constants
+const MAX_LIVES = 3;
+const TILT_LIMIT = 5;
+const HIGH_SCORE_LIMIT = 5;
 const BALL_RADIUS = 10;
 const PLAY_AREA_WIDTH = 800;
 const PLAY_AREA_HEIGHT = 600;
@@ -1685,12 +1687,11 @@ const [highScores, setHighScores] = useState([
         <BallSaveDisplay active={ballSaveActive} timer={ballSaveTimer} />
 
         {/* Game Over Overlay */}
-       gameOver ? (
-        showHighScores ? (
-          <HighScoreTable scores={highScores} />
-        ) : (
-          <GameOverMessage finalScore={score} onRestart={resetGame} />
-        )
+       
+    
+  
+    <GameOverMessage finalScore={score} onRestart={resetGame} />
+  
 
         {/* Bottom Right Launcher and Tube */}
         <BallLauncher onLaunch={handlePlungerRelease} right={20} bottom={20} />
@@ -2156,7 +2157,7 @@ const [highScores, setHighScores] = useState([
         {/* LEFT AND RIGHT FLIPPERS - ADDED BACK */}
         <LeftFlipper ref={leftFlipperRef} top={450} left={150} angle={leftFlipperAngle} />
         <RightFlipper ref={rightFlipperRef} top={450} left={400} angle={rightFlipperAngle} />
-
+)}
       </PinballGame>
     </Container>
   );
