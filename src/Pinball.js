@@ -198,7 +198,19 @@ const [highScores, setHighScores] = useState([
   ]);
   const [isHighScore, setIsHighScore] = useState(false);
   const [showHighScores, setShowHighScores] = useState(false);
+const [flippers, setFlippers] = useState({ leftAngle: 0, rightAngle: 0 });
+  const [plungerPosition, setPlungerPosition] = useState(0);
+  const [flapperState, setFlapperState] = useState(false);
+  const [canPlunge, setCanPlunge] = useState(true); // New state variable
+  const [nudgeCount, setNudgeCount] = useState(0);  // New state variable
 
+  // Define the layout of the static game elements (bumpers, loops, etc.)
+  const gameElements = [
+    { id: 'popBumper', ref: popBumperRef, x: 250, y: 200, radius: 30, color: 'bg-indigo-500', score: 100 },
+    { id: 'magnet', ref: magnetRef, x: 350, y: 350, radius: 25, color: 'bg-yellow-500', score: 50 },
+    { id: 'loopShot', ref: loopShotRef, x: 150, y: 300, radius: 20, color: 'bg-green-500', score: 250 },
+    { id: 'tube', ref: tubeRef, x: 450, y: 150, radius: 40, color: 'bg-red-500', score: 500 },
+  ];
 
   // --- REFS FOR GAME LOGIC (do NOT trigger re-renders by themselves) ---
   const ballPositionRef = useRef({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
@@ -2157,7 +2169,7 @@ const [highScores, setHighScores] = useState([
         {/* LEFT AND RIGHT FLIPPERS - ADDED BACK */}
         <LeftFlipper ref={leftFlipperRef} top={450} left={150} angle={leftFlipperAngle} />
         <RightFlipper ref={rightFlipperRef} top={450} left={400} angle={rightFlipperAngle} />
-)}
+
       </PinballGame>
     </Container>
   );
