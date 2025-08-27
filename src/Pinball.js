@@ -203,16 +203,18 @@ const [flippers, setFlippers] = useState({ leftAngle: 0, rightAngle: 0 });
   const [flapperState, setFlapperState] = useState(false);
   const [canPlunge, setCanPlunge] = useState(true); // New state variable
   const [nudgeCount, setNudgeCount] = useState(0);  // New state variable
+  const [tilt, setTilt] = useState();
 
   // Define the layout of the static game elements (bumpers, loops, etc.)
-  const gameElements = [
-    { id: 'popBumper', ref: popBumperRef, x: 250, y: 200, radius: 30, color: 'bg-indigo-500', score: 100 },
-    { id: 'magnet', ref: magnetRef, x: 350, y: 350, radius: 25, color: 'bg-yellow-500', score: 50 },
-    { id: 'loopShot', ref: loopShotRef, x: 150, y: 300, radius: 20, color: 'bg-green-500', score: 250 },
-    { id: 'tube', ref: tubeRef, x: 450, y: 150, radius: 40, color: 'bg-red-500', score: 500 },
-  ];
+
 
   // --- REFS FOR GAME LOGIC (do NOT trigger re-renders by themselves) ---
+   const popBumperRef = useRef(null);
+  const magnetRef = useRef(null);
+  const loopShotRef = useRef(null);
+  const tubeRef = useRef(null);
+  const tiltRef = useRef(null);
+  const nudgeRef = useRef(null);
   const ballPositionRef = useRef({ x: INITIAL_BALL_X, y: INITIAL_BALL_Y });
   const ballVelocityRef = useRef({ x: 0, y: 0 });
   const tubeEntranceX = useRef(0);
@@ -305,6 +307,13 @@ const [flippers, setFlippers] = useState({ leftAngle: 0, rightAngle: 0 });
   const post1Ref = useRef(null); // NEW: Ref for Post 1
   const post2Ref = useRef(null); // NEW: Ref for Post 2
 
+    const gameElements = [
+    { id: 'popBumper', ref: popBumperRef, x: 250, y: 200, radius: 30, color: 'bg-indigo-500', score: 100 },
+    { id: 'magnet', ref: magnetRef, x: 350, y: 350, radius: 25, color: 'bg-yellow-500', score: 50 },
+    { id: 'loopShot', ref: loopShotRef, x: 150, y: 300, radius: 20, color: 'bg-green-500', score: 250 },
+    { id: 'tube', ref: tubeRef, x: 450, y: 150, radius: 40, color: 'bg-red-500', score: 500 },
+  ];
+ 
 
   // Derived state (from refs, so it's always up-to-date in logic)
   const tubeExitY = tubeEntranceY.current + tubeHeight.current;
