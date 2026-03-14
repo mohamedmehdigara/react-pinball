@@ -1,10 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import Pinball from './Pinball';
-
+import App from './App';
 ReactDOM.render(
   <React.StrictMode>
-    <Pinball />
+    <App />
   </React.StrictMode>,
   document.getElementById('root')
 );
