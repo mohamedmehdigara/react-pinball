@@ -1,26 +1,24 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 
 /**
- * Enhanced Pinball Game
- * Features: Multi-ball, Particle System, Screen Shake, Slingshots, and Whirlpools.
+ * Arcade Ultra Pinball - Visual & UX Overhaul
+ * Enhanced with High-DPI Support, Dynamic Lighting, and Motion Trails.
  */
 const App = () => {
   const canvasRef = useRef(null);
 
   // --- Game State ---
+  const [gameState, setGameState] = useState('START');
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
-  const [message, setMessage] = useState("Hold 'Space' to charge plunger!");
-  const [isGameOver, setIsGameOver] = useState(true);
   const [isTilted, setTilt] = useState(false);
   const [nudgeCount, setNudgeCount] = useState(0);
-  const [canPlunge, setCanPlunge] = useState(true);
   const [plungerPosition, setPlungerPosition] = useState(0);
   const [shake, setShake] = useState(0);
 
   // --- Refs for Physics Engine ---
-  const ballsRef = useRef([]); // Support for multiple balls
-  const particlesRef = useRef([]); // Visual effects
+  const ballsRef = useRef([]);
+  const particlesRef = useRef([]);
   const flippersRef = useRef({
     leftAngle: Math.PI / 6,
     rightAngle: -Math.PI / 6,
@@ -35,27 +33,36 @@ const App = () => {
   const FLIPPER_WIDTH = 14;
   const FLIPPER_ANGLE_DEFAULT = Math.PI / 6;
   const FLIPPER_ANGLE_UP = -Math.PI / 4;
-  const GRAVITY = 0.28;
-  const BUMPER_ELASTICITY = 1.35;
-  const WALL_ELASTICITY = 0.75;
-  const FRICTION = 0.992;
+  const GRAVITY = 0.3;
+  const BUMPER_ELASTICITY = 1.45;
+  const WALL_ELASTICITY = 0.7;
+  const FRICTION = 0.994;
 
   const gameElements = [
-    { id: 'Pop Bumper', x: 150, y: 180, radius: 35, color: '#ff4d4d', score: 100, type: 'bumper' },
-    { id: 'Pop Bumper', x: 350, y: 180, radius: 35, color: '#ff4d4d', score: 100, type: 'bumper' },
-    { id: 'Whirlpool', x: 250, y: 80, radius: 40, color: '#a855f7', score: 500, type: 'whirlpool' },
-    { id: 'Slingshot L', x: 100, y: 500, radius: 20, color: '#3b82f6', score: 50, type: 'slingshot' },
-    { id: 'Slingshot R', x: 400, y: 500, radius: 20, color: '#3b82f6', score: 50, type: 'slingshot' },
-    { id: 'Target', x: 250, y: 320, radius: 25, color: '#fbbf24', score: 250, type: 'bumper' },
+    { id: 'Pop Bumper 1', x: 150, y: 180, radius: 35, color: '#ff0055', score: 100, type: 'bumper' },
+    { id: 'Pop Bumper 2', x: 350, y: 180, radius: 35, color: '#ff0055', score: 100, type: 'bumper' },
+    { id: 'Whirlpool', x: 250, y: 80, radius: 40, color: '#7000ff', score: 500, type: 'whirlpool' },
+    { id: 'Slingshot L', x: 100, y: 500, radius: 20, color: '#00d4ff', score: 50, type: 'slingshot' },
+    { id: 'Slingshot R', x: 400, y: 500, radius: 20, color: '#00d4ff', score: 50, type: 'slingshot' },
+    { id: 'Central Target', x: 250, y: 320, radius: 25, color: '#ffcc00', score: 250, type: 'bumper' },
   ];
 
-  // --- Helper Functions ---
+  // --- Actions ---
+  const startGame = () => {
+    setGameState('PLAYING');
+    setScore(0);
+    setTilt(false);
+    setNudgeCount(0);
+    ballsRef.current = [];
+    particlesRef.current = [];
+  };
+
   const createParticles = (x, y, color) => {
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 12; i++) {
       particlesRef.current.push({
         x, y,
-        vx: (Math.random() - 0.5) * 10,
-        vy: (Math.random() - 0.5) * 10,
+        vx: (Math.random() - 0.5) * 15,
+        vy: (Math.random() - 0.5) * 15,
         life: 1.0,
         color
       });
@@ -89,21 +96,21 @@ const App = () => {
   // --- Input ---
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (isTilted) return;
+      if (isTilted || gameState !== 'PLAYING') return;
       const key = e.key.toLowerCase();
       if (key === 'z') flippersRef.current.isLeftFlipping = true;
       if (key === 'm') flippersRef.current.isRightFlipping = true;
-      if (key === ' ' && isGameOver && canPlunge) {
-        setPlungerPosition(p => Math.min(p + 6, 60));
+      if (key === ' ' && ballsRef.current.length === 0) {
+        setPlungerPosition(p => Math.min(p + 5, 60));
       }
-      if (['arrowleft', 'arrowright', 'arrowup'].includes(key) && !isGameOver && !isTilted) {
+      if (['arrowleft', 'arrowright', 'arrowup'].includes(key)) {
         setNudgeCount(n => {
-          if (n >= 4) { setTilt(true); setMessage("TILT!"); return n; }
+          if (n >= 5) { setTilt(true); return n; }
           ballsRef.current.forEach(b => {
-            b.vx += key === 'arrowleft' ? -2.5 : (key === 'arrowright' ? 2.5 : 0);
-            b.vy += key === 'arrowup' ? -2.5 : 0;
+            b.vx += key === 'arrowleft' ? -3 : (key === 'arrowright' ? 3 : 0);
+            b.vy += key === 'arrowup' ? -3 : 0;
           });
-          setShake(10);
+          setShake(15);
           return n + 1;
         });
       }
@@ -113,18 +120,12 @@ const App = () => {
       const key = e.key.toLowerCase();
       if (key === 'z') flippersRef.current.isLeftFlipping = false;
       if (key === 'm') flippersRef.current.isRightFlipping = false;
-      if (key === ' ' && isGameOver && canPlunge) {
+      if (key === ' ' && gameState === 'PLAYING' && ballsRef.current.length === 0) {
         setPlungerPosition(curr => {
           if (curr > 10) {
             ballsRef.current = [{
-              x: 475, y: 650, radius: 10, vx: 0, vy: -curr / 2.2, isLaunched: true, color: '#fff'
+              x: 475, y: 650, radius: 10, vx: 0, vy: -curr / 1.8, isLaunched: true, color: '#ffffff', trail: []
             }];
-            setIsGameOver(false);
-            setScore(0);
-            setMessage("");
-            setCanPlunge(false);
-            setTilt(false);
-            setNudgeCount(0);
           }
           return 0;
         });
@@ -137,16 +138,25 @@ const App = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isGameOver, canPlunge, isTilted]);
+  }, [gameState, isTilted]);
 
   // --- Game Loop ---
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    
+    // High DPI Scaling
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = CANVAS_WIDTH * dpr;
+    canvas.height = CANVAS_HEIGHT * dpr;
+    ctx.scale(dpr, dpr);
+
     let animationId;
 
     const update = () => {
+      if (gameState !== 'PLAYING') return;
+
       const flips = flippersRef.current;
       const targetLeft = flips.isLeftFlipping ? FLIPPER_ANGLE_UP : FLIPPER_ANGLE_DEFAULT;
       const targetRight = flips.isRightFlipping ? -FLIPPER_ANGLE_UP : -FLIPPER_ANGLE_DEFAULT;
@@ -155,18 +165,17 @@ const App = () => {
 
       if (isTilted) return;
 
-      // Update Particles
       particlesRef.current.forEach(p => {
         p.x += p.vx; p.y += p.vy; p.life -= 0.02;
       });
       particlesRef.current = particlesRef.current.filter(p => p.life > 0);
+      setShake(s => Math.max(0, s * 0.85));
 
-      // Update Screen Shake
-      setShake(s => Math.max(0, s * 0.9));
+      ballsRef.current.forEach((ball) => {
+        // Trail update
+        ball.trail.push({ x: ball.x, y: ball.y });
+        if (ball.trail.length > 8) ball.trail.shift();
 
-      // Update Balls
-      ballsRef.current.forEach((ball, idx) => {
-        if (!ball.isLaunched) return;
         ball.vy += GRAVITY;
         ball.vx *= FRICTION;
         ball.vy *= FRICTION;
@@ -188,22 +197,21 @@ const App = () => {
             const ny = dy / dist;
             const dot = ball.vx * nx + ball.vy * ny;
             
-            ball.vx = (ball.vx - 2 * dot * nx) * (el.type === 'whirlpool' ? 0.2 : BUMPER_ELASTICITY);
-            ball.vy = (ball.vy - 2 * dot * ny) * (el.type === 'whirlpool' ? 0.2 : BUMPER_ELASTICITY);
+            ball.vx = (ball.vx - 2 * dot * nx) * (el.type === 'whirlpool' ? 0.3 : BUMPER_ELASTICITY);
+            ball.vy = (ball.vy - 2 * dot * ny) * (el.type === 'whirlpool' ? 0.3 : BUMPER_ELASTICITY);
             ball.x += nx * ((ball.radius + el.radius) - dist);
             ball.y += ny * ((ball.radius + el.radius) - dist);
 
             setScore(s => s + el.score);
             createParticles(el.x, el.y, el.color);
-            setShake(5);
+            setShake(10);
 
-            // Whirlpool Logic: Multiball
             if (el.type === 'whirlpool' && ballsRef.current.length < 2) {
               setTimeout(() => {
                 ballsRef.current.push({
-                  x: el.x, y: el.y, radius: 10, vx: 5, vy: 5, isLaunched: true, color: '#fbbf24'
+                  x: el.x, y: el.y, radius: 10, vx: 6, vy: 6, isLaunched: true, color: '#fbbf24', trail: []
                 });
-              }, 200);
+              }, 100);
             }
           }
         });
@@ -214,147 +222,223 @@ const App = () => {
           const col = checkFlipperCollision(ball, f.x, f.y, f.a, f.l);
           if (col.collided) {
             const flipping = f.l ? flips.isLeftFlipping : flips.isRightFlipping;
-            const power = flipping ? 14 : 2;
+            const power = flipping ? 16 : 2;
             ball.vx = col.normalX * power * (1 + col.t);
             ball.vy = col.normalY * power * (1 + col.t);
-            ball.x += col.normalX * 6;
-            ball.y += col.normalY * 6;
-            setScore(s => s + 10);
+            ball.x += col.normalX * 10;
+            ball.y += col.normalY * 10;
+            setScore(s => s + 25);
+            setShake(5);
           }
         });
       });
 
-      // Handle Drain
-      ballsRef.current = ballsRef.current.filter(b => b.y - b.radius < CANVAS_HEIGHT);
-      if (ballsRef.current.length === 0 && !isGameOver) {
-        setIsGameOver(true);
-        setMessage("BALL LOST! Charge Space.");
+      const remainingBalls = ballsRef.current.filter(b => b.y - b.radius < CANVAS_HEIGHT);
+      if (ballsRef.current.length > 0 && remainingBalls.length === 0) {
+        setGameState('GAMEOVER');
         setHighScore(prev => Math.max(prev, score));
       }
+      ballsRef.current = remainingBalls;
     };
 
     const draw = () => {
       const flips = flippersRef.current;
       ctx.save();
-      // Screen Shake
       if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
 
-      ctx.fillStyle = '#0f172a';
+      // Deep Space BG
+      ctx.fillStyle = '#020617';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      // Grid/Lane lines
+      // Neon Grid
       ctx.strokeStyle = '#1e293b';
       ctx.lineWidth = 1;
-      for(let i=0; i<CANVAS_WIDTH; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, CANVAS_HEIGHT); ctx.stroke(); }
+      for(let i=0; i<CANVAS_WIDTH; i+=50) {
+        ctx.globalAlpha = i % 100 === 0 ? 0.2 : 0.05;
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, CANVAS_HEIGHT); ctx.stroke();
+      }
+      ctx.globalAlpha = 1.0;
 
-      // Elements
+      // Draw Elements with Lighting
       gameElements.forEach(el => {
-        ctx.beginPath();
+        ctx.save();
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = el.color;
+        
         const grad = ctx.createRadialGradient(el.x, el.y, 2, el.x, el.y, el.radius);
-        grad.addColorStop(0, el.color);
+        grad.addColorStop(0, '#fff');
+        grad.addColorStop(0.3, el.color);
         grad.addColorStop(1, '#000');
+        
         ctx.fillStyle = grad;
+        ctx.beginPath();
         ctx.arc(el.x, el.y, el.radius, 0, Math.PI * 2);
         ctx.fill();
+        
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
+        ctx.restore();
       });
 
       // Particles
       particlesRef.current.forEach(p => {
         ctx.globalAlpha = p.life;
         ctx.fillStyle = p.color;
-        ctx.fillRect(p.x, p.y, 3, 3);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+        ctx.fill();
       });
       ctx.globalAlpha = 1.0;
 
-      // Plunger & Flippers
-      ctx.fillStyle = '#64748b';
+      // Plunger
+      ctx.fillStyle = '#475569';
       ctx.fillRect(470, 620 + plungerPosition, 20, 80);
 
+      // Flippers
       const drawF = (x, y, a, l) => {
         ctx.save();
         ctx.translate(x, y); ctx.rotate(a);
+        ctx.shadowBlur = 15; ctx.shadowColor = '#3b82f6';
         ctx.fillStyle = '#3b82f6';
-        ctx.beginPath(); ctx.roundRect(0, -FLIPPER_WIDTH/2, l ? FLIPPER_LENGTH : -FLIPPER_LENGTH, FLIPPER_WIDTH, 10);
-        ctx.fill(); ctx.stroke(); ctx.restore();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); 
+        ctx.roundRect(0, -FLIPPER_WIDTH/2, l ? FLIPPER_LENGTH : -FLIPPER_LENGTH, FLIPPER_WIDTH, [10]);
+        ctx.fill(); ctx.stroke();
+        ctx.restore();
       };
       drawF(135, 645, flips.leftAngle, true);
       drawF(325, 645, flips.rightAngle, false);
 
-      // Balls
+      // Balls & Trails
       ballsRef.current.forEach(b => {
-        ctx.fillStyle = isTilted ? '#ef4444' : b.color;
-        ctx.shadowBlur = 15; ctx.shadowColor = b.color;
-        ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
+        // Trail
+        b.trail.forEach((t, i) => {
+          ctx.globalAlpha = i / b.trail.length * 0.4;
+          ctx.fillStyle = b.color;
+          ctx.beginPath(); ctx.arc(t.x, t.y, b.radius * (i / b.trail.length), 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
+
+        // Lighting Effect (Glow on board)
+        const ballGlow = ctx.createRadialGradient(b.x, b.y, b.radius, b.x, b.y, b.radius * 4);
+        ballGlow.addColorStop(0, (isTilted ? '#f43f5e33' : b.color + '33'));
+        ballGlow.addColorStop(1, 'transparent');
+        ctx.fillStyle = ballGlow;
+        ctx.fillRect(b.x - 50, b.y - 50, 100, 100);
+
+        ctx.save();
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = isTilted ? '#f43f5e' : b.color;
+        ctx.fillStyle = isTilted ? '#f43f5e' : b.color;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       });
+
+      // Glass Cover Reflection
+      const glassGrad = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      glassGrad.addColorStop(0, 'rgba(255,255,255,0.08)');
+      glassGrad.addColorStop(0.4, 'transparent');
+      glassGrad.addColorStop(1, 'rgba(255,255,255,0.08)');
+      ctx.fillStyle = glassGrad;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
       ctx.restore();
     };
 
     const loop = () => { update(); draw(); animationId = requestAnimationFrame(loop); };
     loop();
     return () => cancelAnimationFrame(animationId);
-  }, [isGameOver, isTilted, score, shake]);
+  }, [gameState, isTilted, score, shake, plungerPosition]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-100 p-4 font-sans select-none overflow-hidden">
-      <div className="mb-4 text-center">
-        <h1 className="text-6xl font-black tracking-tighter italic text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 drop-shadow-lg">
-          ARCADE ULTRA
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4 font-sans select-none overflow-hidden">
+      {/* Visual Header */}
+      <div className="mb-6 text-center">
+        <h1 className="text-6xl md:text-8xl font-black tracking-tighter italic text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 drop-shadow-[0_0_30px_rgba(6,182,212,0.6)]">
+          ULTRA PIN
         </h1>
-        <p className="text-xs text-cyan-400 font-mono tracking-widest mt-1 uppercase">Physics Simulation v2.5</p>
-      </div>
-
-      <div className="flex gap-4 mb-4 w-full max-w-lg">
-        <div className="flex-1 bg-slate-900 border-2 border-cyan-500/30 p-3 rounded-2xl shadow-xl text-center">
-          <p className="text-[10px] uppercase text-slate-500 font-bold mb-1">Score</p>
-          <p className="text-3xl font-mono font-bold text-cyan-400">{score.toLocaleString()}</p>
-        </div>
-        <div className="flex-1 bg-slate-900 border-2 border-purple-500/30 p-3 rounded-2xl shadow-xl text-center">
-          <p className="text-[10px] uppercase text-slate-500 font-bold mb-1">Record</p>
-          <p className="text-3xl font-mono font-bold text-purple-400">{highScore.toLocaleString()}</p>
+        <div className="flex justify-center gap-12 mt-4">
+          <div className="text-center group">
+            <p className="text-[10px] uppercase text-slate-500 font-black tracking-[0.3em] group-hover:text-cyan-400 transition-colors">Score</p>
+            <p className="text-4xl font-mono font-bold text-white leading-none">{score.toLocaleString()}</p>
+          </div>
+          <div className="text-center group">
+            <p className="text-[10px] uppercase text-slate-500 font-black tracking-[0.3em] group-hover:text-purple-400 transition-colors">Record</p>
+            <p className="text-4xl font-mono font-bold text-white leading-none">{highScore.toLocaleString()}</p>
+          </div>
         </div>
       </div>
 
-      <div className="relative border-[12px] border-slate-800 rounded-[40px] overflow-hidden shadow-[0_0_80px_rgba(34,211,238,0.15)] bg-slate-900">
-        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="max-w-full h-auto cursor-none" />
+      {/* Main Cabinet Frame */}
+      <div className="relative border-[14px] border-slate-900 rounded-[54px] overflow-hidden shadow-[0_0_120px_rgba(59,130,246,0.25)] bg-slate-950 p-1">
+        <canvas ref={canvasRef} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} className="max-w-full h-auto cursor-none block" />
         
-        {isGameOver && (
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-300">
-            <h2 className="text-4xl font-black text-white mb-2">{message}</h2>
-            <p className="text-slate-400 text-sm mb-6 uppercase tracking-widest">Release Space to Fire</p>
-            <div className="w-64 h-3 bg-slate-800 rounded-full p-1 border border-slate-700">
-                <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.5)] transition-all duration-75" 
-                     style={{ width: `${(plungerPosition / 60) * 100}%` }} />
+        {/* Overlay Layers */}
+        {gameState === 'START' && (
+          <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-2xl flex flex-col items-center justify-center p-12 text-center animate-in fade-in duration-700">
+            <div className="w-32 h-32 bg-cyan-500/20 rounded-full animate-pulse absolute" />
+            <h2 className="text-6xl font-black text-white mb-6 z-10 tracking-tight">READY PILOT?</h2>
+            <p className="text-slate-400 text-lg mb-12 max-w-xs z-10 font-medium">
+              Launch the ball into the <span className="text-purple-400">Whirlpool</span> to trigger Multi-Ball mode.
+            </p>
+            <button 
+              onClick={startGame}
+              className="z-10 group relative px-16 py-5 bg-cyan-500 hover:bg-cyan-400 text-black font-black text-2xl rounded-2xl transition-all hover:scale-110 active:scale-95 shadow-[0_20px_50px_rgba(6,182,212,0.4)]"
+            >
+              IGNITE ENGINE
+            </button>
+          </div>
+        )}
+
+        {gameState === 'GAMEOVER' && (
+          <div className="absolute inset-0 bg-red-950/80 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-300">
+            <h2 className="text-7xl font-black text-white mb-4 drop-shadow-2xl">DRAINED</h2>
+            <p className="text-white/90 text-2xl font-mono mb-10 italic tracking-widest bg-black/40 px-6 py-2 rounded-full border border-white/10">
+              FINAL: {score.toLocaleString()}
+            </p>
+            <button 
+              onClick={startGame}
+              className="px-14 py-5 bg-white text-black font-black text-xl rounded-2xl hover:bg-slate-200 transition-all hover:scale-105 active:scale-95 shadow-[0_20px_60px_rgba(255,255,255,0.2)]"
+            >
+              RE-LAUNCH
+            </button>
+          </div>
+        )}
+
+        {gameState === 'PLAYING' && ballsRef.current.length === 0 && (
+          <div className="absolute bottom-40 left-0 right-0 text-center pointer-events-none">
+            <p className="text-cyan-400 font-black text-xl tracking-tighter uppercase italic drop-shadow-md animate-pulse">Hold [SPACE] to Power Up</p>
+            <div className="mt-4 w-60 h-2 bg-slate-800/80 mx-auto rounded-full overflow-hidden border border-white/10 backdrop-blur-sm">
+               <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-400 transition-all duration-75 shadow-[0_0_15px_rgba(6,182,212,0.8)]" style={{ width: `${(plungerPosition/60)*100}%` }} />
             </div>
           </div>
         )}
       </div>
 
-      <div className="mt-6 flex justify-between gap-12 text-center max-w-lg w-full bg-slate-900/50 p-4 rounded-3xl border border-slate-800">
-        <div>
-          <p className="text-[10px] text-slate-500 uppercase font-black mb-2">Flippers</p>
-          <div className="flex gap-2">
-            <kbd className="w-12 h-12 flex items-center justify-center bg-slate-800 rounded-xl border-b-4 border-slate-950 text-xl font-bold text-cyan-400 shadow-lg">Z</kbd>
-            <kbd className="w-12 h-12 flex items-center justify-center bg-slate-800 rounded-xl border-b-4 border-slate-950 text-xl font-bold text-cyan-400 shadow-lg">M</kbd>
+      {/* Controller Legend */}
+      <div className="mt-10 grid grid-cols-3 gap-8 max-w-lg w-full bg-slate-900/30 p-6 rounded-[40px] border border-white/5 backdrop-blur-md shadow-inner">
+        <div className="text-center group">
+          <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-4 group-hover:text-cyan-400 transition-colors">Left</p>
+          <kbd className="inline-flex w-16 h-16 items-center justify-center bg-slate-800 rounded-3xl border-b-[8px] border-slate-950 text-3xl font-black text-cyan-400 shadow-2xl active:translate-y-1 active:border-b-0 transition-all">Z</kbd>
+        </div>
+        <div className="text-center flex flex-col items-center justify-center pt-2">
+          <div className="flex flex-col gap-3">
+             <span className="px-5 py-2 bg-slate-800/80 rounded-xl text-[10px] font-black text-white/40 border border-white/5 uppercase">Space: Launch</span>
+             <span className="px-5 py-2 bg-slate-800/80 rounded-xl text-[10px] font-black text-white/40 border border-white/5 uppercase">Arrows: Nudge</span>
           </div>
         </div>
-        <div className="flex-1">
-          <p className="text-[10px] text-slate-500 uppercase font-black mb-2">Plunger</p>
-          <kbd className="w-full h-12 flex items-center justify-center bg-cyan-600 rounded-xl border-b-4 border-cyan-800 text-lg font-bold text-white shadow-lg">SPACE</kbd>
-        </div>
-        <div>
-          <p className="text-[10px] text-slate-500 uppercase font-black mb-2">Nudge</p>
-          <div className="flex gap-2">
-            <kbd className="w-12 h-12 flex items-center justify-center bg-slate-800 rounded-xl border-b-4 border-slate-950 text-lg shadow-lg">←↑→</kbd>
-          </div>
+        <div className="text-center group">
+          <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-4 group-hover:text-cyan-400 transition-colors">Right</p>
+          <kbd className="inline-flex w-16 h-16 items-center justify-center bg-slate-800 rounded-3xl border-b-[8px] border-slate-950 text-3xl font-black text-cyan-400 shadow-2xl active:translate-y-1 active:border-b-0 transition-all">M</kbd>
         </div>
       </div>
-      {nudgeCount > 0 && !isGameOver && (
-        <div className={`mt-4 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all duration-300 ${nudgeCount > 3 ? 'bg-red-500/20 text-red-500 border-red-500 animate-pulse' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/50'}`}>
-          Tilt Danger: {nudgeCount} / 4
+
+      {isTilted && (
+        <div className="mt-6 px-10 py-3 bg-red-600/20 text-red-500 border-2 border-red-600 font-black italic text-3xl animate-bounce rounded-2xl shadow-[0_0_40px_rgba(220,38,38,0.4)] backdrop-blur-md">
+          TILTED!
         </div>
       )}
     </div>
