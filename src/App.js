@@ -1,145 +1,122 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 /**
- * Arcade Ultra Pinball - Final Polish
- * Fixes: Robust drain detection, launch protection, and collision edge-cases.
+ * Cyber Neon Pinball - Pro Edition (Standalone)
+ * Fix: Improved Flipper Response & Physics Interaction
  */
+
+const WIDTH = 500;
+const HEIGHT = 750;
+const GRAVITY = 0.45;
+const FRICTION = 0.993;
+const SUBSTEPS = 12;
+const BALL_RADIUS = 10;
+const FLIPPER_Y = 680;
+const FLIPPER_LENGTH = 105;
+
 const App = () => {
   const canvasRef = useRef(null);
-
-  // --- Game State ---
-  const [gameState, setGameState] = useState('START'); // START, PLAYING, GAMEOVER
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
-  const [combo, setCombo] = useState(0);
-  const [isTilted, setTilt] = useState(false);
-  const [nudgeCount, setNudgeCount] = useState(0);
-  const [plungerPosition, setPlungerPosition] = useState(0);
-  const [shake, setShake] = useState(0);
-  const [ballInPlay, setBallInPlay] = useState(false);
+  const [multiplier, setMultiplier] = useState(1);
+  const [lives, setLives] = useState(3);
+  const [gameState, setGameState] = useState('START'); 
+  const [shake, setShake] = useState({ x: 0, y: 0 });
+  const [plungerPower, setPlungerPower] = useState(0);
 
-  // --- Refs for Physics Engine ---
-  const ballsRef = useRef([]);
-  const particlesRef = useRef([]);
-  const combosRef = useRef([]);
-  const framesSinceLaunch = useRef(0);
-  const flippersRef = useRef({
-    leftAngle: Math.PI / 6,
-    rightAngle: -Math.PI / 6,
-    isLeftFlipping: false,
-    isRightFlipping: false
+  // High Performance Physics Refs
+  const balls = useRef([]);
+  const particles = useRef([]);
+  
+  // Use a ref for key states to ensure physics loop always has latest data
+  const keys = useRef({ z: false, m: false, space: false });
+
+  const flippers = useRef({
+    left: { angle: 0.4, target: 0.4, x: 130, baseAngle: 0.4, upAngle: -0.6 },
+    right: { angle: -0.4, target: -0.4, x: 350, baseAngle: -0.4, upAngle: 0.6 }
   });
+  
+  const bumpers = useRef([
+    { x: 150, y: 220, r: 35, color: '#ff007b', score: 100, pulse: 0, id: 1 },
+    { x: 350, y: 220, r: 35, color: '#ff007b', score: 100, pulse: 0, id: 2 },
+    { x: 250, y: 120, r: 25, color: '#00f2ff', score: 500, pulse: 0, id: 3 },
+    { x: 250, y: 340, r: 45, color: '#7000ff', score: 250, pulse: 0, id: 4 }
+  ]);
 
-  const CANVAS_WIDTH = 500;
-  const CANVAS_HEIGHT = 700;
-  const FLIPPER_LENGTH = 85;
-  const FLIPPER_WIDTH = 14;
-  const FLIPPER_ANGLE_DEFAULT = Math.PI / 6;
-  const FLIPPER_ANGLE_UP = -Math.PI / 4;
-  const GRAVITY = 0.38; // Slightly increased for snappier feel
-  const BUMPER_ELASTICITY = 1.65;
-  const WALL_ELASTICITY = 0.7;
-  const FRICTION = 0.992;
+  const slingshots = useRef([
+    { x1: 100, y1: 580, x2: 130, y2: 640, x3: 80, y3: 640, color: '#00f2ff', pulse: 0 },
+    { x1: 400, y1: 580, x2: 370, y2: 640, x3: 420, y3: 640, color: '#00f2ff', pulse: 0 }
+  ]);
 
-  const gameElements = [
-    { id: 'Pop 1', x: 150, y: 180, radius: 35, color: '#ff0055', score: 100, type: 'bumper' },
-    { id: 'Pop 2', x: 350, y: 180, radius: 35, color: '#ff0055', score: 100, type: 'bumper' },
-    { id: 'Whirlpool', x: 250, y: 80, radius: 45, color: '#7000ff', score: 500, type: 'whirlpool' },
-    { id: 'Slingshot L', x: 100, y: 500, radius: 22, color: '#00d4ff', score: 50, type: 'slingshot' },
-    { id: 'Slingshot R', x: 400, y: 500, radius: 22, color: '#00d4ff', score: 50, type: 'slingshot' },
-    { id: 'Mid Bumper', x: 250, y: 320, radius: 28, color: '#ffcc00', score: 250, type: 'bumper' },
-  ];
+  useEffect(() => {
+    const saved = localStorage.getItem('neon-pinball-highscore');
+    if (saved) setHighScore(parseInt(saved, 10));
+  }, []);
 
-  const startGame = () => {
-    ballsRef.current = [];
-    particlesRef.current = [];
-    combosRef.current = [];
-    framesSinceLaunch.current = 0;
+  const initGame = () => {
     setScore(0);
-    setCombo(0);
-    setTilt(false);
-    setNudgeCount(0);
-    setBallInPlay(false);
+    setMultiplier(1);
+    setLives(3);
+    balls.current = [];
+    particles.current = [];
     setGameState('PLAYING');
   };
 
-  const createParticles = (x, y, color) => {
-    for (let i = 0; i < 12; i++) {
-      particlesRef.current.push({
+  const spawnBall = (power) => {
+    if (lives <= 0) return;
+    balls.current.push({
+      x: 475, y: 710, vx: 0, vy: -16 - (power / 4.5),
+      radius: BALL_RADIUS, trail: []
+    });
+  };
+
+  const createExplosion = (x, y, color, count = 12) => {
+    for (let i = 0; i < count; i++) {
+      particles.current.push({
         x, y,
-        vx: (Math.random() - 0.5) * 15,
-        vy: (Math.random() - 0.5) * 15,
-        radius: Math.random() * 2 + 1,
+        vx: (Math.random() - 0.5) * 12,
+        vy: (Math.random() - 0.5) * 12,
         life: 1.0,
         color
       });
     }
   };
 
-  const triggerCombo = (x, y) => {
-    setCombo(prev => prev + 1);
-    combosRef.current.push({ x, y: y - 30, life: 1.0, text: `X${combo + 1}` });
-  };
-
-  const checkFlipperCollision = (ball, fX, fY, fAngle, isLeft) => {
-    const start = { x: fX, y: fY };
-    const end = {
-      x: fX + (isLeft ? 1 : -1) * FLIPPER_LENGTH * Math.cos(fAngle),
-      y: fY + (isLeft ? 1 : -1) * FLIPPER_LENGTH * Math.sin(fAngle)
-    };
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const l2 = dx * dx + dy * dy;
-    let t = ((ball.x - start.x) * dx + (ball.y - start.y) * dy) / l2;
-    t = Math.max(0, Math.min(1, t));
-    const closest = { x: start.x + t * dx, y: start.y + t * dy };
-    const distDx = ball.x - closest.x;
-    const distDy = ball.y - closest.y;
-    const distance = Math.sqrt(distDx * distDx + distDy * distDy);
-
-    return {
-      collided: distance < ball.radius + FLIPPER_WIDTH / 2,
-      normalX: distDx / (distance || 1),
-      normalY: distDy / (distance || 1),
-      t
-    };
-  };
-
+  // Improved Keyboard Handlers
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (gameState !== 'PLAYING' || isTilted) return;
-      const key = e.key.toLowerCase();
-      if (key === 'z') flippersRef.current.isLeftFlipping = true;
-      if (key === 'm') flippersRef.current.isRightFlipping = true;
-      if (key === ' ' && !ballInPlay) {
-        setPlungerPosition(p => Math.min(p + 6, 75));
+      const code = e.code;
+      if (code === 'KeyZ') {
+          keys.current.z = true;
+          flippers.current.left.target = flippers.current.left.upAngle;
       }
-      if (['arrowleft', 'arrowright', 'arrowup'].includes(key)) {
-        setNudgeCount(n => {
-          if (n >= 8) { setTilt(true); return n; }
-          ballsRef.current.forEach(b => {
-            b.vx += key === 'arrowleft' ? -3 : (key === 'arrowright' ? 3 : 0);
-            b.vy += key === 'arrowup' ? -3 : 0;
-          });
-          setShake(20);
-          return n + 1;
-        });
+      if (code === 'KeyM') {
+          keys.current.m = true;
+          flippers.current.right.target = flippers.current.right.upAngle;
+      }
+      if (code === 'Space') keys.current.space = true;
+      if (e.key.includes('Arrow')) {
+        setShake({ x: (Math.random() - 0.5) * 12, y: (Math.random() - 0.5) * 12 });
+        balls.current.forEach(b => { b.vx += (Math.random() - 0.5) * 4; b.vy -= 0.5; });
       }
     };
 
     const handleKeyUp = (e) => {
-      const key = e.key.toLowerCase();
-      if (key === 'z') flippersRef.current.isLeftFlipping = false;
-      if (key === 'm') flippersRef.current.isRightFlipping = false;
-      if (key === ' ' && gameState === 'PLAYING' && !ballInPlay) {
-        if (plungerPosition > 5) {
-          ballsRef.current = [{
-            x: 475, y: 640, radius: 10, vx: 0, vy: -plungerPosition / 1.3, color: '#ffffff', trail: []
-          }];
-          framesSinceLaunch.current = 0;
-          setBallInPlay(true);
+      const code = e.code;
+      if (code === 'KeyZ') {
+          keys.current.z = false;
+          flippers.current.left.target = flippers.current.left.baseAngle;
+      }
+      if (code === 'KeyM') {
+          keys.current.m = false;
+          flippers.current.right.target = flippers.current.right.baseAngle;
+      }
+      if (code === 'Space') {
+        if (gameState === 'PLAYING' && balls.current.length === 0) {
+            spawnBall(plungerPower);
+            setPlungerPower(0);
         }
-        setPlungerPosition(0);
+        keys.current.space = false;
       }
     };
 
@@ -149,259 +126,329 @@ const App = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [gameState, isTilted, ballInPlay, plungerPosition]);
+  }, [gameState, plungerPower]);
 
+  // Main Physics & Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = CANVAS_WIDTH * dpr;
-    canvas.height = CANVAS_HEIGHT * dpr;
-    ctx.scale(dpr, dpr);
+    let raf;
 
-    let animationId;
+    const loop = () => {
+      if (gameState === 'PLAYING') {
+        // Handle Spacebar Plunger Charging
+        if (keys.current.space && balls.current.length === 0) {
+          setPlungerPower(p => Math.min(p + 2.5, 100));
+        }
 
-    const update = () => {
-      if (gameState !== 'PLAYING') return;
+        // Flipper Animation Smoothing
+        flippers.current.left.angle += (flippers.current.left.target - flippers.current.left.angle) * 0.5;
+        flippers.current.right.angle += (flippers.current.right.target - flippers.current.right.angle) * 0.5;
 
-      const flips = flippersRef.current;
-      const targetLeft = flips.isLeftFlipping ? FLIPPER_ANGLE_UP : FLIPPER_ANGLE_DEFAULT;
-      const targetRight = flips.isRightFlipping ? -FLIPPER_ANGLE_UP : -FLIPPER_ANGLE_DEFAULT;
-      flips.leftAngle += (targetLeft - flips.leftAngle) * 0.45;
-      flips.rightAngle += (targetRight - flips.rightAngle) * 0.45;
+        // Substep Physics for accuracy
+        for (let s = 0; s < SUBSTEPS; s++) {
+          balls.current.forEach((ball) => {
+            ball.vy += GRAVITY / SUBSTEPS;
+            ball.vx *= Math.pow(FRICTION, 1/SUBSTEPS);
+            ball.vy *= Math.pow(FRICTION, 1/SUBSTEPS);
+            ball.x += ball.vx / SUBSTEPS;
+            ball.y += ball.vy / SUBSTEPS;
 
-      if (!isTilted) {
-        particlesRef.current.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life -= 0.03; });
-        particlesRef.current = particlesRef.current.filter(p => p.life > 0);
-        combosRef.current.forEach(c => { c.y -= 0.8; c.life -= 0.015; });
-        combosRef.current = combosRef.current.filter(c => c.life > 0);
-        setShake(s => Math.max(0, s * 0.9));
-      }
-
-      ballsRef.current.forEach((ball) => {
-        ball.trail.push({ x: ball.x, y: ball.y });
-        if (ball.trail.length > 8) ball.trail.shift();
-
-        ball.vy += GRAVITY;
-        ball.vx *= FRICTION;
-        ball.vy *= FRICTION;
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-
-        // Boundaries
-        if (ball.x + ball.radius > CANVAS_WIDTH) { ball.vx *= -WALL_ELASTICITY; ball.x = CANVAS_WIDTH - ball.radius; }
-        else if (ball.x - ball.radius < 0) { ball.vx *= -WALL_ELASTICITY; ball.x = ball.radius; }
-        if (ball.y - ball.radius < 0) { ball.vy *= -WALL_ELASTICITY; ball.y = ball.radius; }
-
-        if (!isTilted) {
-          // Element Collisions
-          gameElements.forEach(el => {
-            const dx = ball.x - el.x;
-            const dy = ball.y - el.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < ball.radius + el.radius) {
-              const nx = dx / dist;
-              const ny = dy / dist;
-              const dot = ball.vx * nx + ball.vy * ny;
-              ball.vx = (ball.vx - 2 * dot * nx) * (el.type === 'whirlpool' ? 0.3 : BUMPER_ELASTICITY);
-              ball.vy = (ball.vy - 2 * dot * ny) * (el.type === 'whirlpool' ? 0.3 : BUMPER_ELASTICITY);
-              ball.x += nx * (ball.radius + el.radius - dist + 1);
-              ball.y += ny * (ball.radius + el.radius - dist + 1);
-
-              setScore(s => s + el.score * (combo + 1));
-              createParticles(el.x, el.y, el.color);
-              triggerCombo(el.x, el.y);
-              setShake(8);
-              
-              if (el.type === 'whirlpool' && ballsRef.current.length < 3) {
-                // Multiball logic
-                ballsRef.current.push({ 
-                  x: el.x, y: el.y, radius: 10, 
-                  vx: (Math.random() - 0.5) * 10, 
-                  vy: 5, color: '#fbbf24', trail: [] 
-                });
-              }
+            // Curved Top Boundary
+            if (ball.y < 240) {
+                const dx = ball.x - 250;
+                const dy = ball.y - 150;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > 240 - ball.radius) {
+                    const nx = -dx / dist;
+                    const ny = -dy / dist;
+                    const vDotN = ball.vx * nx + ball.vy * ny;
+                    ball.vx = (ball.vx - 2 * vDotN * nx) * 0.7;
+                    ball.vy = (ball.vy - 2 * vDotN * ny) * 0.7;
+                    ball.x = 250 - nx * (240 - ball.radius);
+                    ball.y = 150 - ny * (240 - ball.radius);
+                }
             }
-          });
 
-          // Flipper Collisions
-          const fData = [{ x: 135, y: 645, a: flips.leftAngle, l: true }, { x: 325, y: 645, a: flips.rightAngle, l: false }];
-          fData.forEach(f => {
-            const col = checkFlipperCollision(ball, f.x, f.y, f.a, f.l);
-            if (col.collided) {
-              const flipping = f.l ? flips.isLeftFlipping : flips.isRightFlipping;
-              const power = flipping ? 22 : 4;
-              ball.vx = col.normalX * power * (1.2 + col.t);
-              ball.vy = col.normalY * power * (1.2 + col.t);
-              ball.x += col.normalX * 10;
-              ball.y += col.normalY * 10;
-              setScore(s => s + 10);
-              if (flipping) setCombo(0);
+            // Slingshot Collisions
+            slingshots.current.forEach(sl => {
+                const dx = sl.x2 - sl.x1;
+                const dy = sl.y2 - sl.y1;
+                const l2 = dx*dx + dy*dy;
+                const t = Math.max(0, Math.min(1, ((ball.x - sl.x1) * dx + (ball.y - sl.y1) * dy) / l2));
+                const px = sl.x1 + t * dx;
+                const py = sl.y1 + t * dy;
+                const d = Math.sqrt((ball.x - px)**2 + (ball.y - py)**2);
+                if (d < ball.radius + 6) {
+                    const nx = (ball.x - px) / d;
+                    const ny = (ball.y - py) / d;
+                    ball.vx = nx * 18;
+                    ball.vy = ny * 18;
+                    if (s === 0) {
+                        sl.pulse = 1.0;
+                        setScore(prev => prev + 25 * multiplier);
+                        createExplosion(px, py, '#00f2ff', 6);
+                    }
+                }
+            });
+
+            // Bumper Collisions
+            bumpers.current.forEach(bump => {
+              const dx = ball.x - bump.x;
+              const dy = ball.y - bump.y;
+              const dist = Math.sqrt(dx*dx + dy*dy);
+              if (dist < ball.radius + bump.r) {
+                const nx = dx / dist;
+                const ny = dy / dist;
+                const vDotN = ball.vx * nx + ball.vy * ny;
+                ball.vx = (ball.vx - 2 * vDotN * nx) * 1.65;
+                ball.vy = (ball.vy - 2 * vDotN * ny) * 1.65;
+                ball.x = bump.x + nx * (ball.radius + bump.r + 2);
+                ball.y = bump.y + ny * (ball.radius + bump.r + 2);
+                if (s === 0) {
+                  setScore(prev => prev + bump.score * multiplier);
+                  bump.pulse = 1.0;
+                  createExplosion(bump.x, bump.y, bump.color);
+                  if (bump.id === 3) setMultiplier(m => Math.min(m + 1, 10));
+                }
+              }
+            });
+
+            // Improved Flipper Collisions
+            const solveF = (f, isLeft) => {
+              const dir = isLeft ? 1 : -1;
+              const endX = f.x + dir * Math.cos(f.angle) * FLIPPER_LENGTH;
+              const endY = FLIPPER_Y + dir * Math.sin(f.angle) * FLIPPER_LENGTH;
+              
+              const dx = endX - f.x;
+              const dy = endY - FLIPPER_Y;
+              const l2 = dx*dx + dy*dy;
+              const t = Math.max(0, Math.min(1, ((ball.x - f.x) * dx + (ball.y - FLIPPER_Y) * dy) / l2));
+              
+              const px = f.x + t * dx;
+              const py = FLIPPER_Y + t * dy;
+              const d = Math.sqrt((ball.x - px)**2 + (ball.y - py)**2);
+              
+              if (d < ball.radius + 8) {
+                // Determine collision normal
+                const nx = (ball.x - px) / d;
+                const ny = (ball.y - py) / d;
+                
+                // Calculate flipper speed at point of contact
+                const active = isLeft ? keys.current.z : keys.current.m;
+                const surfaceVel = active ? 24 : 4;
+                
+                ball.vx = nx * surfaceVel;
+                ball.vy = ny * surfaceVel;
+                
+                // Pop ball out of flipper to prevent sticking
+                ball.x = px + nx * (ball.radius + 10);
+                ball.y = py + ny * (ball.radius + 10);
+              }
+            };
+            solveF(flippers.current.left, true);
+            solveF(flippers.current.right, false);
+
+            // Bounds
+            if (ball.x < ball.radius) { ball.vx = Math.abs(ball.vx) * 0.5; ball.x = ball.radius; }
+            if (ball.x > WIDTH - ball.radius) {
+                if (ball.y > 150) { ball.vx = -Math.abs(ball.vx) * 0.5; ball.x = WIDTH - ball.radius; }
             }
           });
         }
+
+        // Trail Update
+        balls.current.forEach(b => {
+            b.trail.push({ x: b.x, y: b.y });
+            if (b.trail.length > 8) b.trail.shift();
+        });
+
+        // Life Management
+        const activeBalls = balls.current.filter(b => b.y < HEIGHT + 50);
+        if (balls.current.length > 0 && activeBalls.length === 0) {
+            setLives(l => {
+                const next = l - 1;
+                if (next <= 0) {
+                    setGameState('GAMEOVER');
+                    setHighScore(hs => {
+                        const newHs = Math.max(hs, score);
+                        localStorage.setItem('neon-pinball-highscore', newHs.toString());
+                        return newHs;
+                    });
+                } else {
+                    setMultiplier(1);
+                }
+                return next;
+            });
+        }
+        balls.current = activeBalls;
+
+        // Visual Decay
+        particles.current.forEach(p => { p.x += p.vx; p.y += p.vy; p.life -= 0.025; });
+        particles.current = particles.current.filter(p => p.life > 0);
+        bumpers.current.forEach(b => b.pulse *= 0.9);
+        slingshots.current.forEach(sl => sl.pulse *= 0.85);
+        setShake(s => ({ x: s.x * 0.8, y: s.y * 0.8 }));
+      }
+
+      // --- Draw Cycle ---
+      ctx.fillStyle = '#050508';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      // BG Elements
+      ctx.strokeStyle = 'rgba(0, 242, 255, 0.05)';
+      ctx.lineWidth = 1;
+      for(let i=0; i<WIDTH; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, HEIGHT); ctx.stroke(); }
+      for(let i=0; i<HEIGHT; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(WIDTH, i); ctx.stroke(); }
+
+      // Slingshots
+      slingshots.current.forEach(sl => {
+          ctx.beginPath();
+          ctx.moveTo(sl.x1, sl.y1); ctx.lineTo(sl.x2, sl.y2); ctx.lineTo(sl.x3, sl.y3); ctx.closePath();
+          ctx.fillStyle = sl.pulse > 0.1 ? '#fff' : '#111';
+          ctx.fill();
+          ctx.strokeStyle = '#00f2ff';
+          ctx.lineWidth = 3 + sl.pulse * 5;
+          ctx.stroke();
       });
 
-      if (ballInPlay) {
-        framesSinceLaunch.current++;
-      }
-
-      // Refined remaining ball logic
-      const activeBalls = ballsRef.current.filter(b => b.y - b.radius < CANVAS_HEIGHT + 50);
-      
-      // Drain check: Only game over if no balls remain and launch buffer has passed
-      if (ballInPlay && framesSinceLaunch.current > 30 && activeBalls.length === 0) {
-        setGameState('GAMEOVER');
-        setHighScore(prev => Math.max(prev, score));
-        setBallInPlay(false);
-      }
-      
-      ballsRef.current = activeBalls;
-    };
-
-    const draw = () => {
-      ctx.save();
-      if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
-
-      ctx.fillStyle = '#020617';
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-      // Grid
-      ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.05;
-      for(let i=0; i<CANVAS_WIDTH; i+=50) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, CANVAS_HEIGHT); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(CANVAS_WIDTH, i); ctx.stroke();
-      }
-      ctx.globalAlpha = 1.0;
-
-      // Draw Elements
-      gameElements.forEach(el => {
+      // Bumpers
+      bumpers.current.forEach(b => {
         ctx.save();
-        ctx.shadowBlur = 20; ctx.shadowColor = el.color;
-        const grad = ctx.createRadialGradient(el.x, el.y, 2, el.x, el.y, el.radius);
-        grad.addColorStop(0, '#fff'); grad.addColorStop(0.3, el.color); grad.addColorStop(1, '#000');
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(el.x, el.y, el.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 15 + b.pulse * 30;
+        ctx.shadowColor = b.color;
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r + b.pulse * 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
         ctx.restore();
       });
 
-      // Draw Flippers
-      const flips = flippersRef.current;
-      const drawF = (x, y, a, l) => {
+      // Flippers
+      const drawF = (f, isLeft) => {
         ctx.save();
-        ctx.translate(x, y); ctx.rotate(a);
-        ctx.fillStyle = isTilted ? '#475569' : '#3b82f6';
-        ctx.shadowBlur = isTilted ? 0 : 15; ctx.shadowColor = '#3b82f6';
-        ctx.beginPath(); ctx.roundRect(0, -FLIPPER_WIDTH/2, l ? FLIPPER_LENGTH : -FLIPPER_LENGTH, FLIPPER_WIDTH, [10]);
-        ctx.fill(); ctx.restore();
+        ctx.translate(f.x, FLIPPER_Y);
+        ctx.rotate(f.angle);
+        ctx.shadowBlur = 15; ctx.shadowColor = '#00f2ff';
+        ctx.fillStyle = '#1a1a25'; ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 4;
+        const w = isLeft ? FLIPPER_LENGTH : -FLIPPER_LENGTH;
+        ctx.beginPath(); ctx.roundRect(0, -10, w, 20, 10); ctx.fill(); ctx.stroke();
+        ctx.restore();
       };
-      drawF(135, 645, flips.leftAngle, true);
-      drawF(325, 645, flips.rightAngle, false);
-
-      // Plunger Lane Visual
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(460, 0, 40, CANVAS_HEIGHT);
-      ctx.fillStyle = '#475569';
-      ctx.fillRect(470, 630 + plungerPosition, 20, 70);
+      drawF(flippers.current.left, true);
+      drawF(flippers.current.right, false);
 
       // Balls
-      ballsRef.current.forEach(b => {
+      balls.current.forEach(b => {
         b.trail.forEach((t, i) => {
-          ctx.globalAlpha = (i / b.trail.length) * 0.3;
-          ctx.fillStyle = isTilted ? '#f43f5e' : b.color;
-          ctx.beginPath(); ctx.arc(t.x, t.y, b.radius * (i / b.trail.length), 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = i / b.trail.length * 0.4;
+            ctx.fillStyle = '#00f2ff';
+            ctx.beginPath(); ctx.arc(t.x, t.y, b.radius * (i/b.trail.length), 0, Math.PI * 2); ctx.fill();
         });
-        ctx.globalAlpha = 1.0;
-        ctx.save();
-        ctx.shadowBlur = 15; ctx.shadowColor = isTilted ? '#f43f5e' : b.color;
-        ctx.fillStyle = isTilted ? '#f43f5e' : b.color;
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 15; ctx.shadowColor = '#fff';
         ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
+        ctx.shadowBlur = 0;
       });
 
-      // UI effects
-      particlesRef.current.forEach(p => { 
-        ctx.globalAlpha = p.life; ctx.fillStyle = p.color; 
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill(); 
+      // Particles
+      particles.current.forEach(p => {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill();
       });
-      combosRef.current.forEach(c => { 
-        ctx.globalAlpha = c.life; ctx.fillStyle = '#fff'; 
-        ctx.font = 'bold 24px monospace'; ctx.fillText(c.text, c.x, c.y); 
-      });
+      ctx.globalAlpha = 1;
 
-      ctx.restore();
+      // Scanline Effect Overlay
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      for(let i=0; i<HEIGHT; i+=4) ctx.fillRect(0, i, WIDTH, 1);
+
+      raf = requestAnimationFrame(loop);
     };
 
-    const loop = () => { update(); draw(); animationId = requestAnimationFrame(loop); };
     loop();
-    return () => cancelAnimationFrame(animationId);
-  }, [gameState, isTilted, score, shake, plungerPosition, combo, ballInPlay]);
+    return () => cancelAnimationFrame(raf);
+  }, [gameState, plungerPower, multiplier, score]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4 font-sans select-none overflow-hidden">
-      <div className="mb-6 flex justify-between w-full max-w-lg items-center px-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#010103] text-white p-4 font-sans select-none overflow-hidden">
+      {/* HUD Header */}
+      <div className="w-[500px] bg-black border-x border-t border-cyan-500/20 rounded-t-3xl p-5 flex justify-between items-end">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-500 font-bold">Score</p>
-          <p className="text-5xl font-black font-mono">{score.toLocaleString()}</p>
+          <p className="text-[10px] text-cyan-500 font-black tracking-widest uppercase mb-1">Score</p>
+          <p className="text-4xl font-mono font-black italic">{score.toLocaleString()}</p>
         </div>
-        <div className="text-right">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-purple-500 font-bold">Best</p>
-          <p className="text-3xl font-black font-mono text-slate-400">{highScore.toLocaleString()}</p>
+        <div className="flex flex-col items-end gap-2">
+            <div className={`text-xs font-bold px-3 py-1 rounded border transition-colors ${multiplier > 1 ? 'border-pink-500 text-pink-500 bg-pink-500/10' : 'border-gray-800 text-gray-500'}`}>
+                {multiplier}X MULTIPLIER
+            </div>
+            <div className="flex gap-2">
+                {[...Array(3)].map((_, i) => (
+                    <div key={i} className={`w-3 h-6 skew-x-[-15deg] transition-all duration-300 ${i < lives ? 'bg-cyan-500 shadow-[0_0_10px_#06b6d4]' : 'bg-gray-800'}`} />
+                ))}
+            </div>
         </div>
       </div>
 
-      <div className="relative border-[12px] border-slate-900 rounded-[60px] overflow-hidden shadow-2xl bg-slate-950">
-        <canvas ref={canvasRef} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} className="max-w-full h-auto" />
-        
+      {/* Game Table */}
+      <div className="relative bg-[#020205] border-[10px] border-[#1a1a25] rounded-b-[40px] shadow-2xl overflow-hidden" style={{ transform: `translate(${shake.x}px, ${shake.y}px)` }}>
+        <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="block" />
+
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] text-white/20 font-mono tracking-[0.2em]">
+            BEST: {highScore.toLocaleString()}
+        </div>
+
         {gameState === 'START' && (
-          <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-8 text-center">
-            <h1 className="text-7xl font-black italic text-cyan-500 mb-8 tracking-tighter">ULTRA PIN</h1>
-            <p className="text-cyan-400/60 mb-8 font-mono tracking-widest uppercase text-xs">High Fidelity Arcade Simulation</p>
-            <button onClick={startGame} className="px-16 py-6 bg-cyan-500 text-black font-black text-2xl rounded-2xl hover:scale-110 transition-transform shadow-[0_0_30px_rgba(6,182,212,0.5)]">START GAME</button>
+          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-8 text-center backdrop-blur-sm">
+            <h1 className="text-8xl font-black italic tracking-tighter text-white mb-2">NEON</h1>
+            <h2 className="text-2xl text-cyan-400 font-bold tracking-[0.4em] mb-12 uppercase">Striker Pro</h2>
+            <button onClick={initGame} className="group relative px-12 py-4 border-2 border-cyan-400 text-cyan-400 font-black text-xl hover:bg-cyan-400 hover:text-black transition-all">
+                <span className="relative z-10">START ENGINE</span>
+                <div className="absolute inset-0 bg-cyan-400 scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+            </button>
+            <div className="mt-12 text-[10px] text-gray-500 font-mono space-y-1 uppercase tracking-widest">
+                <p>Z / M : FLIPPERS</p>
+                <p>SPACE : LAUNCHER</p>
+                <p>ARROWS : NUDGE</p>
+            </div>
           </div>
         )}
 
         {gameState === 'GAMEOVER' && (
-          <div className="absolute inset-0 bg-red-950/90 flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-300">
-            <h2 className="text-6xl font-black text-white mb-2 tracking-tighter">BALL DRAINED</h2>
-            <p className="text-white/40 mb-8 font-mono tracking-widest uppercase">Score: {score.toLocaleString()}</p>
-            <button onClick={startGame} className="px-12 py-5 bg-white text-black font-black text-xl rounded-2xl hover:scale-105 transition-transform">PLAY AGAIN</button>
+          <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center z-50 text-center p-8 animate-in fade-in duration-500">
+            <h1 className="text-6xl font-black italic text-pink-600 mb-4 animate-bounce">CRASHED</h1>
+            <p className="text-2xl font-mono mb-8 text-white/60">RECORD: {score.toLocaleString()}</p>
+            <button onClick={initGame} className="px-10 py-3 bg-white text-black font-black hover:bg-cyan-400 hover:text-white transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+              REBOOT
+            </button>
           </div>
         )}
 
-        {gameState === 'PLAYING' && !ballInPlay && (
-          <div className="absolute bottom-40 left-0 right-0 text-center animate-pulse">
-            <p className="text-cyan-400 font-black text-sm uppercase tracking-widest">Hold [SPACE] to Charge Plunger</p>
-            <div className="mt-4 w-48 h-3 bg-slate-800 mx-auto rounded-full overflow-hidden border border-white/10 p-0.5">
-               <div className="h-full bg-cyan-500 rounded-full transition-all duration-75" style={{ width: `${(plungerPosition/75)*100}%` }} />
+        {plungerPower > 0 && (
+            <div className="absolute right-4 bottom-10 w-2 h-40 bg-gray-900/50 rounded-full overflow-hidden border border-white/5">
+                <div className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300" style={{ height: `${plungerPower}%` }} />
             </div>
-          </div>
         )}
       </div>
 
-      <div className="mt-10 grid grid-cols-3 gap-8 max-w-lg w-full">
-        <div className="text-center">
-          <kbd className="w-14 h-14 bg-slate-800 rounded-xl flex items-center justify-center text-2xl font-black mx-auto border-b-4 border-slate-950">Z</kbd>
-          <p className="mt-2 text-[10px] uppercase text-slate-500 font-bold">Left Flipper</p>
+      {/* Controls Help */}
+      <div className="mt-8 grid grid-cols-3 gap-12 text-center">
+        <div className="flex flex-col items-center gap-2">
+            <div className={`w-12 h-10 border-2 rounded flex items-center justify-center text-sm font-bold transition-colors ${keys.current.z ? 'border-cyan-400 bg-cyan-400 text-black shadow-[0_0_15px_#06b6d4]' : 'border-white/20 text-white/40'}`}>Z</div>
+            <span className="text-[10px] font-bold tracking-widest opacity-40">LEFT</span>
         </div>
-        <div className="text-center self-center text-[10px] uppercase text-slate-600 font-black leading-tight">
-          SPACE: Plunger<br/>
-          ARROWS: Nudge Table
+        <div className="flex flex-col items-center gap-2">
+            <div className={`w-24 h-10 border-2 rounded flex items-center justify-center text-sm font-bold transition-colors ${keys.current.space ? 'border-cyan-400 bg-cyan-400 text-black shadow-[0_0_15px_#06b6d4]' : 'border-white/20 text-white/40'}`}>SPACE</div>
+            <span className="text-[10px] font-bold tracking-widest opacity-40">LAUNCH</span>
         </div>
-        <div className="text-center">
-          <kbd className="w-14 h-14 bg-slate-800 rounded-xl flex items-center justify-center text-2xl font-black mx-auto border-b-4 border-slate-950">M</kbd>
-          <p className="mt-2 text-[10px] uppercase text-slate-500 font-bold">Right Flipper</p>
+        <div className="flex flex-col items-center gap-2">
+            <div className={`w-12 h-10 border-2 rounded flex items-center justify-center text-sm font-bold transition-colors ${keys.current.m ? 'border-cyan-400 bg-cyan-400 text-black shadow-[0_0_15px_#06b6d4]' : 'border-white/20 text-white/40'}`}>M</div>
+            <span className="text-[10px] font-bold tracking-widest opacity-40">RIGHT</span>
         </div>
       </div>
-
-      {isTilted && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-12 py-4 bg-red-600 text-white font-black italic text-4xl rounded-2xl animate-bounce shadow-2xl border-4 border-white/20">
-          TILT!
-        </div>
-      )}
     </div>
   );
 };
