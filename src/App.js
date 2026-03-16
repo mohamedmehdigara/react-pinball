@@ -1,122 +1,180 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-/**
- * Cyber Neon Pinball - Pro Edition (Standalone)
- * Fix: Improved Flipper Response & Physics Interaction
- */
-
-const WIDTH = 500;
-const HEIGHT = 750;
-const GRAVITY = 0.45;
-const FRICTION = 0.993;
-const SUBSTEPS = 12;
+/** * --- CONSTANTS & CONFIG --- */
+const WIDTH = 480;
+const HEIGHT = 800;
 const BALL_RADIUS = 10;
-const FLIPPER_Y = 680;
-const FLIPPER_LENGTH = 105;
+const PADDLE_Y = 700;
+const PADDLE_LEN = 110; 
+const GRAVITY = 0.5;
+const FRICTION = 0.995;
+const SUB_STEPS = 12; // 720Hz Physics Precision
+
+const usePinballEngine = (onScore, onLifeLost) => {
+  const ball = useRef({ x: 455, y: 750, vx: 0, vy: 0, active: false, inLane: true, trail: [] });
+  
+  // Input buffer supporting multiple keys for the same action
+  const inputState = useRef({ 
+    Left: false,   // ArrowLeft or KeyZ
+    Right: false,  // ArrowRight or KeyM
+    Space: false 
+  });
+  
+  const flippers = useRef({
+    left: { angle: 0.4, target: 0.4, base: 0.4, up: -0.6, x: 110, isLeft: true },
+    right: { angle: -0.4, target: -0.4, base: -0.4, up: 0.6, x: 340, isLeft: false }
+  });
+
+  const bumpers = useRef([
+    { x: 150, y: 200, r: 35, color: '#ff007b', hit: 0, score: 100 },
+    { x: 330, y: 200, r: 35, color: '#ff007b', hit: 0, score: 100 },
+    { x: 240, y: 350, r: 45, color: '#00f2ff', hit: 0, score: 250 },
+    { x: 80, y: 450, r: 25, color: '#7000ff', hit: 0, score: 50 },
+    { x: 400, y: 450, r: 25, color: '#7000ff', hit: 0, score: 50 },
+  ]);
+
+  const physicsStep = useCallback((dt) => {
+    const b = ball.current;
+    if (!b.active) return;
+
+    // Apply Forces
+    b.vy += GRAVITY * dt;
+    b.vx *= Math.pow(FRICTION, dt);
+    b.vy *= Math.pow(FRICTION, dt);
+
+    // Launcher Logic
+    if (b.inLane) {
+      if (b.y < 150) b.inLane = false;
+      if (b.inLane) {
+        b.x = 455;
+        if (b.y > 750) { b.y = 750; b.vy = 0; }
+      }
+    }
+
+    // Step Movement
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+
+    // Boundary Collisions
+    const leftWall = 20;
+    const rightWall = b.inLane ? 475 : 440;
+    if (b.x < leftWall + BALL_RADIUS) { b.x = leftWall + BALL_RADIUS; b.vx = Math.abs(b.vx) * 0.5; }
+    if (b.x > rightWall - BALL_RADIUS) { b.x = rightWall - BALL_RADIUS; b.vx = -Math.abs(b.vx) * 0.5; }
+    if (b.y < 20 + BALL_RADIUS) { b.y = 20 + BALL_RADIUS; b.vy = Math.abs(b.vy) * 0.5; }
+
+    // Flipper Physics
+    const processFlipper = (f) => {
+      const isPressed = f.isLeft ? inputState.current.Left : inputState.current.Right;
+      f.target = isPressed ? f.up : f.base;
+      
+      const oldAngle = f.angle;
+      const snap = isPressed ? 0.7 : 0.3;
+      f.angle += (f.target - f.angle) * snap;
+
+      const x1 = f.x;
+      const y1 = PADDLE_Y;
+      const length = f.isLeft ? PADDLE_LEN : -PADDLE_LEN;
+      const x2 = x1 + Math.cos(f.angle) * length;
+      const y2 = y1 + Math.sin(f.angle) * length;
+
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const l2 = dx * dx + dy * dy;
+      let t = ((b.x - x1) * dx + (b.y - y1) * dy) / l2;
+      t = Math.max(0, Math.min(1, t));
+      const px = x1 + t * dx;
+      const py = y1 + t * dy;
+      const dist = Math.hypot(b.x - px, b.y - py);
+
+      const padding = 14; 
+      if (dist < BALL_RADIUS + padding) {
+        const isFlicking = Math.abs(f.angle - oldAngle) > 0.001 && isPressed;
+        const normalAngle = f.angle + (f.isLeft ? -Math.PI / 2 : Math.PI / 2);
+        const nx = Math.cos(normalAngle);
+        const ny = Math.sin(normalAngle);
+
+        const dot = b.vx * nx + b.vy * ny;
+        if (dot < 0 || isFlicking) {
+          const boost = isFlicking ? 28 : 8; 
+          b.vx = (b.vx - 2 * dot * nx) + nx * boost;
+          b.vy = (b.vy - 2 * dot * ny) * 0.6 + ny * boost;
+          onScore(10);
+        }
+        
+        b.x = px + nx * (BALL_RADIUS + padding + 1);
+        b.y = py + ny * (BALL_RADIUS + padding + 1);
+      }
+    };
+
+    processFlipper(flippers.current.left);
+    processFlipper(flippers.current.right);
+
+    // Bumper Collisions
+    bumpers.current.forEach(bmp => {
+      const dist = Math.hypot(b.x - bmp.x, b.y - bmp.y);
+      if (dist < BALL_RADIUS + bmp.r) {
+        const nx = (b.x - bmp.x) / dist;
+        const ny = (b.y - bmp.y) / dist;
+        b.vx = nx * 18;
+        b.vy = ny * 18;
+        b.x = bmp.x + nx * (BALL_RADIUS + bmp.r + 2);
+        b.y = bmp.y + ny * (BALL_RADIUS + bmp.r + 2);
+        bmp.hit = 1.0;
+        onScore(bmp.score);
+      }
+    });
+
+    if (b.y > HEIGHT + 50) {
+      b.active = false;
+      onLifeLost();
+    }
+  }, [onScore, onLifeLost]);
+
+  return { ball, flippers, bumpers, physicsStep, inputState };
+};
 
 const App = () => {
   const canvasRef = useRef(null);
+  const [gameState, setGameState] = useState('MENU');
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
-  const [multiplier, setMultiplier] = useState(1);
   const [lives, setLives] = useState(3);
-  const [gameState, setGameState] = useState('START'); 
-  const [shake, setShake] = useState({ x: 0, y: 0 });
   const [plungerPower, setPlungerPower] = useState(0);
-
-  // High Performance Physics Refs
-  const balls = useRef([]);
-  const particles = useRef([]);
   
-  // Use a ref for key states to ensure physics loop always has latest data
-  const keys = useRef({ z: false, m: false, space: false });
-
-  const flippers = useRef({
-    left: { angle: 0.4, target: 0.4, x: 130, baseAngle: 0.4, upAngle: -0.6 },
-    right: { angle: -0.4, target: -0.4, x: 350, baseAngle: -0.4, upAngle: 0.6 }
-  });
-  
-  const bumpers = useRef([
-    { x: 150, y: 220, r: 35, color: '#ff007b', score: 100, pulse: 0, id: 1 },
-    { x: 350, y: 220, r: 35, color: '#ff007b', score: 100, pulse: 0, id: 2 },
-    { x: 250, y: 120, r: 25, color: '#00f2ff', score: 500, pulse: 0, id: 3 },
-    { x: 250, y: 340, r: 45, color: '#7000ff', score: 250, pulse: 0, id: 4 }
-  ]);
-
-  const slingshots = useRef([
-    { x1: 100, y1: 580, x2: 130, y2: 640, x3: 80, y3: 640, color: '#00f2ff', pulse: 0 },
-    { x1: 400, y1: 580, x2: 370, y2: 640, x3: 420, y3: 640, color: '#00f2ff', pulse: 0 }
-  ]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('neon-pinball-highscore');
-    if (saved) setHighScore(parseInt(saved, 10));
-  }, []);
-
-  const initGame = () => {
-    setScore(0);
-    setMultiplier(1);
-    setLives(3);
-    balls.current = [];
-    particles.current = [];
-    setGameState('PLAYING');
-  };
-
-  const spawnBall = (power) => {
-    if (lives <= 0) return;
-    balls.current.push({
-      x: 475, y: 710, vx: 0, vy: -16 - (power / 4.5),
-      radius: BALL_RADIUS, trail: []
-    });
-  };
-
-  const createExplosion = (x, y, color, count = 12) => {
-    for (let i = 0; i < count; i++) {
-      particles.current.push({
-        x, y,
-        vx: (Math.random() - 0.5) * 12,
-        vy: (Math.random() - 0.5) * 12,
-        life: 1.0,
-        color
+  const { ball, flippers, bumpers, physicsStep, inputState } = usePinballEngine(
+    (pts) => setScore(s => s + pts),
+    () => {
+      setLives(l => {
+        if (l <= 1) {
+          setGameState('GAMEOVER');
+          return 0;
+        }
+        ball.current = { x: 455, y: 750, vx: 0, vy: 0, active: true, inLane: true, trail: [] };
+        return l - 1;
       });
     }
-  };
+  );
 
-  // Improved Keyboard Handlers
   useEffect(() => {
     const handleKeyDown = (e) => {
-      const code = e.code;
-      if (code === 'KeyZ') {
-          keys.current.z = true;
-          flippers.current.left.target = flippers.current.left.upAngle;
-      }
-      if (code === 'KeyM') {
-          keys.current.m = true;
-          flippers.current.right.target = flippers.current.right.upAngle;
-      }
-      if (code === 'Space') keys.current.space = true;
-      if (e.key.includes('Arrow')) {
-        setShake({ x: (Math.random() - 0.5) * 12, y: (Math.random() - 0.5) * 12 });
-        balls.current.forEach(b => { b.vx += (Math.random() - 0.5) * 4; b.vy -= 0.5; });
+      if (e.code === 'ArrowLeft' || e.code === 'KeyZ') inputState.current.Left = true;
+      if (e.code === 'ArrowRight' || e.code === 'KeyM') inputState.current.Right = true;
+      if (e.code === 'Space') inputState.current.Space = true;
+      
+      // Prevent scrolling with arrows/space
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) {
+        e.preventDefault();
       }
     };
 
     const handleKeyUp = (e) => {
-      const code = e.code;
-      if (code === 'KeyZ') {
-          keys.current.z = false;
-          flippers.current.left.target = flippers.current.left.baseAngle;
-      }
-      if (code === 'KeyM') {
-          keys.current.m = false;
-          flippers.current.right.target = flippers.current.right.baseAngle;
-      }
-      if (code === 'Space') {
-        if (gameState === 'PLAYING' && balls.current.length === 0) {
-            spawnBall(plungerPower);
-            setPlungerPower(0);
+      if (e.code === 'ArrowLeft' || e.code === 'KeyZ') inputState.current.Left = false;
+      if (e.code === 'ArrowRight' || e.code === 'KeyM') inputState.current.Right = false;
+      if (e.code === 'Space') {
+        if (ball.current.inLane && ball.current.active) {
+          ball.current.vy = - (plungerPower * 0.7 + 10);
+          setPlungerPower(0);
         }
-        keys.current.space = false;
+        inputState.current.Space = false;
       }
     };
 
@@ -126,327 +184,143 @@ const App = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [gameState, plungerPower]);
+  }, [plungerPower]);
 
-  // Main Physics & Render Loop
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvasRef.current.getContext('2d', { alpha: false });
     let raf;
 
-    const loop = () => {
+    const renderLoop = () => {
       if (gameState === 'PLAYING') {
-        // Handle Spacebar Plunger Charging
-        if (keys.current.space && balls.current.length === 0) {
-          setPlungerPower(p => Math.min(p + 2.5, 100));
+        if (inputState.current.Space && ball.current.inLane) {
+          setPlungerPower(p => Math.min(p + 1.8, 55));
         }
+        for (let i = 0; i < SUB_STEPS; i++) physicsStep(1 / SUB_STEPS);
 
-        // Flipper Animation Smoothing
-        flippers.current.left.angle += (flippers.current.left.target - flippers.current.left.angle) * 0.5;
-        flippers.current.right.angle += (flippers.current.right.target - flippers.current.right.angle) * 0.5;
-
-        // Substep Physics for accuracy
-        for (let s = 0; s < SUBSTEPS; s++) {
-          balls.current.forEach((ball) => {
-            ball.vy += GRAVITY / SUBSTEPS;
-            ball.vx *= Math.pow(FRICTION, 1/SUBSTEPS);
-            ball.vy *= Math.pow(FRICTION, 1/SUBSTEPS);
-            ball.x += ball.vx / SUBSTEPS;
-            ball.y += ball.vy / SUBSTEPS;
-
-            // Curved Top Boundary
-            if (ball.y < 240) {
-                const dx = ball.x - 250;
-                const dy = ball.y - 150;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist > 240 - ball.radius) {
-                    const nx = -dx / dist;
-                    const ny = -dy / dist;
-                    const vDotN = ball.vx * nx + ball.vy * ny;
-                    ball.vx = (ball.vx - 2 * vDotN * nx) * 0.7;
-                    ball.vy = (ball.vy - 2 * vDotN * ny) * 0.7;
-                    ball.x = 250 - nx * (240 - ball.radius);
-                    ball.y = 150 - ny * (240 - ball.radius);
-                }
-            }
-
-            // Slingshot Collisions
-            slingshots.current.forEach(sl => {
-                const dx = sl.x2 - sl.x1;
-                const dy = sl.y2 - sl.y1;
-                const l2 = dx*dx + dy*dy;
-                const t = Math.max(0, Math.min(1, ((ball.x - sl.x1) * dx + (ball.y - sl.y1) * dy) / l2));
-                const px = sl.x1 + t * dx;
-                const py = sl.y1 + t * dy;
-                const d = Math.sqrt((ball.x - px)**2 + (ball.y - py)**2);
-                if (d < ball.radius + 6) {
-                    const nx = (ball.x - px) / d;
-                    const ny = (ball.y - py) / d;
-                    ball.vx = nx * 18;
-                    ball.vy = ny * 18;
-                    if (s === 0) {
-                        sl.pulse = 1.0;
-                        setScore(prev => prev + 25 * multiplier);
-                        createExplosion(px, py, '#00f2ff', 6);
-                    }
-                }
-            });
-
-            // Bumper Collisions
-            bumpers.current.forEach(bump => {
-              const dx = ball.x - bump.x;
-              const dy = ball.y - bump.y;
-              const dist = Math.sqrt(dx*dx + dy*dy);
-              if (dist < ball.radius + bump.r) {
-                const nx = dx / dist;
-                const ny = dy / dist;
-                const vDotN = ball.vx * nx + ball.vy * ny;
-                ball.vx = (ball.vx - 2 * vDotN * nx) * 1.65;
-                ball.vy = (ball.vy - 2 * vDotN * ny) * 1.65;
-                ball.x = bump.x + nx * (ball.radius + bump.r + 2);
-                ball.y = bump.y + ny * (ball.radius + bump.r + 2);
-                if (s === 0) {
-                  setScore(prev => prev + bump.score * multiplier);
-                  bump.pulse = 1.0;
-                  createExplosion(bump.x, bump.y, bump.color);
-                  if (bump.id === 3) setMultiplier(m => Math.min(m + 1, 10));
-                }
-              }
-            });
-
-            // Improved Flipper Collisions
-            const solveF = (f, isLeft) => {
-              const dir = isLeft ? 1 : -1;
-              const endX = f.x + dir * Math.cos(f.angle) * FLIPPER_LENGTH;
-              const endY = FLIPPER_Y + dir * Math.sin(f.angle) * FLIPPER_LENGTH;
-              
-              const dx = endX - f.x;
-              const dy = endY - FLIPPER_Y;
-              const l2 = dx*dx + dy*dy;
-              const t = Math.max(0, Math.min(1, ((ball.x - f.x) * dx + (ball.y - FLIPPER_Y) * dy) / l2));
-              
-              const px = f.x + t * dx;
-              const py = FLIPPER_Y + t * dy;
-              const d = Math.sqrt((ball.x - px)**2 + (ball.y - py)**2);
-              
-              if (d < ball.radius + 8) {
-                // Determine collision normal
-                const nx = (ball.x - px) / d;
-                const ny = (ball.y - py) / d;
-                
-                // Calculate flipper speed at point of contact
-                const active = isLeft ? keys.current.z : keys.current.m;
-                const surfaceVel = active ? 24 : 4;
-                
-                ball.vx = nx * surfaceVel;
-                ball.vy = ny * surfaceVel;
-                
-                // Pop ball out of flipper to prevent sticking
-                ball.x = px + nx * (ball.radius + 10);
-                ball.y = py + ny * (ball.radius + 10);
-              }
-            };
-            solveF(flippers.current.left, true);
-            solveF(flippers.current.right, false);
-
-            // Bounds
-            if (ball.x < ball.radius) { ball.vx = Math.abs(ball.vx) * 0.5; ball.x = ball.radius; }
-            if (ball.x > WIDTH - ball.radius) {
-                if (ball.y > 150) { ball.vx = -Math.abs(ball.vx) * 0.5; ball.x = WIDTH - ball.radius; }
-            }
-          });
+        if (ball.current.active) {
+          ball.current.trail.push({ x: ball.current.x, y: ball.current.y });
+          if (ball.current.trail.length > 8) ball.current.trail.shift();
         }
-
-        // Trail Update
-        balls.current.forEach(b => {
-            b.trail.push({ x: b.x, y: b.y });
-            if (b.trail.length > 8) b.trail.shift();
-        });
-
-        // Life Management
-        const activeBalls = balls.current.filter(b => b.y < HEIGHT + 50);
-        if (balls.current.length > 0 && activeBalls.length === 0) {
-            setLives(l => {
-                const next = l - 1;
-                if (next <= 0) {
-                    setGameState('GAMEOVER');
-                    setHighScore(hs => {
-                        const newHs = Math.max(hs, score);
-                        localStorage.setItem('neon-pinball-highscore', newHs.toString());
-                        return newHs;
-                    });
-                } else {
-                    setMultiplier(1);
-                }
-                return next;
-            });
-        }
-        balls.current = activeBalls;
-
-        // Visual Decay
-        particles.current.forEach(p => { p.x += p.vx; p.y += p.vy; p.life -= 0.025; });
-        particles.current = particles.current.filter(p => p.life > 0);
-        bumpers.current.forEach(b => b.pulse *= 0.9);
-        slingshots.current.forEach(sl => sl.pulse *= 0.85);
-        setShake(s => ({ x: s.x * 0.8, y: s.y * 0.8 }));
       }
 
-      // --- Draw Cycle ---
-      ctx.fillStyle = '#050508';
+      ctx.fillStyle = '#050510';
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      // BG Elements
-      ctx.strokeStyle = 'rgba(0, 242, 255, 0.05)';
+      // Grid
+      ctx.strokeStyle = '#101030';
       ctx.lineWidth = 1;
-      for(let i=0; i<WIDTH; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, HEIGHT); ctx.stroke(); }
-      for(let i=0; i<HEIGHT; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(WIDTH, i); ctx.stroke(); }
-
-      // Slingshots
-      slingshots.current.forEach(sl => {
-          ctx.beginPath();
-          ctx.moveTo(sl.x1, sl.y1); ctx.lineTo(sl.x2, sl.y2); ctx.lineTo(sl.x3, sl.y3); ctx.closePath();
-          ctx.fillStyle = sl.pulse > 0.1 ? '#fff' : '#111';
-          ctx.fill();
-          ctx.strokeStyle = '#00f2ff';
-          ctx.lineWidth = 3 + sl.pulse * 5;
-          ctx.stroke();
-      });
+      for(let x=0; x<WIDTH; x+=40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, HEIGHT); ctx.stroke(); }
+      for(let y=0; y<HEIGHT; y+=40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WIDTH, y); ctx.stroke(); }
 
       // Bumpers
-      bumpers.current.forEach(b => {
-        ctx.save();
-        ctx.shadowBlur = 15 + b.pulse * 30;
-        ctx.shadowColor = b.color;
-        ctx.fillStyle = b.color;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r + b.pulse * 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-        ctx.restore();
+      bumpers.current.forEach(bmp => {
+        ctx.shadowBlur = bmp.hit * 30;
+        ctx.shadowColor = bmp.color;
+        ctx.fillStyle = bmp.hit > 0.5 ? '#fff' : bmp.color;
+        ctx.beginPath(); ctx.arc(bmp.x, bmp.y, bmp.r, 0, Math.PI * 2); ctx.fill();
+        bmp.hit *= 0.9;
       });
+      ctx.shadowBlur = 0;
+
+      // Ball
+      ball.current.trail.forEach((t, i) => {
+        ctx.fillStyle = `rgba(0, 242, 255, ${i / 10})`;
+        ctx.beginPath(); ctx.arc(t.x, t.y, BALL_RADIUS * (i / 8), 0, Math.PI * 2); ctx.fill();
+      });
+
+      if (ball.current.active) {
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
+        ctx.beginPath(); ctx.arc(ball.current.x, ball.current.y, BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+      }
 
       // Flippers
-      const drawF = (f, isLeft) => {
+      const drawFlipper = (f) => {
         ctx.save();
-        ctx.translate(f.x, FLIPPER_Y);
+        ctx.translate(f.x, PADDLE_Y);
         ctx.rotate(f.angle);
-        ctx.shadowBlur = 15; ctx.shadowColor = '#00f2ff';
-        ctx.fillStyle = '#1a1a25'; ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 4;
-        const w = isLeft ? FLIPPER_LENGTH : -FLIPPER_LENGTH;
-        ctx.beginPath(); ctx.roundRect(0, -10, w, 20, 10); ctx.fill(); ctx.stroke();
+        const active = f.isLeft ? inputState.current.Left : inputState.current.Right;
+        ctx.fillStyle = active ? '#00f2ff' : '#0044cc';
+        ctx.shadowBlur = active ? 15 : 0;
+        ctx.shadowColor = '#00f2ff';
+        const len = f.isLeft ? PADDLE_LEN : -PADDLE_LEN;
+        ctx.beginPath();
+        ctx.roundRect(0, -12, len, 24, 12);
+        ctx.fill();
         ctx.restore();
       };
-      drawF(flippers.current.left, true);
-      drawF(flippers.current.right, false);
+      drawFlipper(flippers.current.left);
+      drawFlipper(flippers.current.right);
 
-      // Balls
-      balls.current.forEach(b => {
-        b.trail.forEach((t, i) => {
-            ctx.globalAlpha = i / b.trail.length * 0.4;
-            ctx.fillStyle = '#00f2ff';
-            ctx.beginPath(); ctx.arc(t.x, t.y, b.radius * (i/b.trail.length), 0, Math.PI * 2); ctx.fill();
-        });
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = '#fff';
-        ctx.shadowBlur = 15; ctx.shadowColor = '#fff';
-        ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
-      });
+      // Walls
+      ctx.strokeStyle = '#222266';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(4, 4, WIDTH-8, HEIGHT-8);
+      ctx.beginPath(); ctx.moveTo(445, 150); ctx.lineTo(445, HEIGHT); ctx.stroke();
 
-      // Particles
-      particles.current.forEach(p => {
-        ctx.globalAlpha = p.life;
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill();
-      });
-      ctx.globalAlpha = 1;
-
-      // Scanline Effect Overlay
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-      for(let i=0; i<HEIGHT; i+=4) ctx.fillRect(0, i, WIDTH, 1);
-
-      raf = requestAnimationFrame(loop);
+      raf = requestAnimationFrame(renderLoop);
     };
 
-    loop();
+    raf = requestAnimationFrame(renderLoop);
     return () => cancelAnimationFrame(raf);
-  }, [gameState, plungerPower, multiplier, score]);
+  }, [gameState, physicsStep]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#010103] text-white p-4 font-sans select-none overflow-hidden">
-      {/* HUD Header */}
-      <div className="w-[500px] bg-black border-x border-t border-cyan-500/20 rounded-t-3xl p-5 flex justify-between items-end">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4 select-none">
+      <div className="w-[480px] flex justify-between items-end mb-4 bg-zinc-900/50 p-6 rounded-3xl border border-white/5 backdrop-blur-lg">
         <div>
-          <p className="text-[10px] text-cyan-500 font-black tracking-widest uppercase mb-1">Score</p>
-          <p className="text-4xl font-mono font-black italic">{score.toLocaleString()}</p>
+          <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-1">Score</p>
+          <p className="text-4xl font-black text-cyan-400 font-mono tracking-tighter">{score.toLocaleString()}</p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-            <div className={`text-xs font-bold px-3 py-1 rounded border transition-colors ${multiplier > 1 ? 'border-pink-500 text-pink-500 bg-pink-500/10' : 'border-gray-800 text-gray-500'}`}>
-                {multiplier}X MULTIPLIER
-            </div>
-            <div className="flex gap-2">
-                {[...Array(3)].map((_, i) => (
-                    <div key={i} className={`w-3 h-6 skew-x-[-15deg] transition-all duration-300 ${i < lives ? 'bg-cyan-500 shadow-[0_0_10px_#06b6d4]' : 'bg-gray-800'}`} />
-                ))}
-            </div>
+        <div className="flex gap-3 mb-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className={`w-3 h-3 rounded-full ${i < lives ? 'bg-cyan-500 shadow-[0_0_10px_#06b6d4]' : 'bg-zinc-800'}`} />
+          ))}
         </div>
       </div>
 
-      {/* Game Table */}
-      <div className="relative bg-[#020205] border-[10px] border-[#1a1a25] rounded-b-[40px] shadow-2xl overflow-hidden" style={{ transform: `translate(${shake.x}px, ${shake.y}px)` }}>
-        <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="block" />
+      <div className="relative rounded-[40px] border-[12px] border-zinc-800 shadow-2xl overflow-hidden">
+        <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="bg-black" />
 
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] text-white/20 font-mono tracking-[0.2em]">
-            BEST: {highScore.toLocaleString()}
-        </div>
-
-        {gameState === 'START' && (
-          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-8 text-center backdrop-blur-sm">
-            <h1 className="text-8xl font-black italic tracking-tighter text-white mb-2">NEON</h1>
-            <h2 className="text-2xl text-cyan-400 font-bold tracking-[0.4em] mb-12 uppercase">Striker Pro</h2>
-            <button onClick={initGame} className="group relative px-12 py-4 border-2 border-cyan-400 text-cyan-400 font-black text-xl hover:bg-cyan-400 hover:text-black transition-all">
-                <span className="relative z-10">START ENGINE</span>
-                <div className="absolute inset-0 bg-cyan-400 scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+        {gameState === 'MENU' && (
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-10 text-center">
+            <h1 className="text-6xl font-black italic tracking-tighter mb-8 text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-500">NEON PIN</h1>
+            <button 
+              onClick={() => { setScore(0); setLives(3); setGameState('PLAYING'); ball.current.active = true; }}
+              className="px-12 py-4 bg-cyan-500 text-black font-black text-xl rounded-2xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(6,182,212,0.4)]"
+            >
+              LAUNCH MISSION
             </button>
-            <div className="mt-12 text-[10px] text-gray-500 font-mono space-y-1 uppercase tracking-widest">
-                <p>Z / M : FLIPPERS</p>
-                <p>SPACE : LAUNCHER</p>
-                <p>ARROWS : NUDGE</p>
-            </div>
           </div>
         )}
 
         {gameState === 'GAMEOVER' && (
-          <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center z-50 text-center p-8 animate-in fade-in duration-500">
-            <h1 className="text-6xl font-black italic text-pink-600 mb-4 animate-bounce">CRASHED</h1>
-            <p className="text-2xl font-mono mb-8 text-white/60">RECORD: {score.toLocaleString()}</p>
-            <button onClick={initGame} className="px-10 py-3 bg-white text-black font-black hover:bg-cyan-400 hover:text-white transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)]">
-              REBOOT
+          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center">
+            <h2 className="text-4xl font-black text-rose-500 mb-2">MISSION FAILED</h2>
+            <p className="text-xl font-bold mb-8">{score.toLocaleString()} PTS</p>
+            <button 
+              onClick={() => setGameState('MENU')}
+              className="px-8 py-3 bg-white text-black font-bold rounded-xl"
+            >
+              RETRY
             </button>
           </div>
         )}
-
-        {plungerPower > 0 && (
-            <div className="absolute right-4 bottom-10 w-2 h-40 bg-gray-900/50 rounded-full overflow-hidden border border-white/5">
-                <div className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-600 to-cyan-300" style={{ height: `${plungerPower}%` }} />
-            </div>
-        )}
       </div>
 
-      {/* Controls Help */}
-      <div className="mt-8 grid grid-cols-3 gap-12 text-center">
-        <div className="flex flex-col items-center gap-2">
-            <div className={`w-12 h-10 border-2 rounded flex items-center justify-center text-sm font-bold transition-colors ${keys.current.z ? 'border-cyan-400 bg-cyan-400 text-black shadow-[0_0_15px_#06b6d4]' : 'border-white/20 text-white/40'}`}>Z</div>
-            <span className="text-[10px] font-bold tracking-widest opacity-40">LEFT</span>
+      <div className="mt-8 grid grid-cols-3 gap-8 w-full max-w-[480px]">
+        <div className="text-center">
+          <p className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Left</p>
+          <div className="w-12 h-12 mx-auto bg-zinc-900 border-2 border-zinc-700 rounded-xl flex items-center justify-center font-black text-cyan-400 text-xl">←</div>
         </div>
-        <div className="flex flex-col items-center gap-2">
-            <div className={`w-24 h-10 border-2 rounded flex items-center justify-center text-sm font-bold transition-colors ${keys.current.space ? 'border-cyan-400 bg-cyan-400 text-black shadow-[0_0_15px_#06b6d4]' : 'border-white/20 text-white/40'}`}>SPACE</div>
-            <span className="text-[10px] font-bold tracking-widest opacity-40">LAUNCH</span>
+        <div className="text-center">
+          <p className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Plunger</p>
+          <div className="h-12 px-4 mx-auto bg-zinc-900 border-2 border-zinc-700 rounded-xl flex items-center justify-center font-black text-white text-xs">SPACE</div>
         </div>
-        <div className="flex flex-col items-center gap-2">
-            <div className={`w-12 h-10 border-2 rounded flex items-center justify-center text-sm font-bold transition-colors ${keys.current.m ? 'border-cyan-400 bg-cyan-400 text-black shadow-[0_0_15px_#06b6d4]' : 'border-white/20 text-white/40'}`}>M</div>
-            <span className="text-[10px] font-bold tracking-widest opacity-40">RIGHT</span>
+        <div className="text-center">
+          <p className="text-[10px] text-zinc-600 font-bold uppercase mb-2">Right</p>
+          <div className="w-12 h-12 mx-auto bg-zinc-900 border-2 border-zinc-700 rounded-xl flex items-center justify-center font-black text-cyan-400 text-xl">→</div>
         </div>
       </div>
     </div>
