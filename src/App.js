@@ -1,232 +1,242 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-/** --- CONFIG & CONSTANTS --- */
 const WIDTH = 480;
 const HEIGHT = 800;
 const BALL_RADIUS = 9;
-const PADDLE_Y = 730;
-const PADDLE_LEN = 105; 
-const GRAVITY = 0.55;
-const FRICTION = 0.994;
-const SUB_STEPS = 12; // High-precision sub-stepping
+const SUB_STEPS = 8;
+const GRAVITY = 0.35; 
+const FRICTION = 0.995;
+const MAX_SPEED = 28;
+const BOUNCE = 0.5; 
+const FLIPPER_BOUNCE = 0.4;
 
-const usePinballEngine = (onScore, onLifeLost, onCombo, onMultiBall) => {
-  const balls = useRef([{ 
-    x: 455, y: 750, vx: 0, vy: 0, 
-    active: true, inLane: true, 
-    trail: [], spin: 0, id: Math.random() 
-  }]);
-  const screenShake = useRef(0);
-  const comboCounter = useRef(0);
-  const lastHitTime = useRef(0);
-  const particles = useRef([]); 
-  const inputState = useRef({ Left: false, Right: false, Space: false });
-  
+const App = () => {
+  const canvasRef = useRef(null);
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [gameState, setGameState] = useState('MENU');
+  const [charge, setCharge] = useState(0);
+
+  const ball = useRef({ 
+    x: 450, 
+    y: 750, 
+    vx: 0, 
+    vy: 0, 
+    active: false, 
+    trail: [] 
+  });
+
+  const particles = useRef([]);
+  const shake = useRef(0);
+  const input = useRef({ left: false, right: false, space: false });
+
   const flippers = useRef({
-    left: { angle: 0.4, target: 0.4, base: 0.4, up: -0.6, x: 105, isLeft: true },
-    right: { angle: -0.4, target: -0.4, base: -0.4, up: 0.6, x: 345, isLeft: false }
+    left: { x: 135, y: 720, angle: 0.5, target: 0.5, base: 0.5, up: -0.6, length: 90, width: 16, vel: 0 },
+    right: { x: 345, y: 720, angle: 2.64, target: 2.64, base: 2.64, up: 3.74, length: 90, width: 16, vel: 0 }
   });
 
   const bumpers = useRef([
-    { x: 140, y: 160, r: 35, color: '#ff00ff', pulse: 0, type: 'BUMPER' },
-    { x: 340, y: 160, r: 35, color: '#ff00ff', pulse: 0, type: 'BUMPER' },
-    { x: 240, y: 310, r: 45, color: '#00ffff', pulse: 0, type: 'BUMPER' },
-    // Slingshots (Triangular kickers)
-    { x1: 60, y1: 600, x2: 100, y2: 680, x3: 60, y3: 680, color: '#ffff00', pulse: 0, type: 'SLINGSHOT', side: 'left' },
-    { x1: 420, y1: 600, x2: 380, y2: 680, x3: 420, y3: 680, color: '#ffff00', pulse: 0, type: 'SLINGSHOT', side: 'right' }
+    { x: 240, y: 180, r: 35, color: '#00f2ff', pulse: 0, score: 500 },
+    { x: 130, y: 320, r: 30, color: '#ff00ff', pulse: 0, score: 250 },
+    { x: 350, y: 320, r: 30, color: '#ff00ff', pulse: 0, score: 250 },
+    { x: 240, y: 460, r: 25, color: '#00ff41', pulse: 0, score: 100 },
   ]);
 
-  const createSparks = (x, y, color, count = 12) => {
-    for (let i = 0; i < count; i++) {
+  const walls = useRef([
+    { x1: 15, y1: 800, x2: 15, y2: 200 }, 
+    { x1: 465, y1: 800, x2: 465, y2: 200 }, 
+    { x1: 440, y1: 800, x2: 440, y2: 230 }, 
+    { x1: 15, y1: 580, x2: 100, y2: 660 }, 
+    { x1: 440, y1: 580, x2: 380, y2: 660 }, 
+    { x1: 135, y1: 720, x2: 15, y2: 640 }, 
+    { x1: 345, y1: 720, x2: 440, y2: 640 },
+  ]);
+
+  const resetBall = useCallback(() => {
+    ball.current = {
+      x: 452,
+      y: 750,
+      vx: 0,
+      vy: 0,
+      active: false,
+      trail: []
+    };
+    setCharge(0);
+  }, []);
+
+  const spawnParticles = (x, y, color) => {
+    for (let i = 0; i < 6; i++) {
       particles.current.push({
         x, y,
-        vx: (Math.random() - 0.5) * 15,
-        vy: (Math.random() - 0.5) * 15,
-        life: 1.0,
+        vx: (Math.random() - 0.5) * 10,
+        vy: (Math.random() - 0.5) * 10,
+        life: 1,
         color
       });
     }
   };
 
-  const physicsStep = useCallback((dt) => {
-    // Particle Physics
-    particles.current.forEach(p => {
-      p.x += p.vx; p.y += p.vy;
-      p.vy += 0.2;
-      p.life *= 0.94;
-    });
-    particles.current = particles.current.filter(p => p.life > 0.05);
-
-    balls.current.forEach((b) => {
-      if (!b.active) return;
-
-      b.vy += GRAVITY * dt;
-      b.vx *= Math.pow(FRICTION, dt);
-      b.vy *= Math.pow(FRICTION, dt);
-
-      // Launcher Lane Logic
-      if (b.inLane) {
-        if (b.y < 200) b.inLane = false;
-        b.x = 455;
-        if (b.y > 760) { b.y = 760; b.vy = 0; }
-      }
-
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-
-      // Table Geometry (Implicit walls)
-      const margin = 20 + BALL_RADIUS;
-      const laneWall = 435 - BALL_RADIUS;
-      
-      if (b.x < margin) { b.x = margin; b.vx *= -0.6; b.spin += b.vy * 0.1; }
-      if (b.x > WIDTH - margin) { b.x = WIDTH - margin; b.vx *= -0.6; b.spin -= b.vy * 0.1; }
-      if (!b.inLane && b.x > laneWall && b.y > 200) { b.x = laneWall; b.vx *= -0.6; }
-      if (b.y < margin) { b.y = margin; b.vy *= -0.6; }
-
-      // Top Arc Collision
-      if (b.y < 250) {
-        const dx = b.x - 240, dy = b.y - 250;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 220 && b.x < 430) {
-          const nx = -dx/dist, ny = -dy/dist;
-          const dot = b.vx * nx + b.vy * ny;
-          b.vx -= 1.8 * dot * nx; b.vy -= 1.8 * dot * ny;
-          b.x = 240 - nx * 219; b.y = 250 - ny * 219;
-        }
-      }
-
-      // Flipper Collision (CCD - Continuous Collision Detection)
-      const checkFlipper = (f) => {
-        const isDown = f.isLeft ? inputState.current.Left : inputState.current.Right;
-        f.target = isDown ? f.up : f.base;
-        const oldAngle = f.angle;
-        f.angle += (f.target - f.angle) * 0.5;
-        const angVel = (f.angle - oldAngle) / dt;
-
-        const x1 = f.x, y1 = PADDLE_Y;
-        const len = f.isLeft ? PADDLE_LEN : -PADDLE_LEN;
-        const x2 = x1 + Math.cos(f.angle) * len, y2 = y1 + Math.sin(f.angle) * len;
-
-        const dx = x2 - x1, dy = y2 - y1;
-        const l2 = dx*dx + dy*dy;
-        let t = ((b.x - x1) * dx + (b.y - y1) * dy) / l2;
-        t = Math.max(0, Math.min(1, t));
-        const px = x1 + t * dx, py = y1 + t * dy;
-        const dist = Math.hypot(b.x - px, b.y - py);
-
-        if (dist < BALL_RADIUS + 8) {
-          const normal = f.angle + (f.isLeft ? -Math.PI/2 : Math.PI/2);
-          const nx = Math.cos(normal), ny = Math.sin(normal);
-          const kick = Math.abs(angVel) * 15 + 8;
-          
-          b.vx = (b.vx - 2 * (b.vx * nx + b.vy * ny) * nx) + nx * kick;
-          b.vy = (b.vy - 2 * (b.vx * nx + b.vy * ny) * ny) * 0.4 + ny * kick;
-          b.x = px + nx * (BALL_RADIUS + 9);
-          b.y = py + ny * (BALL_RADIUS + 9);
-          if (Math.abs(angVel) > 0.05) screenShake.current = 10;
-        }
-      };
-      checkFlipper(flippers.current.left);
-      checkFlipper(flippers.current.right);
-
-      // Bumper & Slingshot Logic
-      bumpers.current.forEach(obj => {
-        if (obj.type === 'BUMPER') {
-          const dist = Math.hypot(b.x - obj.x, b.y - obj.y);
-          if (dist < BALL_RADIUS + obj.r) {
-            const nx = (b.x - obj.x) / dist, ny = (b.y - b.y) / dist; // Simple radial bounce
-            b.vx = (b.x - obj.x) / dist * 18;
-            b.vy = (b.y - obj.y) / dist * 18;
-            obj.pulse = 1.0;
-            screenShake.current = 15;
-            createSparks(b.x, b.y, obj.color);
-            handleScore(100, obj.color);
-          }
-        } else if (obj.type === 'SLINGSHOT') {
-          // Simplified triangle proximity
-          const midX = (obj.x1 + obj.x2) / 2;
-          const midY = (obj.y1 + obj.y2) / 2;
-          const dist = Math.hypot(b.x - midX, b.y - midY);
-          if (dist < 40) {
-            const nx = obj.side === 'left' ? 1 : -1;
-            b.vx = nx * 20; b.vy = -5;
-            obj.pulse = 1.0;
-            screenShake.current = 8;
-            createSparks(b.x, b.y, obj.color, 5);
-            handleScore(50, obj.color);
-          }
-        }
-      });
-
-      if (b.y > HEIGHT + 50) {
-        b.active = false;
-        const activeCount = balls.current.filter(bl => bl.active).length;
-        if (activeCount === 0) onLifeLost();
-      }
-    });
-
-    screenShake.current *= 0.85;
-  }, [onScore, onLifeLost, onCombo]);
-
-  const handleScore = (val, color) => {
-    const now = Date.now();
-    if (now - lastHitTime.current < 1000) {
-      comboCounter.current++;
-    } else {
-      comboCounter.current = 1;
-    }
-    lastHitTime.current = now;
-    onScore(val * comboCounter.current);
-    onCombo(comboCounter.current);
-    
-    // Multi-ball trigger on high combo
-    if (comboCounter.current === 15) {
-      balls.current.push({ 
-        x: 240, y: 400, vx: 10, vy: -10, 
-        active: true, inLane: false, 
-        trail: [], spin: 0, id: Math.random() 
-      });
-      onMultiBall();
-    }
+  const getClosestPoint = (px, py, x1, y1, x2, y2) => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const l2 = dx * dx + dy * dy;
+    let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return { x: x1 + t * dx, y: y1 + t * dy, t };
   };
 
-  return { balls, flippers, bumpers, physicsStep, inputState, particles, screenShake };
-};
+  const updatePhysics = useCallback(() => {
+    const b = ball.current;
+    const flp = flippers.current;
 
-const App = () => {
-  const canvasRef = useRef(null);
-  const [gameState, setGameState] = useState('MENU');
-  const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
-  const [combo, setCombo] = useState(1);
-  const [charge, setCharge] = useState(0);
+    // Update Flipper Rotation
+    [flp.left, flp.right].forEach((f, i) => {
+      const isPressed = i === 0 ? input.current.left : input.current.right;
+      f.target = isPressed ? f.up : f.base;
+      const oldAngle = f.angle;
+      const lerpSpeed = isPressed ? 0.7 : 0.25; 
+      f.angle += (f.target - f.angle) * lerpSpeed;
+      f.vel = (f.angle - oldAngle); // Store angular velocity
+    });
 
-  const { balls, flippers, bumpers, physicsStep, inputState, particles, screenShake } = usePinballEngine(
-    (s) => setScore(prev => prev + s),
-    () => setLives(l => l > 1 ? l - 1 : (setGameState('GAMEOVER'), 0)),
-    (c) => setCombo(c),
-    () => {} // Multi-ball callback
-  );
+    if (!b.active && gameState !== 'PLAYING') return;
+    if (!b.active) return;
 
-  useEffect(() => {
-    const handleKey = (e, down) => {
-      if (e.code === 'KeyZ' || e.code === 'ArrowLeft') inputState.current.Left = down;
-      if (e.code === 'KeyM' || e.code === 'ArrowRight') inputState.current.Right = down;
-      if (e.code === 'Space') {
-        inputState.current.Space = down;
-        if (!down) {
-          const b = balls.current.find(b => b.inLane && b.active);
-          if (b) { b.vy = -(charge * 0.5 + 12); setCharge(0); }
-        }
+    for (let s = 0; s < SUB_STEPS; s++) {
+      b.vy += GRAVITY / SUB_STEPS;
+      b.vx *= Math.pow(FRICTION, 1/SUB_STEPS);
+      b.vy *= Math.pow(FRICTION, 1/SUB_STEPS);
+      
+      b.x += b.vx / SUB_STEPS;
+      b.y += b.vy / SUB_STEPS;
+
+      // Speed capping
+      const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      if (speed > MAX_SPEED) {
+        b.vx = (b.vx / speed) * MAX_SPEED;
+        b.vy = (b.vy / speed) * MAX_SPEED;
       }
-    };
-    window.addEventListener('keydown', (e) => handleKey(e, true));
-    window.addEventListener('keyup', (e) => handleKey(e, false));
-    return () => {
-      window.removeEventListener('keydown', handleKey);
-      window.removeEventListener('keyup', handleKey);
-    };
-  }, [charge, balls]);
+
+      // Upper Dome
+      const distToDome = Math.sqrt((b.x - 240)**2 + (b.y - 200)**2);
+      if (distToDome > 225 && b.y < 200) {
+        const nx = (240 - b.x) / distToDome;
+        const ny = (200 - b.y) / distToDome;
+        const dot = b.vx * nx + b.vy * ny;
+        if (dot < 0) {
+            b.vx -= (1 + BOUNCE) * dot * nx;
+            b.vy -= (1 + BOUNCE) * dot * ny;
+        }
+        b.x = 240 - nx * 224;
+        b.y = 200 - ny * 224;
+      }
+
+      // Walls
+      walls.current.forEach(w => {
+        const cp = getClosestPoint(b.x, b.y, w.x1, w.y1, w.x2, w.y2);
+        const dx = b.x - cp.x;
+        const dy = b.y - cp.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < BALL_RADIUS) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const dot = b.vx * nx + b.vy * ny;
+          if (dot < 0) {
+            b.vx -= (1 + BOUNCE) * dot * nx;
+            b.vy -= (1 + BOUNCE) * dot * ny;
+          }
+          b.x = cp.x + nx * BALL_RADIUS;
+          b.y = cp.y + ny * BALL_RADIUS;
+        }
+      });
+
+      // Bumpers
+      bumpers.current.forEach(p => {
+        const dx = b.x - p.x;
+        const dy = b.y - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < p.r + BALL_RADIUS) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const dot = b.vx * nx + b.vy * ny;
+          const kick = 10;
+          b.vx = (b.vx - 1.8 * dot * nx) + nx * kick;
+          b.vy = (b.vy - 1.8 * dot * ny) + ny * kick;
+          b.x = p.x + nx * (p.r + BALL_RADIUS + 1);
+          p.pulse = 1;
+          setScore(s => s + p.score);
+          spawnParticles(b.x, b.y, p.color);
+          shake.current = 8;
+        }
+      });
+
+      // Flipper Collision - Unified Unified Logic
+      [flp.left, flp.right].forEach((f, i) => {
+        // Calculate current tip position based on true angle
+        const tipX = f.x + Math.cos(f.angle) * f.length;
+        const tipY = f.y + Math.sin(f.angle) * f.length;
+        
+        const cp = getClosestPoint(b.x, b.y, f.x, f.y, tipX, tipY);
+        const dx = b.x - cp.x;
+        const dy = b.y - cp.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const radiusTotal = BALL_RADIUS + f.width / 2;
+
+        if (dist < radiusTotal) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          // Velocity of flipper at the impact point
+          const distFromPivot = cp.t * f.length;
+          const fVelX = -Math.sin(f.angle) * f.vel * distFromPivot * SUB_STEPS;
+          const fVelY = Math.cos(f.angle) * f.vel * distFromPivot * SUB_STEPS;
+
+          const relVX = b.vx - fVelX;
+          const relVY = b.vy - fVelY;
+          const dot = relVX * nx + relVY * ny;
+
+          if (dot < 0) {
+            // Check if moving towards the flipping direction
+            const isFlipping = i === 0 ? (f.vel < 0) : (f.vel > 0);
+            const bounce = isFlipping ? 1.6 : FLIPPER_BOUNCE;
+            
+            b.vx = (b.vx - (1 + bounce) * dot * nx) + fVelX * 0.3;
+            b.vy = (b.vy - (1 + bounce) * dot * ny) + fVelY * 0.3;
+            
+            if (isFlipping) {
+                shake.current = 6;
+                spawnParticles(b.x, b.y, '#00f2ff');
+            }
+          }
+
+          // Force ball out of flipper geometry
+          const overlap = radiusTotal - dist;
+          b.x += nx * overlap;
+          b.y += ny * overlap;
+        }
+      });
+    }
+
+    if (b.y > HEIGHT + 40) {
+      setLives(l => {
+        if (l <= 1) { setGameState('GAMEOVER'); return 0; }
+        resetBall();
+        return l - 1;
+      });
+    }
+
+    if (b.active) {
+      b.trail.unshift({ x: b.x, y: b.y });
+      if (b.trail.length > 12) b.trail.pop();
+    } else {
+      b.trail = [];
+    }
+    
+    particles.current.forEach(p => { p.x += p.vx; p.y += p.vy; p.life *= 0.92; });
+    particles.current = particles.current.filter(p => p.life > 0.05);
+    bumpers.current.forEach(p => p.pulse *= 0.85);
+    shake.current *= 0.8;
+  }, [gameState, resetBall]);
 
   useEffect(() => {
     const ctx = canvasRef.current.getContext('2d');
@@ -234,185 +244,159 @@ const App = () => {
 
     const render = () => {
       if (gameState === 'PLAYING') {
-        if (inputState.current.Space) setCharge(c => Math.min(c + 2, 70));
-        for (let i = 0; i < SUB_STEPS; i++) physicsStep(1 / SUB_STEPS);
+        updatePhysics();
+        if (input.current.space && !ball.current.active) {
+          setCharge(c => Math.min(c + 3, 100));
+        }
       }
 
-      // Background
-      ctx.fillStyle = '#050508';
+      ctx.fillStyle = '#050510';
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      // Camera Perspective
       ctx.save();
-      if (screenShake.current > 0.1) {
-        ctx.translate((Math.random()-0.5)*screenShake.current, (Math.random()-0.5)*screenShake.current);
-      }
+      if (shake.current > 0.5) ctx.translate((Math.random()-0.5)*shake.current, (Math.random()-0.5)*shake.current);
 
-      // Grid
-      ctx.strokeStyle = '#00f2ff11';
-      ctx.lineWidth = 1;
-      for(let i=0; i<WIDTH; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i, HEIGHT); ctx.stroke(); }
-      for(let i=0; i<HEIGHT; i+=50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(WIDTH, i); ctx.stroke(); }
-
-      // Elements
-      bumpers.current.forEach(obj => {
-        ctx.shadowBlur = 15 + obj.pulse * 20;
-        ctx.shadowColor = obj.color;
-        ctx.strokeStyle = obj.color;
-        ctx.lineWidth = 3 + obj.pulse * 5;
-
-        if (obj.type === 'BUMPER') {
-          ctx.beginPath(); ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI*2); ctx.stroke();
-          ctx.fillStyle = obj.pulse > 0.1 ? '#fff' : '#000';
-          ctx.fill();
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(obj.x1, obj.y1); ctx.lineTo(obj.x2, obj.y2); ctx.lineTo(obj.x3, obj.y3); ctx.closePath();
-          ctx.stroke();
-          ctx.fillStyle = obj.pulse > 0.1 ? '#fff' : '#111';
-          ctx.fill();
-        }
-        obj.pulse *= 0.9;
+      walls.current.forEach(w => {
+        ctx.strokeStyle = '#2a2a4a';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
       });
 
-      // Sparks
+      ctx.beginPath(); 
+      ctx.strokeStyle = '#2a2a4a';
+      ctx.lineWidth = 4;
+      ctx.arc(240, 200, 225, Math.PI, 0); 
+      ctx.stroke();
+
+      bumpers.current.forEach(p => {
+        ctx.shadowBlur = 10 + p.pulse * 25;
+        ctx.shadowColor = p.color;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 3 + p.pulse * 6;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = `${p.color}33`;
+        ctx.fill();
+      });
+      ctx.shadowBlur = 0;
+
+      [flippers.current.left, flippers.current.right].forEach((f) => {
+        ctx.save();
+        ctx.translate(f.x, f.y);
+        ctx.rotate(f.angle);
+        ctx.fillStyle = '#1a1a35';
+        ctx.strokeStyle = '#00f2ff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(0, -f.width/2, f.length, f.width, f.width/2);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#00f2ff';
+        ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+      });
+
+      const b = ball.current;
+      if (b.active || (!b.active && gameState === 'PLAYING')) {
+        b.trail.forEach((t, i) => {
+          ctx.fillStyle = `rgba(0, 242, 255, ${0.4 - i * 0.03})`;
+          ctx.beginPath(); ctx.arc(t.x, t.y, BALL_RADIUS * (1 - i * 0.07), 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#00f2ff';
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(b.x, b.y, BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
       particles.current.forEach(p => {
-        ctx.globalAlpha = p.life;
         ctx.fillStyle = p.color;
-        ctx.fillRect(p.x, p.y, 3, 3);
+        ctx.globalAlpha = p.life;
+        ctx.fillRect(p.x, p.y, 2, 2);
       });
       ctx.globalAlpha = 1;
 
-      // Flippers
-      const drawF = (f) => {
-        ctx.save();
-        ctx.translate(f.x, PADDLE_Y);
-        ctx.rotate(f.angle);
-        const isActive = f.isLeft ? inputState.current.Left : inputState.current.Right;
-        ctx.fillStyle = isActive ? '#fff' : '#111';
-        ctx.shadowBlur = isActive ? 30 : 5;
-        ctx.shadowColor = '#00f2ff';
-        const l = f.isLeft ? PADDLE_LEN : -PADDLE_LEN;
-        ctx.beginPath(); ctx.roundRect(0, -10, l, 20, 10); ctx.fill();
-        ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 2; ctx.stroke();
-        ctx.restore();
-      };
-      drawF(flippers.current.left);
-      drawF(flippers.current.right);
-
-      // Balls
-      balls.current.forEach(b => {
-        if (!b.active) return;
-        b.trail.push({ x: b.x, y: b.y });
-        if (b.trail.length > 15) b.trail.shift();
-
-        // Speed Blur / Trail
-        ctx.beginPath();
-        b.trail.forEach((t, i) => {
-          ctx.lineTo(t.x, t.y);
-          ctx.strokeStyle = `rgba(0, 242, 255, ${i/30})`;
-          ctx.lineWidth = (i/15) * BALL_RADIUS * 2;
-        });
-        ctx.stroke();
-
-        ctx.save();
-        ctx.translate(b.x, b.y);
-        ctx.rotate(b.spin * 0.1);
-        ctx.fillStyle = '#fff';
-        ctx.shadowBlur = 15; ctx.shadowColor = '#00f2ff';
-        ctx.beginPath(); ctx.arc(0, 0, BALL_RADIUS, 0, Math.PI*2); ctx.fill();
-        // Inner detail for spin
-        ctx.fillStyle = '#00f2ff';
-        ctx.fillRect(-2, -BALL_RADIUS, 4, BALL_RADIUS*2);
-        ctx.restore();
-      });
-
-      // Table Borders
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#222'; ctx.lineWidth = 20;
-      ctx.strokeRect(10, 10, WIDTH-20, HEIGHT-20);
-      ctx.beginPath(); ctx.moveTo(435, 200); ctx.lineTo(435, HEIGHT); ctx.stroke();
-
       ctx.restore();
-
-      // CRT Scanlines
-      ctx.fillStyle = 'rgba(0,0,0,0.1)';
-      for(let i=0; i<HEIGHT; i+=4) ctx.fillRect(0, i, WIDTH, 1);
-
       raf = requestAnimationFrame(render);
     };
-    raf = requestAnimationFrame(render);
+
+    render();
     return () => cancelAnimationFrame(raf);
-  }, [gameState, physicsStep, balls]);
+  }, [gameState, updatePhysics]);
+
+  useEffect(() => {
+    const handleDown = (e) => {
+      if (e.code === 'KeyZ' || e.code === 'ArrowLeft') input.current.left = true;
+      if (e.code === 'KeyM' || e.code === 'ArrowRight') input.current.right = true;
+      if (e.code === 'Space') input.current.space = true;
+    };
+    const handleUp = (e) => {
+      if (e.code === 'KeyZ' || e.code === 'ArrowLeft') input.current.left = false;
+      if (e.code === 'KeyM' || e.code === 'ArrowRight') input.current.right = false;
+      if (e.code === 'Space') {
+        input.current.space = false;
+        if (!ball.current.active && gameState === 'PLAYING') {
+          ball.current.active = true;
+          ball.current.vy = -18 - (charge / 4);
+          ball.current.vx = -1.2;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleDown);
+    window.addEventListener('keyup', handleUp);
+    return () => { 
+        window.removeEventListener('keydown', handleDown); 
+        window.removeEventListener('keyup', handleUp); 
+    };
+  }, [charge, gameState]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#020205] text-white p-4 font-sans select-none overflow-hidden">
-      <div className="w-[480px] flex justify-between items-end mb-6">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#010103] text-white font-mono p-4 select-none">
+      <div className="mb-4 w-[480px] flex justify-between items-end border-b border-white/5 pb-2 px-4">
         <div>
-          <p className="text-[10px] text-cyan-500 font-bold tracking-[0.3em] uppercase mb-1">Neural Interface Active</p>
-          <h1 className="text-6xl font-black italic tracking-tighter text-white">
-            {score.toLocaleString()}
-          </h1>
+          <div className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest opacity-70">Data_Score</div>
+          <div className="text-4xl font-black">{score.toLocaleString()}</div>
         </div>
         <div className="text-right">
-          <div className="text-4xl font-black italic text-rose-500 animate-pulse">
-            {combo > 1 ? `x${combo}` : ''}
-          </div>
-          <div className="flex gap-2 mt-2">
+          <div className="text-[10px] text-pink-500 font-bold uppercase tracking-widest opacity-70">Core_Integrity</div>
+          <div className="flex gap-1.5 justify-end mt-1">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className={`h-1.5 w-8 rounded-full ${i < lives ? 'bg-cyan-400 shadow-[0_0_10px_#22d3ee]' : 'bg-zinc-800'}`} />
+              <div key={i} className={`w-3.5 h-3.5 rounded-full border border-pink-500/30 ${i < lives ? 'bg-pink-500 shadow-[0_0_12px_#ec4899]' : 'bg-transparent'}`} />
             ))}
           </div>
         </div>
       </div>
 
-      <div className="relative border-[1px] border-zinc-800 rounded-3xl shadow-[0_0_100px_rgba(0,242,255,0.1)] overflow-hidden">
-        <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="bg-black block" />
+      <div className="relative border-[8px] border-[#1a1a35] rounded-[40px] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)] bg-black">
+        <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} />
         
-        {/* UI Overlays */}
-        {charge > 0 && (
-          <div className="absolute bottom-10 right-4 w-2 h-40 bg-zinc-900 rounded-full flex flex-col-reverse overflow-hidden border border-zinc-700">
-            <div className="bg-cyan-400 w-full transition-all duration-75" style={{ height: `${(charge/70)*100}%` }} />
-          </div>
-        )}
+        <div className="absolute right-4 bottom-24 w-2 h-40 bg-white/5 rounded-full overflow-hidden border border-white/10">
+          <div className="w-full bg-cyan-400 absolute bottom-0 transition-all duration-75 shadow-[0_0_15px_#00f2ff]" style={{ height: `${charge}%` }} />
+        </div>
 
         {gameState === 'MENU' && (
-          <div className="absolute inset-0 bg-[#000000ee] flex flex-col items-center justify-center text-center p-12">
-            <div className="mb-8 space-y-[-15px]">
-              <h2 className="text-8xl font-black italic tracking-tighter text-white">NEON</h2>
-              <h2 className="text-6xl font-black italic tracking-widest text-cyan-500">PULSE</h2>
-            </div>
+          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center text-center p-10 z-10">
+            <h1 className="text-7xl font-black italic mb-2 tracking-tighter">NEON<span className="text-cyan-400">FLUX</span></h1>
+            <p className="text-white/30 text-[9px] mb-12 tracking-[0.5em]">SYSTEMS_READY_V2.0</p>
             <button 
-              onClick={() => { setScore(0); setLives(3); setGameState('PLAYING'); }}
-              className="group relative px-16 py-6 bg-white text-black font-black text-2xl rounded-xl hover:scale-110 transition-transform active:scale-95"
+              onClick={() => { setScore(0); setLives(3); setGameState('PLAYING'); resetBall(); }}
+              className="group relative px-12 py-5 bg-transparent border border-cyan-400 text-cyan-400 font-bold uppercase transition-all hover:bg-cyan-400 hover:text-black active:scale-95"
             >
-              START MISSION
+              <span className="relative z-10">Ignite Engine</span>
             </button>
-            <div className="mt-12 grid grid-cols-2 gap-8 text-[10px] font-bold text-zinc-500 tracking-widest">
-              <div>[Z] LEFT FLIPPER</div>
-              <div>[M] RIGHT FLIPPER</div>
-              <div className="col-span-2">[SPACE] PLUNGER CHARGE</div>
+            <div className="mt-12 text-[9px] text-white/20 uppercase tracking-[0.2em] leading-relaxed">
+              [Z] Left Flipper • [M] Right Flipper<br/>Hold [Space] To Launch
             </div>
           </div>
         )}
 
         {gameState === 'GAMEOVER' && (
-          <div className="absolute inset-0 bg-rose-950/90 backdrop-blur-md flex flex-col items-center justify-center p-12">
-            <h3 className="text-7xl font-black italic text-white mb-4">HALT</h3>
-            <p className="text-rose-400 font-bold tracking-[0.5em] mb-12">CORE DE-STABILIZED</p>
-            <div className="text-4xl font-black mb-12 text-white">{score.toLocaleString()}</div>
-            <button 
-              onClick={() => setGameState('MENU')}
-              className="w-full py-6 bg-white text-black font-black rounded-xl hover:bg-rose-500 hover:text-white transition-colors"
-            >
-              RE-INITIALIZE
-            </button>
+          <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-10 text-center z-10">
+            <div className="text-pink-500 text-xs font-bold tracking-[0.4em] mb-4 uppercase opacity-50">Session Terminated</div>
+            <h2 className="text-5xl font-black italic mb-8">CONNECTION_LOST</h2>
+            <div className="text-cyan-400 text-3xl font-black mb-12 tracking-wider">{score.toLocaleString()}</div>
+            <button onClick={() => setGameState('MENU')} className="px-10 py-4 border border-white/20 text-white/80 font-bold uppercase hover:bg-white hover:text-black transition-all text-sm">Reconnect</button>
           </div>
         )}
-      </div>
-
-      <div className="mt-8 text-zinc-800 text-[9px] font-black uppercase tracking-[0.4em]">
-        Elite Physical Engine • Multi-Ball Enabled • No Cloud Latency
       </div>
     </div>
   );
