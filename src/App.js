@@ -1,402 +1,276 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-const WIDTH = 480;
-const HEIGHT = 800;
-const BALL_RADIUS = 9;
-const SUB_STEPS = 8;
-const GRAVITY = 0.35; 
-const FRICTION = 0.995;
-const MAX_SPEED = 28;
-const BOUNCE = 0.5; 
-const FLIPPER_BOUNCE = 0.4;
+// Configuration
+const WIDTH = 500;
+const HEIGHT = 850;
+const API_KEY = ""; // Environment provides this
 
 const App = () => {
-  const canvasRef = useRef(null);
+  // --- STATE ---
   const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
-  const [gameState, setGameState] = useState('MENU');
-  const [charge, setCharge] = useState(0);
-
-  const ball = useRef({ 
-    x: 450, 
-    y: 750, 
-    vx: 0, 
-    vy: 0, 
-    active: false, 
-    trail: [] 
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [directive, setDirective] = useState("");
+  const [logs, setLogs] = useState(["SYSTEM_READY", "AWAITING_NEURAL_INPUT"]);
+  const [realityShift, setRealityShift] = useState({ 
+    gravity: 0.4, 
+    glitch: 0, 
+    color: '#00f2ff',
+    speed: 1.0 
   });
 
-  const particles = useRef([]);
-  const shake = useRef(0);
-  const input = useRef({ left: false, right: false, space: false });
-
-  const flippers = useRef({
-    left: { x: 135, y: 720, angle: 0.5, target: 0.5, base: 0.5, up: -0.6, length: 90, width: 16, vel: 0 },
-    right: { x: 345, y: 720, angle: 2.64, target: 2.64, base: 2.64, up: 3.74, length: 90, width: 16, vel: 0 }
+  const canvasRef = useRef(null);
+  const engine = useRef({
+    ball: { x: 478, y: 800, vx: 0, vy: 0, active: false, radius: 10, history: [] },
+    bumpers: [
+      { x: 250, y: 250, r: 50, energy: 0, id: 'core' },
+      { x: 120, y: 400, r: 30, energy: 0, id: 'node_a' },
+      { x: 380, y: 400, r: 30, energy: 0, id: 'node_b' }
+    ],
+    flippers: {
+      left: { x: 160, y: 810, angle: 0.5, target: 0.5 },
+      right: { x: 340, y: 810, angle: 2.64, target: 2.64 }
+    }
   });
 
-  const bumpers = useRef([
-    { x: 240, y: 180, r: 35, color: '#00f2ff', pulse: 0, score: 500 },
-    { x: 130, y: 320, r: 30, color: '#ff00ff', pulse: 0, score: 250 },
-    { x: 350, y: 320, r: 30, color: '#ff00ff', pulse: 0, score: 250 },
-    { x: 240, y: 460, r: 25, color: '#00ff41', pulse: 0, score: 100 },
-  ]);
+  const keys = useRef({});
 
-  const walls = useRef([
-    { x1: 15, y1: 800, x2: 15, y2: 200 }, 
-    { x1: 465, y1: 800, x2: 465, y2: 200 }, 
-    { x1: 440, y1: 800, x2: 440, y2: 230 }, 
-    { x1: 15, y1: 580, x2: 100, y2: 660 }, 
-    { x1: 440, y1: 580, x2: 380, y2: 660 }, 
-    { x1: 135, y1: 720, x2: 15, y2: 640 }, 
-    { x1: 345, y1: 720, x2: 440, y2: 640 },
-  ]);
+  // --- NEURAL INTERFACE (The AI Reality Bender) ---
+  const manifestReality = async () => {
+    if (!directive || isProcessing) return;
+    setIsProcessing(true);
+    const currentDirective = directive;
+    setDirective("");
+    
+    setLogs(prev => [`TRANSFIGURE: "${currentDirective}"`, ...prev].slice(0, 5));
 
-  const resetBall = useCallback(() => {
-    ball.current = {
-      x: 452,
-      y: 750,
-      vx: 0,
-      vy: 0,
-      active: false,
-      trail: []
-    };
-    setCharge(0);
-  }, []);
-
-  const spawnParticles = (x, y, color) => {
-    for (let i = 0; i < 6; i++) {
-      particles.current.push({
-        x, y,
-        vx: (Math.random() - 0.5) * 10,
-        vy: (Math.random() - 0.5) * 10,
-        life: 1,
-        color
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `The user wants to change a pinball game's physics/visuals with this prompt: "${currentDirective}". 
+          Respond ONLY with a JSON object containing: 
+          { "gravity": float (0.1 to 2.0), "glitch": float (0 to 1), "color": hex_string, "speed": float (0.5 to 3.0), "log": short_string_system_message }` }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
       });
+
+      const data = await response.json();
+      const config = JSON.parse(data.candidates[0].content.parts[0].text);
+      
+      setRealityShift(config);
+      setLogs(prev => [config.log.toUpperCase(), ...prev].slice(0, 5));
+    } catch (err) {
+      setLogs(prev => ["NEURAL_LINK_ERROR", ...prev]);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const getClosestPoint = (px, py, x1, y1, x2, y2) => {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const l2 = dx * dx + dy * dy;
-    let t = ((px - x1) * dx + (py - y1) * dy) / l2;
-    t = Math.max(0, Math.min(1, t));
-    return { x: x1 + t * dx, y: y1 + t * dy, t };
-  };
+  // --- PHYSICS ENGINE ---
+  const update = useCallback(() => {
+    const e = engine.current;
+    const { gravity, glitch, speed } = realityShift;
 
-  const updatePhysics = useCallback(() => {
-    const b = ball.current;
-    const flp = flippers.current;
+    // Flipper movement
+    e.flippers.left.target = keys.current['z'] ? -0.6 : 0.5;
+    e.flippers.right.target = keys.current['/'] ? 3.7 : 2.64;
+    e.flippers.left.angle += (e.flippers.left.target - e.flippers.left.angle) * 0.4 * speed;
+    e.flippers.right.angle += (e.flippers.right.target - e.flippers.right.angle) * 0.4 * speed;
 
-    // Update Flipper Rotation
-    [flp.left, flp.right].forEach((f, i) => {
-      const isPressed = i === 0 ? input.current.left : input.current.right;
-      f.target = isPressed ? f.up : f.base;
-      const oldAngle = f.angle;
-      const lerpSpeed = isPressed ? 0.7 : 0.25; 
-      f.angle += (f.target - f.angle) * lerpSpeed;
-      f.vel = (f.angle - oldAngle); // Store angular velocity
-    });
-
-    if (!b.active && gameState !== 'PLAYING') return;
-    if (!b.active) return;
-
-    for (let s = 0; s < SUB_STEPS; s++) {
-      b.vy += GRAVITY / SUB_STEPS;
-      b.vx *= Math.pow(FRICTION, 1/SUB_STEPS);
-      b.vy *= Math.pow(FRICTION, 1/SUB_STEPS);
-      
-      b.x += b.vx / SUB_STEPS;
-      b.y += b.vy / SUB_STEPS;
-
-      // Speed capping
-      const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      if (speed > MAX_SPEED) {
-        b.vx = (b.vx / speed) * MAX_SPEED;
-        b.vy = (b.vy / speed) * MAX_SPEED;
-      }
-
-      // Upper Dome
-      const distToDome = Math.sqrt((b.x - 240)**2 + (b.y - 200)**2);
-      if (distToDome > 225 && b.y < 200) {
-        const nx = (240 - b.x) / distToDome;
-        const ny = (200 - b.y) / distToDome;
-        const dot = b.vx * nx + b.vy * ny;
-        if (dot < 0) {
-            b.vx -= (1 + BOUNCE) * dot * nx;
-            b.vy -= (1 + BOUNCE) * dot * ny;
-        }
-        b.x = 240 - nx * 224;
-        b.y = 200 - ny * 224;
-      }
+    if (e.ball.active) {
+      e.ball.vy += gravity * speed;
+      e.ball.x += e.ball.vx * speed;
+      e.ball.y += e.ball.vy * speed;
 
       // Walls
-      walls.current.forEach(w => {
-        const cp = getClosestPoint(b.x, b.y, w.x1, w.y1, w.x2, w.y2);
-        const dx = b.x - cp.x;
-        const dy = b.y - cp.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < BALL_RADIUS) {
-          const nx = dx / dist;
-          const ny = dy / dist;
-          const dot = b.vx * nx + b.vy * ny;
-          if (dot < 0) {
-            b.vx -= (1 + BOUNCE) * dot * nx;
-            b.vy -= (1 + BOUNCE) * dot * ny;
-          }
-          b.x = cp.x + nx * BALL_RADIUS;
-          b.y = cp.y + ny * BALL_RADIUS;
-        }
-      });
+      if (e.ball.x < 15 || e.ball.x > WIDTH - 15) e.ball.vx *= -0.8;
+      if (e.ball.y < 15) e.ball.vy *= -0.8;
 
       // Bumpers
-      bumpers.current.forEach(p => {
-        const dx = b.x - p.x;
-        const dy = b.y - p.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < p.r + BALL_RADIUS) {
-          const nx = dx / dist;
-          const ny = dy / dist;
-          const dot = b.vx * nx + b.vy * ny;
-          const kick = 10;
-          b.vx = (b.vx - 1.8 * dot * nx) + nx * kick;
-          b.vy = (b.vy - 1.8 * dot * ny) + ny * kick;
-          b.x = p.x + nx * (p.r + BALL_RADIUS + 1);
-          p.pulse = 1;
-          setScore(s => s + p.score);
-          spawnParticles(b.x, b.y, p.color);
-          shake.current = 8;
+      e.bumpers.forEach(b => {
+        const dx = e.ball.x - b.x, dy = e.ball.y - b.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < b.r + e.ball.radius) {
+          const nx = dx/dist, ny = dy/dist;
+          e.ball.vx = nx * 12 * speed;
+          e.ball.vy = ny * 12 * speed;
+          b.energy = 1.0;
+          setScore(s => s + 100);
+        }
+        b.energy *= 0.9;
+      });
+
+      // Flippers Collision (Simplified)
+      [e.flippers.left, e.flippers.right].forEach((f, i) => {
+        const dx = e.ball.x - f.x, dy = e.ball.y - f.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 60 && e.ball.y > 780) {
+            const power = (keys.current[i === 0 ? 'z' : '/']) ? 15 : 5;
+            e.ball.vy = -power * speed;
+            e.ball.vx = (i === 0 ? 5 : -5) * speed;
         }
       });
 
-      // Flipper Collision - Unified Unified Logic
-      [flp.left, flp.right].forEach((f, i) => {
-        // Calculate current tip position based on true angle
-        const tipX = f.x + Math.cos(f.angle) * f.length;
-        const tipY = f.y + Math.sin(f.angle) * f.length;
-        
-        const cp = getClosestPoint(b.x, b.y, f.x, f.y, tipX, tipY);
-        const dx = b.x - cp.x;
-        const dy = b.y - cp.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const radiusTotal = BALL_RADIUS + f.width / 2;
-
-        if (dist < radiusTotal) {
-          const nx = dx / dist;
-          const ny = dy / dist;
-
-          // Velocity of flipper at the impact point
-          const distFromPivot = cp.t * f.length;
-          const fVelX = -Math.sin(f.angle) * f.vel * distFromPivot * SUB_STEPS;
-          const fVelY = Math.cos(f.angle) * f.vel * distFromPivot * SUB_STEPS;
-
-          const relVX = b.vx - fVelX;
-          const relVY = b.vy - fVelY;
-          const dot = relVX * nx + relVY * ny;
-
-          if (dot < 0) {
-            // Check if moving towards the flipping direction
-            const isFlipping = i === 0 ? (f.vel < 0) : (f.vel > 0);
-            const bounce = isFlipping ? 1.6 : FLIPPER_BOUNCE;
-            
-            b.vx = (b.vx - (1 + bounce) * dot * nx) + fVelX * 0.3;
-            b.vy = (b.vy - (1 + bounce) * dot * ny) + fVelY * 0.3;
-            
-            if (isFlipping) {
-                shake.current = 6;
-                spawnParticles(b.x, b.y, '#00f2ff');
-            }
-          }
-
-          // Force ball out of flipper geometry
-          const overlap = radiusTotal - dist;
-          b.x += nx * overlap;
-          b.y += ny * overlap;
-        }
-      });
-    }
-
-    if (b.y > HEIGHT + 40) {
-      setLives(l => {
-        if (l <= 1) { setGameState('GAMEOVER'); return 0; }
-        resetBall();
-        return l - 1;
-      });
-    }
-
-    if (b.active) {
-      b.trail.unshift({ x: b.x, y: b.y });
-      if (b.trail.length > 12) b.trail.pop();
-    } else {
-      b.trail = [];
-    }
-    
-    particles.current.forEach(p => { p.x += p.vx; p.y += p.vy; p.life *= 0.92; });
-    particles.current = particles.current.filter(p => p.life > 0.05);
-    bumpers.current.forEach(p => p.pulse *= 0.85);
-    shake.current *= 0.8;
-  }, [gameState, resetBall]);
-
-  useEffect(() => {
-    const ctx = canvasRef.current.getContext('2d');
-    let raf;
-
-    const render = () => {
-      if (gameState === 'PLAYING') {
-        updatePhysics();
-        if (input.current.space && !ball.current.active) {
-          setCharge(c => Math.min(c + 3, 100));
-        }
+      // Glitch Effect: Random jitter
+      if (glitch > 0.5) {
+        e.ball.x += (Math.random() - 0.5) * glitch * 10;
+        e.ball.y += (Math.random() - 0.5) * glitch * 10;
       }
 
-      ctx.fillStyle = '#050510';
+      // Trail
+      e.ball.history.push({x: e.ball.x, y: e.ball.y});
+      if (e.ball.history.length > 15) e.ball.history.shift();
+
+      // Out
+      if (e.ball.y > HEIGHT) {
+        e.ball.active = false;
+        e.ball.x = 478; e.ball.y = 800;
+        e.ball.vx = 0; e.ball.vy = 0;
+      }
+    } else if (keys.current[' ']) {
+      e.ball.active = true;
+      e.ball.vy = -20 * speed;
+    }
+  }, [realityShift]);
+
+  // --- RENDERER ---
+  useEffect(() => {
+    const ctx = canvasRef.current.getContext('2d');
+    let frame;
+    const render = () => {
+      update();
+      ctx.fillStyle = '#050508';
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      ctx.save();
-      if (shake.current > 0.5) ctx.translate((Math.random()-0.5)*shake.current, (Math.random()-0.5)*shake.current);
+      // Grid
+      ctx.strokeStyle = '#111122';
+      ctx.lineWidth = 1;
+      for(let i=0; i<WIDTH; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, HEIGHT); ctx.stroke(); }
 
-      walls.current.forEach(w => {
-        ctx.strokeStyle = '#2a2a4a';
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
+      // Draw Bumpers
+      engine.current.bumpers.forEach(b => {
+        const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r + (b.energy * 20));
+        grad.addColorStop(0, realityShift.color);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = 0.3 + b.energy;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r + (b.energy * 10), 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = realityShift.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.stroke();
       });
 
-      ctx.beginPath(); 
-      ctx.strokeStyle = '#2a2a4a';
-      ctx.lineWidth = 4;
-      ctx.arc(240, 200, 225, Math.PI, 0); 
-      ctx.stroke();
-
-      bumpers.current.forEach(p => {
-        ctx.shadowBlur = 10 + p.pulse * 25;
-        ctx.shadowColor = p.color;
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 3 + p.pulse * 6;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = `${p.color}33`;
-        ctx.fill();
+      // Draw Ball Trail
+      ctx.globalAlpha = 0.5;
+      engine.current.ball.history.forEach((h, i) => {
+        ctx.fillStyle = realityShift.color;
+        ctx.beginPath(); ctx.arc(h.x, h.y, (i/15) * engine.current.ball.radius, 0, Math.PI*2); ctx.fill();
       });
+
+      // Draw Ball
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = realityShift.color;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(engine.current.ball.x, engine.current.ball.y, engine.current.ball.radius, 0, Math.PI*2); ctx.fill();
       ctx.shadowBlur = 0;
 
-      [flippers.current.left, flippers.current.right].forEach((f) => {
+      // Draw Flippers
+      ctx.fillStyle = '#fff';
+      [engine.current.flippers.left, engine.current.flippers.right].forEach(f => {
         ctx.save();
         ctx.translate(f.x, f.y);
         ctx.rotate(f.angle);
-        ctx.fillStyle = '#1a1a35';
-        ctx.strokeStyle = '#00f2ff';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.roundRect(0, -f.width/2, f.length, f.width, f.width/2);
-        ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#00f2ff';
-        ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(0, -5, 80, 10, 5); ctx.fill();
         ctx.restore();
       });
 
-      const b = ball.current;
-      if (b.active || (!b.active && gameState === 'PLAYING')) {
-        b.trail.forEach((t, i) => {
-          ctx.fillStyle = `rgba(0, 242, 255, ${0.4 - i * 0.03})`;
-          ctx.beginPath(); ctx.arc(t.x, t.y, BALL_RADIUS * (1 - i * 0.07), 0, Math.PI * 2); ctx.fill();
-        });
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#00f2ff';
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(b.x, b.y, BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
-      }
-
-      particles.current.forEach(p => {
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.life;
-        ctx.fillRect(p.x, p.y, 2, 2);
-      });
-      ctx.globalAlpha = 1;
-
-      ctx.restore();
-      raf = requestAnimationFrame(render);
+      frame = requestAnimationFrame(render);
     };
-
     render();
-    return () => cancelAnimationFrame(raf);
-  }, [gameState, updatePhysics]);
+    return () => cancelAnimationFrame(frame);
+  }, [update, realityShift]);
 
+  // Input listeners
   useEffect(() => {
-    const handleDown = (e) => {
-      if (e.code === 'KeyZ' || e.code === 'ArrowLeft') input.current.left = true;
-      if (e.code === 'KeyM' || e.code === 'ArrowRight') input.current.right = true;
-      if (e.code === 'Space') input.current.space = true;
-    };
-    const handleUp = (e) => {
-      if (e.code === 'KeyZ' || e.code === 'ArrowLeft') input.current.left = false;
-      if (e.code === 'KeyM' || e.code === 'ArrowRight') input.current.right = false;
-      if (e.code === 'Space') {
-        input.current.space = false;
-        if (!ball.current.active && gameState === 'PLAYING') {
-          ball.current.active = true;
-          ball.current.vy = -18 - (charge / 4);
-          ball.current.vx = -1.2;
-        }
-      }
-    };
-    window.addEventListener('keydown', handleDown);
-    window.addEventListener('keyup', handleUp);
-    return () => { 
-        window.removeEventListener('keydown', handleDown); 
-        window.removeEventListener('keyup', handleUp); 
-    };
-  }, [charge, gameState]);
+    const down = (e) => keys.current[e.key.toLowerCase()] = true;
+    const up = (e) => keys.current[e.key.toLowerCase()] = false;
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+  }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#010103] text-white font-mono p-4 select-none">
-      <div className="mb-4 w-[480px] flex justify-between items-end border-b border-white/5 pb-2 px-4">
-        <div>
-          <div className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest opacity-70">Data_Score</div>
-          <div className="text-4xl font-black">{score.toLocaleString()}</div>
-        </div>
-        <div className="text-right">
-          <div className="text-[10px] text-pink-500 font-bold uppercase tracking-widest opacity-70">Core_Integrity</div>
-          <div className="flex gap-1.5 justify-end mt-1">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className={`w-3.5 h-3.5 rounded-full border border-pink-500/30 ${i < lives ? 'bg-pink-500 shadow-[0_0_12px_#ec4899]' : 'bg-transparent'}`} />
-            ))}
+    <div className="flex h-screen bg-[#020205] text-white font-mono overflow-hidden">
+      {/* Neural Command Terminal */}
+      <div className="w-96 border-r border-white/10 p-8 flex flex-col justify-between bg-black/40">
+        <div className="space-y-8">
+          <div>
+            <h1 className="text-2xl font-black tracking-tighter text-white">SINGULARITY_OS</h1>
+            <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-widest">Reality Interface v4.0</p>
           </div>
+
+          <div className="space-y-4">
+            <div className="text-[10px] text-zinc-400 font-bold uppercase">Neural Directive</div>
+            <textarea 
+              value={directive}
+              onChange={(e) => setDirective(e.target.value)}
+              placeholder="e.g., 'Make it underwater and slow', 'Intense solar flare', 'Vaporwave aesthetics'"
+              className="w-full h-32 bg-white/5 border border-white/10 rounded-lg p-3 text-sm focus:border-cyan-500 outline-none transition-all resize-none"
+            />
+            <button 
+              onClick={manifestReality}
+              disabled={isProcessing}
+              className={`w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                isProcessing ? 'bg-zinc-800 text-zinc-500' : 'bg-white text-black hover:bg-cyan-400'
+              }`}
+            >
+              {isProcessing ? 'MANIFESTING...' : 'EXECUTE DIRECTIVE'}
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[10px] text-zinc-400 font-bold uppercase">Reality Stream</div>
+            <div className="space-y-1">
+              {logs.map((log, i) => (
+                <div key={i} className="text-[10px] text-zinc-500 border-l border-white/10 pl-2 py-1">
+                  <span className="text-cyan-500 mr-2">»</span> {log}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 bg-white/5 rounded-lg">
+           <div className="flex justify-between text-[10px] text-zinc-500 mb-2">
+             <span>GRAVITY</span>
+             <span>{(realityShift.gravity * 100).toFixed(0)}%</span>
+           </div>
+           <div className="h-1 bg-white/10 w-full overflow-hidden">
+             <div className="h-full bg-cyan-500 transition-all duration-1000" style={{ width: `${(realityShift.gravity/2)*100}%` }} />
+           </div>
         </div>
       </div>
 
-      <div className="relative border-[8px] border-[#1a1a35] rounded-[40px] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)] bg-black">
-        <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} />
-        
-        <div className="absolute right-4 bottom-24 w-2 h-40 bg-white/5 rounded-full overflow-hidden border border-white/10">
-          <div className="w-full bg-cyan-400 absolute bottom-0 transition-all duration-75 shadow-[0_0_15px_#00f2ff]" style={{ height: `${charge}%` }} />
+      {/* The Simulation */}
+      <div className="flex-1 flex flex-col items-center justify-center relative p-12">
+        <div className="absolute top-12 right-12 text-right">
+           <div className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Accumulated Data</div>
+           <div className="text-6xl font-black italic tracking-tighter text-white">{score.toLocaleString()}</div>
         </div>
 
-        {gameState === 'MENU' && (
-          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center text-center p-10 z-10">
-            <h1 className="text-7xl font-black italic mb-2 tracking-tighter">NEON<span className="text-cyan-400">FLUX</span></h1>
-            <p className="text-white/30 text-[9px] mb-12 tracking-[0.5em]">SYSTEMS_READY_V2.0</p>
-            <button 
-              onClick={() => { setScore(0); setLives(3); setGameState('PLAYING'); resetBall(); }}
-              className="group relative px-12 py-5 bg-transparent border border-cyan-400 text-cyan-400 font-bold uppercase transition-all hover:bg-cyan-400 hover:text-black active:scale-95"
-            >
-              <span className="relative z-10">Ignite Engine</span>
-            </button>
-            <div className="mt-12 text-[9px] text-white/20 uppercase tracking-[0.2em] leading-relaxed">
-              [Z] Left Flipper • [M] Right Flipper<br/>Hold [Space] To Launch
-            </div>
+        <div className="relative">
+          <div className="absolute -inset-10 rounded-full blur-3xl opacity-20" style={{ backgroundColor: realityShift.color }} />
+          <div className="relative border-[1px] border-white/20 rounded-[40px] overflow-hidden shadow-2xl">
+            <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="max-h-[85vh] w-auto" />
           </div>
-        )}
+        </div>
 
-        {gameState === 'GAMEOVER' && (
-          <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-10 text-center z-10">
-            <div className="text-pink-500 text-xs font-bold tracking-[0.4em] mb-4 uppercase opacity-50">Session Terminated</div>
-            <h2 className="text-5xl font-black italic mb-8">CONNECTION_LOST</h2>
-            <div className="text-cyan-400 text-3xl font-black mb-12 tracking-wider">{score.toLocaleString()}</div>
-            <button onClick={() => setGameState('MENU')} className="px-10 py-4 border border-white/20 text-white/80 font-bold uppercase hover:bg-white hover:text-black transition-all text-sm">Reconnect</button>
-          </div>
-        )}
+        <div className="mt-8 flex gap-12 text-[9px] text-zinc-600 font-black uppercase tracking-[0.3em]">
+          <span>Z / / : PULSE</span>
+          <span>SPACE : INITIALIZE</span>
+          <span>{realityShift.log?.toUpperCase() || 'STABLE_ORBIT'}</span>
+        </div>
       </div>
     </div>
   );
