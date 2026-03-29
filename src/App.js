@@ -1,453 +1,319 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import * as THREE from 'three';
-import { Cpu, Zap, Activity, Shield } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { create } from 'zustand';
+import Matter from 'matter-js';
+import { Trophy, RefreshCw, Play, Zap, Heart, Award } from 'lucide-react';
 
-const GRAVITY = -0.022;
-const FRICTION = 0.992;
-const BALL_RADIUS = 0.38;
-const TABLE_WIDTH = 13;
-const TABLE_HEIGHT = 24;
-
-class Spark {
-  constructor(pos, color) {
-    this.pos = pos.clone();
-    this.vel = new THREE.Vector3((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, Math.random() * 0.2);
-    this.life = 1.0;
-    this.decay = 0.03 + Math.random() * 0.04;
-    const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
-    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), material);
-    this.mesh.position.copy(this.pos);
+/**
+ * GAME STATE MANAGEMENT
+ * Using Zustand to decouple game logic from the React render cycle,
+ * preventing stale closures in Matter.js event listeners.
+ */
+const useGameStore = create((set, get) => ({
+  score: 0,
+  balls: 3,
+  gameState: 'START', // 'START', 'PLAYING', 'GAMEOVER'
+  highScore: parseInt(localStorage.getItem('pinball-highscore')) || 0,
+  
+  addScore: (points) => {
+    const newScore = get().score + points;
+    set({ score: newScore });
+    if (newScore > get().highScore) {
+      set({ highScore: newScore });
+      localStorage.setItem('pinball-highscore', newScore.toString());
+    }
+  },
+  
+  loseBall: () => {
+    const remaining = get().balls - 1;
+    if (remaining <= 0) {
+      set({ balls: 0, gameState: 'GAMEOVER' });
+    } else {
+      set({ balls: remaining });
+    }
+  },
+  
+  startGame: () => {
+    set({ gameState: 'PLAYING', score: 0, balls: 3 });
   }
-  update() {
-    this.pos.add(this.vel);
-    this.life -= this.decay;
-    this.mesh.position.copy(this.pos);
-    this.mesh.material.opacity = this.life;
-    this.mesh.scale.setScalar(Math.max(0.01, this.life));
-  }
-}
+}));
 
 const App = () => {
-  const mountRef = useRef(null);
-  const [gameState, setGameState] = useState('START'); 
-  const [score, setScore] = useState(0);
-  const [ballsLeft, setBallsLeft] = useState(3);
-  const [multiplier, setMultiplier] = useState(1);
-  const [syncProgress, setSyncProgress] = useState(0);
+  const sceneRef = useRef(null);
+  const engineRef = useRef(Matter.Engine.create());
+  const runnerRef = useRef(null);
+  const renderRef = useRef(null);
+  
+  // Local refs for physics objects to avoid React state lag
+  const leftFlipperRef = useRef(null);
+  const rightFlipperRef = useRef(null);
 
-  const engine = useRef({
-    scene: null, camera: null, renderer: null,
-    balls: [], particles: [],
-    flippers: {
-      left: { pivot: new THREE.Vector3(-3.2, -10, 0.5), angle: -0.4, target: -0.4, length: 3, mesh: null, active: false },
-      right: { pivot: new THREE.Vector3(3.2, -10, 0.5), angle: 0.4, target: 0.4, length: 3, mesh: null, active: false }
-    },
-    bumpers: [],
-    plunger: { mesh: null, basePos: -11, power: 0, isCharging: false },
-    shake: 0,
-    multiballProgress: 0,
-    mainLight: null,
-    clock: new THREE.Clock()
-  });
+  const { score, balls, gameState, highScore, addScore, loseBall, startGame } = useGameStore();
 
-  const spawnParticles = (pos, color, count = 10) => {
-    for (let i = 0; i < count; i++) {
-      const s = new Spark(pos, color);
-      engine.current.particles.push(s);
-      engine.current.scene.add(s.mesh);
-    }
-  };
+  const WIDTH = 400;
+  const HEIGHT = 650;
 
-  const createBall = useCallback((x, y, vx = 0, vy = 0) => {
-    // High Visibility Gold Chrome Ball
-    const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(BALL_RADIUS, 32, 32),
-      new THREE.MeshStandardMaterial({ 
-        color: 0xffcc00, 
-        metalness: 1.0, 
-        roughness: 0.05,
-        emissive: 0xaa8800,
-        emissiveIntensity: 0.5
-      })
-    );
-    const light = new THREE.PointLight(0xffffff, 1.2, 5);
-    mesh.add(light);
-    mesh.position.set(x, y, 0.5);
-    engine.current.scene.add(mesh);
-    const ballObj = { mesh, pos: new THREE.Vector3(x, y, 0.5), vel: new THREE.Vector3(vx, vy, 0), active: true };
-    engine.current.balls.push(ballObj);
-    return ballObj;
-  }, []);
+  const initPhysics = useCallback(() => {
+    const engine = engineRef.current;
+    const world = engine.world;
+    world.gravity.y = 1.5; // High gravity for fast-paced action
 
-  const initScene = useCallback(() => {
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x010103);
-    engine.current.scene = scene;
+    const render = Matter.Render.create({
+      element: sceneRef.current,
+      engine: engine,
+      options: {
+        width: WIDTH,
+        height: HEIGHT,
+        wireframes: false,
+        background: '#020617', // Slate 950
+        pixelRatio: window.devicePixelRatio
+      }
+    });
+    renderRef.current = render;
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, -25, 28);
-    camera.lookAt(0, -2, 0);
-    engine.current.camera = camera;
+    // --- Boundaries ---
+    const wallProps = { isStatic: true, friction: 0, restitution: 0.5, render: { fillStyle: '#1e293b' } };
+    const walls = [
+      Matter.Bodies.rectangle(WIDTH / 2, -10, WIDTH, 40, wallProps), // Top
+      Matter.Bodies.rectangle(-10, HEIGHT / 2, 40, HEIGHT, wallProps), // Left
+      Matter.Bodies.rectangle(WIDTH + 10, HEIGHT / 2, 40, HEIGHT, wallProps), // Right
+      // Plunger Lane Wall
+      Matter.Bodies.rectangle(WIDTH - 50, HEIGHT - 150, 10, 350, wallProps)
+    ];
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    mountRef.current.appendChild(renderer.domElement);
-    engine.current.renderer = renderer;
+    // Out of bounds sensor
+    const voidSensor = Matter.Bodies.rectangle(WIDTH / 2, HEIGHT + 50, WIDTH, 60, {
+      isStatic: true, isSensor: true, label: 'VOID'
+    });
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.2);
-    scene.add(ambient);
+    // --- Bumpers ---
+    const createBumper = (x, y, radius, pts) => Matter.Bodies.circle(x, y, radius, {
+      isStatic: true,
+      label: 'BUMPER',
+      plugin: { points: pts },
+      restitution: 1.6,
+      render: { fillStyle: '#e11d48', strokeStyle: '#fb7185', lineWidth: 4 }
+    });
 
-    const mainLight = new THREE.PointLight(0x00ffff, 3, 100);
-    mainLight.position.set(0, 5, 20);
-    scene.add(mainLight);
-    engine.current.mainLight = mainLight;
+    const bumpers = [
+      createBumper(120, 180, 25, 100),
+      createBumper(280, 180, 25, 100),
+      createBumper(200, 300, 30, 250)
+    ];
 
-    // Floor and Grid
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(30, 50),
-      new THREE.MeshStandardMaterial({ color: 0x050510, metalness: 0.8, roughness: 0.2 })
-    );
-    scene.add(floor);
-
-    const grid = new THREE.GridHelper(50, 50, 0x00ffff, 0x111133);
-    grid.rotation.x = Math.PI / 2;
-    grid.position.z = -0.02;
-    scene.add(grid);
-
-    // Walls
-    const createWall = (w, h, x, y, color = 0x222255) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, 2.5), new THREE.MeshStandardMaterial({ color }));
-      mesh.position.set(x, y, 1.25);
-      scene.add(mesh);
-    };
-    createWall(0.5, TABLE_HEIGHT, -TABLE_WIDTH/2, 0);
-    createWall(0.5, TABLE_HEIGHT, TABLE_WIDTH/2, 0);
-    createWall(TABLE_WIDTH, 0.5, 0, TABLE_HEIGHT/2);
-    createWall(0.3, 16, 5.0, -4, 0x4444aa); // Plunger Channel
-
-    // High Vis Plunger Launcher
-    const plungerMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(1.2, 0.8, 1.5),
-        new THREE.MeshStandardMaterial({ color: 0xff0066, emissive: 0xff0066, emissiveIntensity: 2 })
-    );
-    plungerMesh.position.set(5.75, -11, 0.75);
-    scene.add(plungerMesh);
-    engine.current.plunger.mesh = plungerMesh;
-
-    // Flippers
-    const setupFlipper = (side) => {
-      const f = engine.current.flippers[side];
-      const group = new THREE.Group();
-      const mesh = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.35, 2.3, 8, 16),
-        new THREE.MeshStandardMaterial({ 
-          color: 0x00ffee, 
-          emissive: 0x00ffee, 
-          emissiveIntensity: 1.5 
-        })
-      );
-      mesh.rotation.z = Math.PI / 2;
-      mesh.position.x = side === 'left' ? 1.2 : -1.2;
-      group.add(mesh);
-      group.position.copy(f.pivot);
-      scene.add(group);
-      f.mesh = group;
-    };
-    setupFlipper('left');
-    setupFlipper('right');
-
-    // Bumpers
-    const addBumper = (x, y, color) => {
-      const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.0, 1.0, 1.2, 32),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 3 })
-      );
-      mesh.rotation.x = Math.PI / 2;
-      mesh.position.set(x, y, 0.6);
-      scene.add(mesh);
-      engine.current.bumpers.push({ 
-        mesh, 
-        pos: new THREE.Vector3(x, y, 0.6), 
-        radius: 1.0, 
-        hit: 0, 
-        baseColor: new THREE.Color(color) 
+    // --- Flippers Logic ---
+    const createFlipper = (x, y, side) => {
+      const isLeft = side === 'left';
+      const group = Matter.Body.nextGroup(true);
+      
+      const flipper = Matter.Bodies.trapezoid(x, y, 100, 25, 0.2, {
+        label: isLeft ? 'L_FLIPPER' : 'R_FLIPPER',
+        collisionFilter: { group },
+        chamfer: { radius: [12, 12, 5, 5] },
+        render: { fillStyle: '#3b82f6' }
       });
-    };
-    addBumper(-3, 6, 0x00ffff);
-    addBumper(3, 6, 0x00ffff);
-    addBumper(0, 10, 0xff00ff);
 
-    return { scene, camera, renderer };
+      const pivot = Matter.Bodies.circle(isLeft ? x - 40 : x + 40, y, 5, {
+        isStatic: true,
+        collisionFilter: { group },
+        render: { visible: false }
+      });
+
+      const constraint = Matter.Constraint.create({
+        bodyA: flipper,
+        bodyB: pivot,
+        pointB: { x: 0, y: 0 },
+        pointA: { x: isLeft ? -40 : 40, y: 0 },
+        stiffness: 1,
+        length: 0,
+        render: { visible: false }
+      });
+
+      return { body: flipper, pivot, constraint };
+    };
+
+    const leftF = createFlipper(130, HEIGHT - 80, 'left');
+    const rightF = createFlipper(WIDTH - 180, HEIGHT - 80, 'right');
+    leftFlipperRef.current = leftF.body;
+    rightFlipperRef.current = rightF.body;
+
+    // Slingshots (triangular bumpers above flippers)
+    const leftSling = Matter.Bodies.fromVertices(70, HEIGHT - 180, 
+      [{x:0, y:0}, {x:40, y:60}, {x:0, y:100}], 
+      { isStatic: true, label: 'BUMPER', plugin: { points: 50 }, restitution: 1.8, render: { fillStyle: '#1d4ed8' } }
+    );
+
+    Matter.Composite.add(world, [
+      ...walls, voidSensor, ...bumpers, leftSling,
+      leftF.body, leftF.pivot, leftF.constraint,
+      rightF.body, rightF.pivot, rightF.constraint
+    ]);
+
+    // Collision Logic
+    Matter.Events.on(engine, 'collisionStart', (event) => {
+      event.pairs.forEach((pair) => {
+        const labels = [pair.bodyA.label, pair.bodyB.label];
+        
+        if (labels.includes('BUMPER')) {
+          const b = pair.bodyA.label === 'BUMPER' ? pair.bodyA : pair.bodyB;
+          useGameStore.getState().addScore(b.plugin.points || 50);
+          b.render.fillStyle = '#ffffff';
+          setTimeout(() => b.render.fillStyle = (b.circleRadius ? '#e11d48' : '#1d4ed8'), 100);
+        }
+
+        if (labels.includes('VOID')) {
+          const ball = pair.bodyA.label === 'BALL' ? pair.bodyA : (pair.bodyB.label === 'BALL' ? pair.bodyB : null);
+          if (ball) {
+            Matter.Composite.remove(world, ball);
+            useGameStore.getState().loseBall();
+          }
+        }
+      });
+    });
+
+    const runner = Matter.Runner.create();
+    runnerRef.current = runner;
+    Matter.Runner.run(runner, engine);
+    Matter.Render.run(render);
+
+    const handleKeyDown = (e) => {
+      if (e.code === 'KeyZ' || e.code === 'ArrowLeft') {
+        Matter.Body.setAngularVelocity(leftFlipperRef.current, -0.5);
+      }
+      if (e.code === 'KeyM' || e.code === 'ArrowRight') {
+        Matter.Body.setAngularVelocity(rightFlipperRef.current, 0.5);
+      }
+      if (e.code === 'Space') {
+        spawnBall();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      Matter.Render.stop(render);
+      Matter.Runner.stop(runner);
+      Matter.Engine.clear(engine);
+      Matter.World.clear(world);
+      render.canvas.remove();
+    };
   }, []);
 
   useEffect(() => {
-    const { scene, camera, renderer } = initScene();
+    const cleanup = initPhysics();
+    return cleanup;
+  }, [initPhysics]);
 
-    const onKey = (e, down) => {
-      if (e.code === 'KeyA' || e.code === 'ArrowLeft') engine.current.flippers.left.active = down;
-      if (e.code === 'KeyD' || e.code === 'ArrowRight') engine.current.flippers.right.active = down;
-      if (e.code === 'Space') {
-        engine.current.plunger.isCharging = down;
-        if (!down && gameState === 'PLAYING') {
-            const ballInLane = engine.current.balls.some(b => b.active && b.pos.x > 5.1 && b.pos.y < -5);
-            if (!ballInLane) {
-                createBall(5.75, -10.5, 0, 0.5 + engine.current.plunger.power * 1.5);
-                engine.current.plunger.power = 0;
-            }
-        }
-      }
-    };
+  const spawnBall = () => {
+    const world = engineRef.current.world;
+    const existingBalls = world.bodies.filter(b => b.label === 'BALL');
+    
+    // Prevent spawning if game is over or ball is already active
+    if (useGameStore.getState().gameState !== 'PLAYING' || existingBalls.length > 0) return;
 
-    const handleDown = (e) => onKey(e, true);
-    const handleUp = (e) => onKey(e, false);
-    window.addEventListener('keydown', handleDown);
-    window.addEventListener('keyup', handleUp);
+    const ball = Matter.Bodies.circle(WIDTH - 25, HEIGHT - 50, 12, {
+      label: 'BALL',
+      restitution: 0.5,
+      friction: 0.01,
+      density: 0.02,
+      render: { fillStyle: '#f8fafc', strokeStyle: '#94a3b8', lineWidth: 2 }
+    });
 
-    let frame;
-    const loop = () => {
-      if (gameState === 'PLAYING') {
-        // Plunger Physics & Visuals
-        const p = engine.current.plunger;
-        if (p.isCharging) {
-            p.power = Math.min(p.power + 0.025, 1.0);
-            p.mesh.position.y = p.basePos - p.power * 1.5;
-            p.mesh.material.emissiveIntensity = 2 + p.power * 10;
-        } else {
-            p.mesh.position.y += (p.basePos - p.mesh.position.y) * 0.4;
-            p.mesh.material.emissiveIntensity = 2;
-        }
-
-        // Particle Update
-        for (let i = engine.current.particles.length - 1; i >= 0; i--) {
-            const part = engine.current.particles[i];
-            part.update();
-            if (part.life <= 0) {
-                scene.remove(part.mesh);
-                engine.current.particles.splice(i, 1);
-            }
-        }
-
-        // Flipper Animation
-        Object.keys(engine.current.flippers).forEach(k => {
-          const f = engine.current.flippers[k];
-          const isL = k === 'left';
-          const target = f.active ? (isL ? 0.8 : -0.8) : (isL ? -0.4 : 0.4);
-          f.angle += (target - f.angle) * 0.5;
-          f.mesh.rotation.z = f.angle;
-        });
-
-        // Ball Physics Loop
-        engine.current.balls.forEach((ball, bIdx) => {
-          if (!ball.active) return;
-          ball.vel.y += GRAVITY;
-          ball.vel.multiplyScalar(FRICTION);
-          ball.pos.add(ball.vel);
-
-          // Walls & Bounds
-          if (ball.pos.x < -TABLE_WIDTH/2 + BALL_RADIUS + 0.25) { ball.pos.x = -TABLE_WIDTH/2 + BALL_RADIUS + 0.25; ball.vel.x *= -0.6; }
-          if (ball.pos.x > TABLE_WIDTH/2 - BALL_RADIUS - 0.25) { ball.pos.x = TABLE_WIDTH/2 - BALL_RADIUS - 0.25; ball.vel.x *= -0.6; }
-          if (ball.pos.y > TABLE_HEIGHT/2 - BALL_RADIUS - 0.25) { ball.pos.y = TABLE_HEIGHT/2 - BALL_RADIUS - 0.25; ball.vel.y *= -0.6; }
-          
-          // Launcher One-way Gate
-          if (ball.pos.x > 5.0 - BALL_RADIUS && ball.pos.x < 5.0 && ball.pos.y < 8 && ball.vel.x > 0) {
-             ball.pos.x = 5.0 - BALL_RADIUS; ball.vel.x *= -0.7;
-          }
-
-          // Bumper Logic
-          engine.current.bumpers.forEach(b => {
-            const dist = ball.pos.distanceTo(b.pos);
-            if (dist < b.radius + BALL_RADIUS) {
-              const normal = new THREE.Vector3().subVectors(ball.pos, b.pos).normalize();
-              ball.pos.copy(b.pos).add(normal.multiplyScalar(b.radius + BALL_RADIUS + 0.05));
-              ball.vel.reflect(normal).multiplyScalar(1.65);
-              b.hit = 1.0;
-              setScore(s => s + (250 * multiplier));
-              spawnParticles(ball.pos, b.baseColor, 15);
-              
-              engine.current.multiballProgress += 5;
-              setSyncProgress(Math.min(engine.current.multiballProgress, 100));
-              if (engine.current.multiballProgress >= 100) {
-                createBall(0, 8, -0.3, -0.1);
-                setMultiplier(m => m + 1);
-                engine.current.multiballProgress = 0;
-                engine.current.shake = 0.8;
-              }
-            }
-          });
-
-          // Flipper Collisions
-          Object.keys(engine.current.flippers).forEach(k => {
-            const f = engine.current.flippers[k];
-            const isL = k === 'left';
-            const tip = new THREE.Vector3(f.pivot.x + Math.cos(f.angle) * (isL ? f.length : -f.length), f.pivot.y + Math.sin(f.angle) * (isL ? f.length : -f.length), 0.5);
-            const line = new THREE.Vector3().subVectors(tip, f.pivot);
-            const bToP = new THREE.Vector3().subVectors(ball.pos, f.pivot);
-            const t = Math.max(0, Math.min(1, bToP.dot(line) / line.lengthSq()));
-            const closest = new THREE.Vector3().addVectors(f.pivot, line.multiplyScalar(t));
-            
-            if (ball.pos.distanceTo(closest) < BALL_RADIUS + 0.2) {
-              const n = new THREE.Vector3().subVectors(ball.pos, closest).normalize();
-              ball.pos.copy(closest).add(n.multiplyScalar(BALL_RADIUS + 0.21));
-              const kickPower = f.active ? 0.9 : 0.15;
-              ball.vel.reflect(n).multiplyScalar(0.4).add(n.multiplyScalar(kickPower));
-              if (f.active) {
-                spawnParticles(ball.pos, 0x00ffee, 8);
-                engine.current.shake = 0.3;
-              }
-            }
-          });
-
-          ball.mesh.position.copy(ball.pos);
-
-          // Drain
-          if (ball.pos.y < -15) {
-            ball.active = false;
-            scene.remove(ball.mesh);
-            engine.current.balls.splice(bIdx, 1);
-            if (engine.current.balls.filter(b => b.active).length === 0) {
-              setBallsLeft(prev => {
-                if (prev <= 1) { setGameState('GAMEOVER'); return 0; }
-                return prev - 1;
-              });
-            }
-          }
-        });
-
-        // Bumper Flash Rendering
-        engine.current.bumpers.forEach(b => {
-            if (b.hit > 0) {
-                b.hit -= 0.05;
-                b.mesh.scale.setScalar(1 + b.hit * 0.3);
-                b.mesh.material.emissiveIntensity = 3 + b.hit * 12;
-            } else {
-                b.mesh.scale.setScalar(1);
-                b.mesh.material.emissiveIntensity = 3;
-            }
-        });
-        
-        // Camera Shake
-        if (engine.current.shake > 0) {
-            camera.position.x = (Math.random() - 0.5) * engine.current.shake;
-            camera.position.y = -25 + (Math.random() - 0.5) * engine.current.shake;
-            engine.current.shake *= 0.9;
-        } else {
-            camera.position.x = 0;
-            camera.position.y = -25;
-        }
-      }
-      renderer.render(scene, camera);
-      frame = requestAnimationFrame(loop);
-    };
-    loop();
-
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener('keydown', handleDown);
-      window.removeEventListener('keyup', handleUp);
-      if (mountRef.current && renderer.domElement) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
-    };
-  }, [gameState, multiplier, createBall, initScene]);
-
-  const startReset = () => {
-    engine.current.balls.forEach(b => { if (b.mesh) engine.current.scene.remove(b.mesh); });
-    engine.current.balls = [];
-    engine.current.multiballProgress = 0;
-    setScore(0); setBallsLeft(3); setMultiplier(1); setSyncProgress(0);
-    setGameState('PLAYING');
+    Matter.Composite.add(world, ball);
+    Matter.Body.applyForce(ball, ball.position, { x: 0, y: -0.4 });
   };
 
   return (
-    <div className="relative w-full h-screen bg-black text-white font-mono overflow-hidden select-none">
-      <div ref={mountRef} className="w-full h-full" />
-
-      {/* Stats UI */}
-      <div className="absolute top-10 left-10 space-y-6 pointer-events-none">
-        <div className="flex items-center gap-6">
-            <div className="p-4 bg-cyan-500/10 border-2 border-cyan-500/40 rounded-xl">
-                <Cpu size={32} className="text-cyan-400 animate-pulse" />
-            </div>
-            <div>
-                <div className="text-xs text-cyan-400 font-black tracking-widest uppercase opacity-80">Score Engine</div>
-                <div className="text-6xl font-black tabular-nums tracking-tighter shadow-cyan-500/50 drop-shadow-lg">
-                    {score.toLocaleString()}
-                </div>
-            </div>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4 overflow-hidden select-none font-sans">
+      
+      {/* HUD */}
+      <div className="w-full max-w-[400px] flex justify-between items-end mb-4 px-2">
+        <div>
+          <h2 className="text-slate-500 text-[10px] uppercase font-bold tracking-[0.2em]">High Score</h2>
+          <div className="flex items-center gap-2 text-amber-500">
+            <Award size={16} />
+            <span className="font-mono text-xl">{highScore.toLocaleString()}</span>
+          </div>
         </div>
-        
-        <div className="flex gap-3">
-            {[...Array(3)].map((_, i) => (
-                <div key={i} className={`h-2.5 w-16 rounded-full transition-all duration-700 ${i < ballsLeft ? 'bg-pink-500 shadow-[0_0_20px_#ec4899]' : 'bg-white/10'}`} />
-            ))}
+        <div className="text-right">
+          <h2 className="text-slate-500 text-[10px] uppercase font-bold tracking-[0.2em]">Current Score</h2>
+          <div className="text-3xl font-black text-white font-mono leading-none">
+            {score.toLocaleString()}
+          </div>
         </div>
       </div>
 
-      <div className="absolute top-10 right-10 text-right">
-        <div className="text-xs text-yellow-500 font-black tracking-[0.3em] uppercase mb-1">X-Multiplier</div>
-        <div className="text-8xl font-black italic text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.6)]">
-            {multiplier}
-        </div>
-      </div>
+      {/* Main Table */}
+      <div className="relative rounded-2xl border-[6px] border-slate-800 shadow-[0_0_60px_-15px_rgba(59,130,246,0.5)] overflow-hidden">
+        <div ref={sceneRef} />
 
-      {/* HUD Bar */}
-      <div className="absolute left-10 bottom-10 flex items-center gap-4">
-        <div className="w-8 h-48 bg-white/5 border border-white/10 rounded-lg p-1 relative overflow-hidden">
-            <div 
-                className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-cyan-600 to-cyan-300 shadow-[0_0_25px_#06b6d4] transition-all duration-300"
-                style={{ height: `${syncProgress}%` }}
+        {/* Dynamic Lives Indicator */}
+        <div className="absolute top-4 left-4 flex gap-1.5">
+          {[...Array(3)].map((_, i) => (
+            <Heart 
+              key={i} 
+              size={14} 
+              className={i < balls ? "fill-rose-500 text-rose-500" : "text-slate-800"} 
             />
+          ))}
         </div>
-        <div className="[writing-mode:vertical-lr] text-[10px] font-bold text-cyan-400/60 tracking-[1em]">SYSTEM_SYNC_STATUS</div>
+
+        {/* Start Overlay */}
+        {gameState === 'START' && (
+          <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center text-center p-8 backdrop-blur-md">
+            <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mb-6 shadow-2xl rotate-12">
+              <Zap size={40} className="text-white" />
+            </div>
+            <h1 className="text-4xl font-black italic tracking-tighter mb-2">NEON RUSH</h1>
+            <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+              Precision pinball physics. <br/>
+              <span className="text-blue-400 font-bold">Z / M</span> to Flip. <span className="text-white font-bold">Space</span> to Launch.
+            </p>
+            <button 
+              onClick={startGame}
+              className="group relative px-12 py-4 bg-white text-black font-bold rounded-full overflow-hidden transition-all hover:scale-105 active:scale-95"
+            >
+              <span className="relative z-10 flex items-center gap-2">
+                <Play size={18} fill="black" /> INITIALIZE
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Game Over Overlay */}
+        {gameState === 'GAMEOVER' && (
+          <div className="absolute inset-0 bg-rose-950/95 flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500">
+            <Trophy size={64} className="text-amber-400 mb-4" />
+            <h1 className="text-5xl font-black mb-2 tracking-tighter">FINISH</h1>
+            <div className="bg-white/10 px-6 py-3 rounded-2xl mb-8">
+              <span className="text-slate-300 text-xs block uppercase font-bold mb-1">Final Credits</span>
+              <span className="text-3xl font-mono font-bold text-white">{score.toLocaleString()}</span>
+            </div>
+            <button 
+              onClick={startGame}
+              className="flex items-center gap-2 px-10 py-4 bg-white text-rose-950 font-black rounded-full transition-transform active:scale-90"
+            >
+              <RefreshCw size={20} /> REBOOT SYSTEM
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Start/GameOver Screen */}
-      {gameState !== 'PLAYING' && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md">
-          <div className="text-center space-y-12">
-            <div className="space-y-2">
-                <h1 className="text-9xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-cyan-800">
-                    {gameState === 'GAMEOVER' ? 'CRITICAL_FAIL' : 'CYBER_BALL'}
-                </h1>
-                <div className="flex justify-center items-center gap-6 text-cyan-400 font-bold tracking-[0.8em]">
-                    <Shield size={20} />
-                    AUTHORIZED_USERS_ONLY
-                    <Shield size={20} />
-                </div>
-            </div>
-
-            <button 
-                onClick={startReset}
-                className="group relative px-20 py-8 overflow-hidden rounded-lg bg-white text-black font-black text-3xl italic tracking-tighter transition-all hover:scale-105 active:scale-95"
-            >
-                <span className="relative z-10">{gameState === 'GAMEOVER' ? 'RE-INITIALIZE' : 'BOOT_CORE'}</span>
-                <div className="absolute inset-0 bg-cyan-400 translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-            </button>
-            
-            <div className="flex gap-12 justify-center opacity-30 text-xs font-bold tracking-widest uppercase">
-                <div className="flex flex-col gap-2"><div className="p-3 border rounded">A / D</div>Flippers</div>
-                <div className="flex flex-col gap-2"><div className="p-3 border rounded">Space</div>Launcher</div>
-            </div>
-          </div>
+      {/* Footer Controls */}
+      <div className="mt-6 flex justify-between w-full max-w-[400px] text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">
+        <div className="flex items-center gap-2">
+          <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded">Z</span>
+          <span>Left</span>
         </div>
-      )}
-
-      {/* Charge Status */}
-      {gameState === 'PLAYING' && (
-          <div className="absolute bottom-10 right-10 flex flex-col items-end gap-3">
-             <div className="flex items-center gap-2 text-pink-500 font-bold italic">
-                <Zap size={18} className={engine.current.plunger.isCharging ? 'animate-bounce' : ''} />
-                LAUNCH_PRESSURE
-             </div>
-             <div className="w-80 h-4 bg-white/5 rounded-full overflow-hidden border border-white/20 p-1">
-                <div 
-                    className="h-full bg-gradient-to-r from-pink-600 to-pink-300 shadow-[0_0_20px_#ec4899] transition-all duration-75" 
-                    style={{ width: `${engine.current.plunger.power * 100}%` }} 
-                />
-             </div>
-          </div>
-      )}
+        <div className="flex items-center gap-2">
+          <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded">SPACE</span>
+          <span>Launch Ball</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span>Right</span>
+          <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded">M</span>
+        </div>
+      </div>
     </div>
   );
 };
