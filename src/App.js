@@ -1,350 +1,311 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { Zap, Trophy, Cpu, Play, ChevronRight } from 'lucide-react';
+import { Zap, Shield, Target, RefreshCw } from 'lucide-react';
 
 /**
- * CONSTANTS & CONFIGURATION
+ * CONSTANTS & CONFIG
  */
 const BOARD_WIDTH = 12;
 const BOARD_HEIGHT = 22;
 const BALL_RADIUS = 0.35;
-const GRAVITY = -0.12;
-const FRICTION = 0.992;
-const FLIPPER_LENGTH = 3.0;
-const FLIPPER_WIDTH = 0.6;
-const BUMPER_RADIUS = 0.8;
+const GRAVITY = -0.015; // Adjusted for frame-rate consistency
+const RESTITUTION = 0.75; 
+const FRICTION = 0.992; 
 
 const App = () => {
   const mountRef = useRef(null);
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
-  const [gameState, setGameState] = useState('START'); // START, PLAYING, GAMEOVER
+  const [gameState, setGameState] = useState('START'); 
 
-  // The engineRef holds the non-reactive physics state to avoid React lag
-  const engineRef = useRef({
-    ball: { 
-      pos: new THREE.Vector3(4, -5, BALL_RADIUS), 
+  // Physics Engine Reference
+  const engine = useRef({
+    ball: {
+      pos: new THREE.Vector3(5, -5, 0.4),
       vel: new THREE.Vector3(0, 0, 0),
-      mesh: null 
+      mesh: null
     },
     flippers: {
-      left: { mesh: null, angle: -0.4, target: -0.4 },
-      right: { mesh: null, angle: 0.4, target: 0.4 }
+      left: { 
+        pivot: new THREE.Vector3(-2.8, -8.5, 0.4), 
+        angle: -0.4, 
+        length: 2.8, 
+        width: 0.45,
+        mesh: null,
+        isPressed: false
+      },
+      right: { 
+        pivot: new THREE.Vector3(2.8, -8.5, 0.4), 
+        angle: 0.4, 
+        length: 2.8, 
+        width: 0.45,
+        mesh: null,
+        isPressed: false
+      }
     },
+    colliders: [], // Static boundaries for physics
     bumpers: [],
-    keys: {},
-    score: 0,
-    gameState: 'START'
+    scene: null
   });
-
-  // Keep ref in sync with state for the engine
-  useEffect(() => {
-    engineRef.current.gameState = gameState;
-  }, [gameState]);
 
   useEffect(() => {
     if (!mountRef.current) return;
 
-    const width = mountRef.current.clientWidth;
-    const height = mountRef.current.clientHeight;
-
-    // --- THREE.JS SETUP ---
+    // --- SCENE SETUP ---
     const scene = new THREE.Scene();
+    engine.current.scene = scene;
     scene.background = new THREE.Color(0x020205);
 
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, -18, 16);
-    camera.lookAt(0, 0, 0);
+    const camera = new THREE.PerspectiveCamera(45, mountRef.current.clientWidth / mountRef.current.clientHeight, 0.1, 1000);
+    camera.position.set(0, -16, 20);
+    camera.lookAt(0, 2, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+    renderer.shadowMap.enabled = true;
     mountRef.current.appendChild(renderer.domElement);
 
     // --- LIGHTING ---
     const ambient = new THREE.AmbientLight(0xffffff, 0.3);
     scene.add(ambient);
-
-    const mainLight = new THREE.PointLight(0x00ffff, 2, 50);
+    const mainLight = new THREE.PointLight(0x00ffff, 1.5, 50);
     mainLight.position.set(0, 5, 10);
     scene.add(mainLight);
 
-    const pinkLight = new THREE.PointLight(0xff00ff, 1.5, 30);
-    pinkLight.position.set(0, -10, 5);
-    scene.add(pinkLight);
+    // --- BOARD ---
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(BOARD_WIDTH, BOARD_HEIGHT, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x0a0a12, roughness: 0.2 })
+    );
+    board.position.z = -0.25;
+    scene.add(board);
 
-    // --- GAME WORLD OBJECTS ---
-    
-    // Floor & Grid
-    const floorGeo = new THREE.PlaneGeometry(BOARD_WIDTH, BOARD_HEIGHT);
-    const floorMat = new THREE.MeshPhongMaterial({ color: 0x050510, shininess: 100 });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    scene.add(floor);
+    // --- WALLS & COLLIDERS ---
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e });
+    const colliders = [];
 
-    const grid = new THREE.GridHelper(24, 24, 0x00ffff, 0x112244);
-    grid.rotation.x = Math.PI / 2;
-    grid.position.z = 0.01;
-    scene.add(grid);
-
-    // Walls
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x1a1a3a, metalness: 0.8, roughness: 0.2 });
-    const createWall = (w, h, x, y) => {
+    const createWall = (w, h, x, y, rotation = 0) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, 2), wallMat);
       mesh.position.set(x, y, 1);
+      mesh.rotation.z = rotation;
       scene.add(mesh);
+      
+      // Store for physics (simplified AABB/Circle for static walls)
+      colliders.push({ mesh, x, y, w, h, rotation });
+      return mesh;
     };
-    createWall(0.5, BOARD_HEIGHT, -BOARD_WIDTH / 2 - 0.25, 0); // Left
-    createWall(0.5, BOARD_HEIGHT, BOARD_WIDTH / 2 + 0.25, 0);  // Right
-    createWall(BOARD_WIDTH + 1, 0.5, 0, BOARD_HEIGHT / 2 + 0.25); // Top
 
-    // Ball
-    const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 32, 32);
-    const ballMat = new THREE.MeshStandardMaterial({ 
-      color: 0xffffff, 
-      metalness: 0.9, 
-      roughness: 0.1,
-      emissive: 0x222222 
-    });
-    const ballMesh = new THREE.Mesh(ballGeo, ballMat);
-    ballMesh.position.set(4, -5, BALL_RADIUS);
-    scene.add(ballMesh);
-    engineRef.current.ball.mesh = ballMesh;
+    // Outer Boundaries
+    createWall(0.5, BOARD_HEIGHT, -BOARD_WIDTH/2, 0); 
+    createWall(0.5, BOARD_HEIGHT, BOARD_WIDTH/2, 0);  
+    createWall(BOARD_WIDTH, 0.5, 0, BOARD_HEIGHT/2); 
 
-    // Flippers
-    const createFlipper = (isLeft) => {
-      const group = new THREE.Group();
-      const geo = new THREE.CapsuleGeometry(FLIPPER_WIDTH / 2, FLIPPER_LENGTH - FLIPPER_WIDTH, 12, 12);
-      geo.rotateZ(Math.PI / 2);
-      geo.translate(isLeft ? FLIPPER_LENGTH / 2 : -FLIPPER_LENGTH / 2, 0, 0);
-      const mat = new THREE.MeshStandardMaterial({ 
-        color: isLeft ? 0x00ffff : 0xff00ff,
-        emissive: isLeft ? 0x00ffff : 0xff00ff,
-        emissiveIntensity: 0.6
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      group.add(mesh);
-      group.position.set(isLeft ? -4 : 4, -9, BALL_RADIUS);
-      scene.add(group);
-      return group;
-    };
-    engineRef.current.flippers.left.mesh = createFlipper(true);
-    engineRef.current.flippers.right.mesh = createFlipper(false);
+    // Slanted Guides
+    createWall(6, 0.5, -4.8, -10, Math.PI / 6);
+    createWall(6, 0.5, 4.8, -10, -Math.PI / 6);
 
-    // Bumpers
-    const createBumper = (x, y, color) => {
-      const group = new THREE.Group();
-      const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(BUMPER_RADIUS, BUMPER_RADIUS, 1, 32),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1 })
-      );
+    engine.current.colliders = colliders;
+
+    // --- BUMPERS ---
+    const bumperGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.8, 32);
+    const bumperMat = new THREE.MeshStandardMaterial({ color: 0xff0055, emissive: 0xff0055, emissiveIntensity: 0.5 });
+    const bumperPos = [{x: -2.5, y: 5}, {x: 2.5, y: 5}, {x: 0, y: 8}];
+    
+    engine.current.bumpers = bumperPos.map(p => {
+      const mesh = new THREE.Mesh(bumperGeo, bumperMat.clone());
+      mesh.position.set(p.x, p.y, 0.5);
       mesh.rotation.x = Math.PI / 2;
+      scene.add(mesh);
+      return mesh;
+    });
+
+    // --- FLIPPERS ---
+    const createFlipperMesh = (isLeft) => {
+      const group = new THREE.Group();
+      const capsule = new THREE.CapsuleGeometry(0.45, 2.2, 10, 16);
+      capsule.rotateZ(Math.PI / 2);
+      capsule.translate(isLeft ? 1.4 : -1.4, 0, 0);
+      const mesh = new THREE.Mesh(capsule, new THREE.MeshStandardMaterial({ color: 0x00f3ff, emissive: 0x00f3ff, emissiveIntensity: 0.4 }));
       group.add(mesh);
-      group.position.set(x, y, 0.5);
+      const f = engine.current.flippers[isLeft ? 'left' : 'right'];
+      group.position.copy(f.pivot);
       scene.add(group);
       return group;
     };
-    engineRef.current.bumpers = [
-      createBumper(-3, 4, 0x00ffff),
-      createBumper(3, 4, 0xff00ff),
-      createBumper(0, 7, 0xffff00),
-      createBumper(-2.5, 9, 0x00ff00),
-      createBumper(2.5, 9, 0xff0000),
-    ];
 
-    // --- INPUT ---
-    const handleKeyDown = (e) => (engineRef.current.keys[e.code] = true);
-    const handleKeyUp = (e) => (engineRef.current.keys[e.code] = false);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    engine.current.flippers.left.mesh = createFlipperMesh(true);
+    engine.current.flippers.right.mesh = createFlipperMesh(false);
 
-    // --- GAME LOOP ---
+    // --- BALL ---
+    const ballMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(BALL_RADIUS, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.9, roughness: 0.05 })
+    );
+    engine.current.ball.mesh = ballMesh;
+    scene.add(ballMesh);
+
+    // --- INPUTS ---
+    const handleKey = (e, down) => {
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft') engine.current.flippers.left.isPressed = down;
+      if (e.code === 'KeyD' || e.code === 'ArrowRight') engine.current.flippers.right.isPressed = down;
+    };
+    window.addEventListener('keydown', (e) => handleKey(e, true));
+    window.addEventListener('keyup', (e) => handleKey(e, false));
+
+    // --- PHYSICS LOOP ---
     let animationId;
-    const update = () => {
-      const engine = engineRef.current;
-      const { ball, flippers, bumpers, keys, gameState } = engine;
+    const animate = () => {
+      const b = engine.current.ball;
+      const f = engine.current.flippers;
 
       if (gameState === 'PLAYING') {
-        // Flipper Logic
-        flippers.left.target = (keys['KeyA'] || keys['ArrowLeft']) ? 0.6 : -0.4;
-        flippers.right.target = (keys['KeyD'] || keys['ArrowRight']) ? -0.6 : 0.4;
-        
-        flippers.left.angle += (flippers.left.target - flippers.left.angle) * 0.4;
-        flippers.right.angle += (flippers.right.target - flippers.right.angle) * 0.4;
-        
-        flippers.left.mesh.rotation.z = flippers.left.angle;
-        flippers.right.mesh.rotation.z = flippers.right.angle;
+        // Apply Gravity & Movement
+        b.vel.y += GRAVITY;
+        b.vel.multiplyScalar(FRICTION);
+        b.pos.add(b.vel);
 
-        // Ball Physics
-        ball.vel.y += GRAVITY;
-        ball.vel.multiplyScalar(FRICTION);
-        ball.pos.add(ball.vel.clone().multiplyScalar(0.12));
-
-        // Wall Collisions
-        if (Math.abs(ball.pos.x) > BOARD_WIDTH / 2 - BALL_RADIUS) {
-          ball.vel.x *= -0.7;
-          ball.pos.x = Math.sign(ball.pos.x) * (BOARD_WIDTH / 2 - BALL_RADIUS);
+        // 1. Boundary / Static Wall Collisions
+        if (Math.abs(b.pos.x) > BOARD_WIDTH/2 - BALL_RADIUS) {
+          b.pos.x = (BOARD_WIDTH/2 - BALL_RADIUS) * Math.sign(b.pos.x);
+          b.vel.x *= -RESTITUTION;
         }
-        if (ball.pos.y > BOARD_HEIGHT / 2 - BALL_RADIUS) {
-          ball.vel.y *= -0.7;
-          ball.pos.y = BOARD_HEIGHT / 2 - BALL_RADIUS;
+        if (b.pos.y > BOARD_HEIGHT/2 - BALL_RADIUS) {
+          b.pos.y = BOARD_HEIGHT/2 - BALL_RADIUS;
+          b.vel.y *= -RESTITUTION;
         }
 
-        // Bumper Collisions
-        bumpers.forEach(bumper => {
-          const dx = ball.pos.x - bumper.position.x;
-          const dy = ball.pos.y - bumper.position.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < BUMPER_RADIUS + BALL_RADIUS) {
-            const angle = Math.atan2(dy, dx);
-            ball.vel.set(Math.cos(angle) * 2.5, Math.sin(angle) * 2.5, 0);
-            engine.score += 250;
-            setScore(engine.score);
+        // 2. Flipper Physics (Line-Segment Collision)
+        Object.keys(f).forEach(side => {
+          const flip = f[side];
+          const isLeft = side === 'left';
+          const targetAngle = flip.isPressed ? (isLeft ? 0.6 : -0.6) : (isLeft ? -0.4 : 0.4);
+          const oldAngle = flip.angle;
+          
+          // Smoother Flipper Movement
+          flip.angle += (targetAngle - flip.angle) * 0.4;
+          flip.mesh.rotation.z = flip.angle;
+
+          // Collision Check
+          const p1 = flip.pivot.clone();
+          const p2 = new THREE.Vector3(
+            p1.x + Math.cos(flip.angle) * (isLeft ? flip.length : -flip.length),
+            p1.y + Math.sin(flip.angle) * (isLeft ? flip.length : -flip.length),
+            p1.z
+          );
+
+          const line = new THREE.Vector3().subVectors(p2, p1);
+          const ballToP1 = new THREE.Vector3().subVectors(b.pos, p1);
+          const t = Math.max(0, Math.min(1, ballToP1.dot(line) / line.lengthSq()));
+          const closest = new THREE.Vector3().addVectors(p1, line.multiplyScalar(t));
+          
+          const dist = b.pos.distanceTo(closest);
+          const minDist = BALL_RADIUS + flip.width;
+
+          if (dist < minDist) {
+            const normal = new THREE.Vector3().subVectors(b.pos, closest).normalize();
+            b.pos.copy(closest).add(normal.multiplyScalar(minDist));
             
-            // Visual feedback
-            bumper.scale.set(1.5, 1.5, 1.5);
-            setTimeout(() => bumper.scale.set(1, 1, 1), 60);
+            // Flipper Kick Logic
+            const flipSpeed = (flip.angle - oldAngle) * 1.5;
+            const kickPower = Math.abs(flipSpeed) * 1.2;
+            
+            b.vel.reflect(normal).multiplyScalar(RESTITUTION);
+            b.vel.add(normal.multiplyScalar(kickPower));
           }
         });
 
-        // Flipper Collisions (Simplified projection)
-        const checkFlipper = (fGroup, isLeft) => {
-          const ballLocal = fGroup.worldToLocal(ball.pos.clone());
-          const isActive = isLeft ? (flippers.left.angle > 0.2) : (flippers.right.angle < -0.2);
-          
-          const inRangeX = isLeft 
-            ? (ballLocal.x > 0 && ballLocal.x < FLIPPER_LENGTH) 
-            : (ballLocal.x < 0 && ballLocal.x > -FLIPPER_LENGTH);
-            
-          if (inRangeX && Math.abs(ballLocal.y) < FLIPPER_WIDTH) {
-            ball.vel.y = Math.abs(ball.vel.y) * 0.5 + (isActive ? 3.0 : 1.5);
-            ball.vel.x += isLeft ? 0.5 : -0.5;
-            ball.pos.y += 0.5; // Eject
-            engine.score += 50;
-            setScore(engine.score);
+        // 3. Bumper Logic
+        engine.current.bumpers.forEach(bm => {
+          const dist = b.pos.distanceTo(bm.position);
+          if (dist < 1.1) {
+            const normal = new THREE.Vector3().subVectors(b.pos, bm.position).normalize();
+            b.pos.copy(bm.position).add(normal.multiplyScalar(1.1));
+            b.vel.reflect(normal).multiplyScalar(1.5);
+            setScore(s => s + 50);
+            bm.material.emissiveIntensity = 2;
+          } else {
+            bm.material.emissiveIntensity = THREE.MathUtils.lerp(bm.material.emissiveIntensity, 0.4, 0.1);
           }
-        };
-        checkFlipper(flippers.left.mesh, true);
-        checkFlipper(flippers.right.mesh, false);
+        });
 
-        // Update Mesh
-        ball.mesh.position.copy(ball.pos);
-
-        // Death Check
-        if (ball.pos.y < -BOARD_HEIGHT / 2 - 2) {
+        // 4. Drain Check
+        if (b.pos.y < -12) {
           setGameState('GAMEOVER');
         }
+
+        b.mesh.position.copy(b.pos);
       }
 
       renderer.render(scene, camera);
-      animationId = requestAnimationFrame(update);
+      animationId = requestAnimationFrame(animate);
     };
+    
+    animate();
 
-    update();
-
-    // Cleanup
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
       cancelAnimationFrame(animationId);
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('keyup', handleKey);
       if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
-      renderer.dispose();
     };
-  }, []);
+  }, [gameState]);
 
-  const handleStart = useCallback(() => {
-    const engine = engineRef.current;
-    engine.score = 0;
+  const startGame = () => {
+    engine.current.ball.pos.set(5.2, -8, 0.4);
+    engine.current.ball.vel.set(-0.05, 0.45, 0);
     setScore(0);
-    engine.ball.pos.set(4, -5, BALL_RADIUS);
-    engine.ball.vel.set(-0.2, 3.5, 0);
     setGameState('PLAYING');
-  }, []);
-
-  useEffect(() => {
-    if (gameState === 'GAMEOVER' && score > highScore) {
-      setHighScore(score);
-    }
-  }, [gameState, score, highScore]);
+  };
 
   return (
-    <div className="relative w-full h-screen bg-[#020205] overflow-hidden font-sans text-white">
-      {/* Three.js Container */}
-      <div ref={mountRef} className="w-full h-full cursor-none" />
+    <div className="relative w-full h-screen bg-[#020205] text-white overflow-hidden font-mono select-none">
+      <div ref={mountRef} className="w-full h-full" />
 
-      {/* Score HUD */}
-      <div className="absolute top-0 left-0 w-full p-8 flex justify-between items-start pointer-events-none select-none">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-cyan-400/60 tracking-[0.2em] uppercase text-[10px] font-bold">
-            <Trophy size={14} /> High Record
-          </div>
-          <div className="text-3xl font-black italic tracking-tighter">
-            {highScore.toLocaleString()}
-          </div>
-        </div>
-
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2 text-pink-500/80 tracking-[0.2em] uppercase text-[10px] font-bold">
-            Score <Zap size={14} />
-          </div>
-          <div className="text-5xl font-black italic tracking-tighter drop-shadow-[0_0_15px_rgba(236,72,153,0.4)]">
-            {score.toLocaleString()}
-          </div>
+      {/* HUD */}
+      <div className="absolute top-8 left-8 pointer-events-none">
+        <div className="text-cyan-400 text-[10px] font-bold tracking-[0.2em] mb-1 uppercase opacity-60">System_Output</div>
+        <div className="text-6xl font-black italic tracking-tighter tabular-nums text-white">
+          {score.toLocaleString().padStart(6, '0')}
         </div>
       </div>
 
-      {/* Modal Overlays */}
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-12 text-[10px] font-bold text-white/20 uppercase tracking-widest pointer-events-none">
+        <div className="flex items-center gap-3">
+          <span className="px-2 py-1 border border-white/20 rounded text-white/60">A</span> 
+          <span>Left_Actuator</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="px-2 py-1 border border-white/20 rounded text-white/60">D</span> 
+          <span>Right_Actuator</span>
+        </div>
+      </div>
+
+      {/* OVERLAYS */}
       {gameState !== 'PLAYING' && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-xl z-50 flex items-center justify-center p-6">
-          <div className="w-full max-w-md text-center">
-            <div className="mb-8 inline-flex p-5 rounded-3xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 shadow-[0_0_40px_rgba(6,182,212,0.15)]">
-              <Cpu size={56} className="text-cyan-400 animate-pulse" />
+        <div className="absolute inset-0 bg-[#020205]/80 backdrop-blur-xl flex items-center justify-center p-6 z-50">
+          <div className="max-w-sm w-full bg-[#0a0a1a] border border-white/5 rounded-[2rem] p-10 shadow-2xl text-center">
+            <div className="w-24 h-24 bg-cyan-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-cyan-500/20 shadow-[0_0_30px_rgba(6,182,212,0.1)]">
+              {gameState === 'START' ? <Shield className="text-cyan-400" size={40} /> : <RefreshCw className="text-pink-500" size={40} />}
             </div>
-
-            <h1 className="text-6xl font-black mb-4 tracking-tighter uppercase italic leading-none">
-              {gameState === 'START' ? 'Neon\nPulse' : 'System\nFailure'}
-            </h1>
-
-            <p className="text-gray-400 mb-12 text-xs font-bold uppercase tracking-[0.4em] opacity-70">
-              {gameState === 'START' 
-                ? 'High Fidelity Pinball Protocol' 
-                : `Final Score: ${score.toLocaleString()}`}
+            
+            <h2 className="text-4xl font-black italic tracking-tighter mb-3 uppercase">
+              {gameState === 'START' ? 'Core_Pinball' : 'Session_End'}
+            </h2>
+            <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em] mb-10">
+              {gameState === 'START' ? 'Initialising Physical Constraints' : `Link Terminated // Final Score: ${score}`}
             </p>
 
             <button 
-              onClick={handleStart}
-              className="group relative w-full overflow-hidden rounded-2xl bg-white p-5 text-black transition-all hover:scale-[1.03] active:scale-95"
+              onClick={startGame}
+              className="group relative w-full py-5 bg-white text-black font-black text-xl uppercase italic tracking-tighter rounded-2xl transition-all hover:bg-cyan-400 hover:scale-[1.02] active:scale-95 overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative flex items-center justify-center gap-3 font-black text-xl uppercase tracking-tighter group-hover:text-white transition-colors">
-                <Play size={24} fill="currentColor" />
-                {gameState === 'START' ? 'Initialize' : 'Reboot System'}
+              <div className="relative z-10 flex items-center justify-center gap-3">
+                <Zap size={24} fill="black" />
+                {gameState === 'START' ? 'Initiate' : 'Retry'}
               </div>
             </button>
-            
-            <div className="mt-10 flex flex-wrap justify-center gap-8 opacity-40">
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex gap-1">
-                  <kbd className="px-2 py-1 bg-white/10 rounded text-[10px] border border-white/20">A</kbd>
-                  <kbd className="px-2 py-1 bg-white/10 rounded text-[10px] border border-white/20">D</kbd>
-                </div>
-                <span className="text-[10px] font-bold tracking-widest uppercase">Flippers</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex gap-1">
-                  <kbd className="px-2 py-1 bg-white/10 rounded text-[10px] border border-white/20">←</kbd>
-                  <kbd className="px-2 py-1 bg-white/10 rounded text-[10px] border border-white/20">→</kbd>
-                </div>
-                <span className="text-[10px] font-bold tracking-widest uppercase">Alternate</span>
-              </div>
-            </div>
           </div>
         </div>
       )}
-
-      {/* Decorative footer */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 text-[9px] font-black text-white/10 tracking-[0.8em] uppercase pointer-events-none select-none">
-        <ChevronRight size={12} /> Physical Simulation v2.5 <ChevronRight size={12} />
-      </div>
     </div>
   );
 };
