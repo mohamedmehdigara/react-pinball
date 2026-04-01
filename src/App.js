@@ -1,19 +1,17 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Matter from 'matter-js';
-import { Play, RotateCcw, Shield, Trophy, Activity, Zap } from 'lucide-react';
+import { Cpu, Zap, Trophy, PlayCircle, ChevronUp } from 'lucide-react';
 
 const WIDTH = 450;
 const HEIGHT = 800;
-const BALL_RADIUS = 13;
+const BALL_RADIUS = 14;
 
 export default function App() {
-  // UI State for React Rendering
   const [score, setScore] = useState(0);
   const [ballsRemaining, setBallsRemaining] = useState(3);
-  const [gameState, setGameState] = useState('START'); // START, PLAYING, GAMEOVER
+  const [gameState, setGameState] = useState('START');
   const [plungerPower, setPlungerPower] = useState(0);
   
-  // Physics Engine Refs
   const containerRef = useRef(null);
   const engineRef = useRef(null);
   const renderRef = useRef(null);
@@ -21,37 +19,34 @@ export default function App() {
   const ballRef = useRef(null);
   const flippers = useRef({ left: null, right: null });
   const keys = useRef({ left: false, right: false, space: false });
+  const gameRef = useRef({ score: 0, balls: 3, state: 'START' });
 
-  // Source of Truth Ref (Prevents stale closures in the physics loop)
-  const gameRef = useRef({
-    score: 0,
-    balls: 3,
-    state: 'START'
-  });
-
-  // Sync state changes to the Ref for the Engine loop
-  useEffect(() => {
-    gameRef.current.state = gameState;
-  }, [gameState]);
+  const cleanup = () => {
+    if (runnerRef.current) Matter.Runner.stop(runnerRef.current);
+    if (renderRef.current) {
+      Matter.Render.stop(renderRef.current);
+      if (renderRef.current.canvas) renderRef.current.canvas.remove();
+    }
+    if (engineRef.current) {
+      Matter.World.clear(engineRef.current.world);
+      Matter.Engine.clear(engineRef.current);
+    }
+  };
 
   const spawnBall = useCallback(() => {
     if (!engineRef.current) return;
-    
-    // Remove existing ball if any
-    if (ballRef.current) {
-      Matter.Composite.remove(engineRef.current.world, ballRef.current);
-    }
+    if (ballRef.current) Matter.Composite.remove(engineRef.current.world, ballRef.current);
 
-    const ball = Matter.Bodies.circle(WIDTH - 28, HEIGHT - 100, BALL_RADIUS, {
+    const ball = Matter.Bodies.circle(WIDTH - 28, HEIGHT - 80, BALL_RADIUS, {
       label: 'ball',
       restitution: 0.5,
-      friction: 0.005,
-      frictionAir: 0.001,
-      density: 0.1,
+      friction: 0.0001,
+      frictionAir: 0.005,
+      density: 0.05,
       render: { 
         fillStyle: '#ffffff', 
         strokeStyle: '#818cf8', 
-        lineWidth: 4 
+        lineWidth: 4,
       }
     });
 
@@ -59,34 +54,15 @@ export default function App() {
     Matter.Composite.add(engineRef.current.world, ball);
   }, []);
 
-  const handleBallLoss = useCallback(() => {
-    if (gameRef.current.state !== 'PLAYING') return;
+  const initGame = () => {
+    cleanup();
 
-    gameRef.current.balls -= 1;
-    setBallsRemaining(gameRef.current.balls);
-
-    if (gameRef.current.balls <= 0) {
-      setGameState('GAMEOVER');
-    } else {
-      // Small delay before respawning
-      setTimeout(() => {
-        if (gameRef.current.state === 'PLAYING') spawnBall();
-      }, 1000);
-    }
-  }, [spawnBall]);
-
-  const initGame = useCallback(() => {
-    // 1. Rigorous Cleanup
-    if (runnerRef.current) Matter.Runner.stop(runnerRef.current);
-    if (renderRef.current) {
-      Matter.Render.stop(renderRef.current);
-      if (renderRef.current.canvas) renderRef.current.canvas.remove();
-    }
-    if (engineRef.current) Matter.Engine.clear(engineRef.current);
-
-    // 2. Initialize Engine
-    const engine = Matter.Engine.create();
-    engine.gravity.y = 1.4;
+    const engine = Matter.Engine.create({
+      enableSleeping: false,
+      positionIterations: 30, 
+      velocityIterations: 30
+    });
+    engine.gravity.y = 1.2; 
     engineRef.current = engine;
 
     const render = Matter.Render.create({
@@ -97,54 +73,69 @@ export default function App() {
         height: HEIGHT,
         wireframes: false,
         background: 'transparent',
-        pixelRatio: window.devicePixelRatio || 1
+        pixelRatio: window.devicePixelRatio
       }
     });
     renderRef.current = render;
 
-    // 3. World Boundaries
-    const wallOpts = { isStatic: true, render: { fillStyle: '#1e293b' } };
+    const wallOpts = { isStatic: true, render: { fillStyle: '#1e293b' }, friction: 0, restitution: 0.5 };
+    
+    // Procedure: Top Arc Generation
+    const arcWalls = [];
+    const segments = 12;
+    for (let i = 0; i <= segments; i++) {
+      const angle = (Math.PI / segments) * i;
+      const x = WIDTH / 2 + Math.cos(angle + Math.PI) * (WIDTH / 2);
+      const y = 150 + Math.sin(angle + Math.PI) * 150;
+      arcWalls.push(Matter.Bodies.rectangle(x, y, 80, 20, { 
+        ...wallOpts, 
+        angle: angle + Math.PI / 2 
+      }));
+    }
+
     const walls = [
-      Matter.Bodies.rectangle(WIDTH / 2, -20, WIDTH, 40, wallOpts),
-      Matter.Bodies.rectangle(-20, HEIGHT / 2, 40, HEIGHT, wallOpts),
-      Matter.Bodies.rectangle(WIDTH + 20, HEIGHT / 2, 40, HEIGHT, wallOpts),
-      Matter.Bodies.rectangle(WIDTH - 55, HEIGHT - 180, 10, 650, wallOpts), // Plunger lane
-      // Slopes leading to flippers
-      Matter.Bodies.rectangle(80, HEIGHT - 160, 200, 30, { ...wallOpts, angle: 0.5 }),
-      Matter.Bodies.rectangle(WIDTH - 135, HEIGHT - 160, 150, 30, { ...wallOpts, angle: -0.5 }),
-      // Drain Sensor
-      Matter.Bodies.rectangle(WIDTH / 2, HEIGHT + 100, WIDTH, 100, { 
-        isStatic: true, isSensor: true, label: 'drain' 
+      Matter.Bodies.rectangle(WIDTH / 2, -10, WIDTH, 40, wallOpts),
+      Matter.Bodies.rectangle(-10, HEIGHT / 2, 40, HEIGHT, wallOpts),
+      Matter.Bodies.rectangle(WIDTH + 10, HEIGHT / 2, 40, HEIGHT, wallOpts),
+      Matter.Bodies.rectangle(WIDTH - 55, HEIGHT - 180, 10, 600, wallOpts), 
+      Matter.Bodies.rectangle(70, HEIGHT - 160, 220, 25, { ...wallOpts, angle: 0.6, chamfer: { radius: 10 } }),
+      Matter.Bodies.rectangle(WIDTH - 145, HEIGHT - 160, 180, 25, { ...wallOpts, angle: -0.6, chamfer: { radius: 10 } }),
+      Matter.Bodies.rectangle(WIDTH / 2, HEIGHT + 100, WIDTH, 50, { 
+        isStatic: true, isSensor: true, label: 'drain', render: { visible: false } 
       })
     ];
 
-    // 4. Interactive Bumpers
     const bumpers = [
-      { x: 130, y: 180, pts: 1000 }, { x: 270, y: 180, pts: 1000 },
-      { x: 200, y: 320, pts: 2500 }, { x: 80, y: 480, pts: 500 },
-      { x: 320, y: 480, pts: 500 }
+      { x: 120, y: 250, pts: 100, color: '#f43f5e' },
+      { x: 280, y: 250, pts: 100, color: '#f43f5e' },
+      { x: 200, y: 380, pts: 500, color: '#10b981' },
+      { x: 80, y: 450, pts: 250, color: '#6366f1' },
+      { x: 320, y: 450, pts: 250, color: '#6366f1' }
     ].map(b => {
-      const bumper = Matter.Bodies.circle(b.x, b.y, 30, {
-        isStatic: true,
-        label: 'bumper',
-        restitution: 1.6,
-        render: { fillStyle: '#f43f5e', strokeStyle: '#fff', lineWidth: 4 }
+      const body = Matter.Bodies.circle(b.x, b.y, 28, {
+        isStatic: true, label: 'bumper', restitution: 1.6,
+        render: { fillStyle: b.color, strokeStyle: '#fff', lineWidth: 4 }
       });
-      bumper.scoreValue = b.pts;
-      return bumper;
+      body.scoreValue = b.pts;
+      return body;
     });
 
-    // 5. Kinetic Flippers
     const createFlipper = (x, y, isRight) => {
-      const body = Matter.Bodies.rectangle(x, y, 110, 24, {
+      const group = Matter.Body.nextGroup(true);
+      const width = 110;
+      const height = 24;
+      
+      const body = Matter.Bodies.rectangle(x, y, width, height, {
         chamfer: { radius: 12 },
         label: 'flipper',
+        collisionFilter: { group: group },
         density: 0.1,
-        render: { fillStyle: '#6366f1', strokeStyle: '#fff', lineWidth: 2 }
+        friction: 0,
+        render: { fillStyle: '#818cf8' }
       });
-
+      
       const pivotX = isRight ? x + 45 : x - 45;
-      const pivot = Matter.Constraint.create({
+      const constraint = Matter.Constraint.create({
         pointA: { x: pivotX, y: y },
         bodyB: body,
         pointB: { x: isRight ? 45 : -45, y: 0 },
@@ -152,71 +143,56 @@ export default function App() {
         length: 0,
         render: { visible: false }
       });
-
-      return { 
-        body, 
-        constraint: pivot, 
-        isRight, 
-        upAngle: isRight ? -0.6 : 0.6, 
-        downAngle: isRight ? 0.3 : -0.3 
-      };
+      
+      return { body, constraint, isRight };
     };
 
-    flippers.current.left = createFlipper(WIDTH / 2 - 95, HEIGHT - 140, false);
-    flippers.current.right = createFlipper(WIDTH / 2 + 40, HEIGHT - 140, true);
+    flippers.current.left = createFlipper(WIDTH / 2 - 95, HEIGHT - 110, false);
+    flippers.current.right = createFlipper(WIDTH / 2 + 35, HEIGHT - 110, true);
 
-    const plunger = Matter.Bodies.rectangle(WIDTH - 28, HEIGHT - 10, 40, 60, {
-      isStatic: true, render: { fillStyle: '#475569' }
-    });
-
-    // 6. Engine Update Logic
     Matter.Events.on(engine, 'beforeUpdate', () => {
-      // Flipper physics
-      [flippers.current.left, flippers.current.right].forEach((f, i) => {
-        const active = i === 0 ? keys.current.left : keys.current.right;
-        const targetAngle = active ? f.upAngle : f.downAngle;
-        const diff = targetAngle - f.body.angle;
-        Matter.Body.setAngularVelocity(f.body, diff * 0.45);
+      [flippers.current.left, flippers.current.right].forEach((f) => {
+        if (!f) return;
+        const active = f.isRight ? keys.current.right : keys.current.left;
+        const targetAngle = active ? (f.isRight ? -0.5 : 0.5) : (f.isRight ? 0.6 : -0.6);
+        const newAngle = f.body.angle + (targetAngle - f.body.angle) * 0.45;
+        Matter.Body.setAngle(f.body, newAngle);
       });
 
-      // Plunger mechanics
       if (keys.current.space) {
-        if (plunger.position.y < HEIGHT + 60) {
-          Matter.Body.setPosition(plunger, { x: plunger.position.x, y: plunger.position.y + 4 });
-          setPlungerPower(p => Math.min(p + 2, 100));
+        setPlungerPower(p => Math.min(p + 1.5, 100));
+      } else if (plungerPower > 0) {
+        if (ballRef.current && ballRef.current.position.x > WIDTH - 60) {
+          const force = (plungerPower / 100) * 0.7;
+          Matter.Body.applyForce(ballRef.current, ballRef.current.position, { x: 0, y: -force });
         }
-      } else {
-        if (plunger.position.y > HEIGHT - 10) {
-          if (ballRef.current && ballRef.current.position.x > WIDTH - 60 && ballRef.current.position.y > HEIGHT - 150) {
-            const force = (plunger.position.y - (HEIGHT - 10)) * 0.04;
-            Matter.Body.applyForce(ballRef.current, ballRef.current.position, { x: 0, y: -force });
-          }
-          Matter.Body.setPosition(plunger, { x: plunger.position.x, y: HEIGHT - 10 });
-          setPlungerPower(0);
+        setPlungerPower(0);
+      }
+
+      if (ballRef.current) {
+        const vel = ballRef.current.velocity;
+        if (Math.abs(vel.x) < 0.1 && Math.abs(vel.y) < 0.1 && ballRef.current.position.y < HEIGHT - 200) {
+          Matter.Body.applyForce(ballRef.current, ballRef.current.position, { x: 0.002, y: 0 });
         }
       }
     });
 
-    // 7. Collision Detection
     Matter.Events.on(engine, 'collisionStart', (event) => {
       event.pairs.forEach(pair => {
         const labels = [pair.bodyA.label, pair.bodyB.label];
-        
         if (labels.includes('bumper')) {
           const b = pair.bodyA.label === 'bumper' ? pair.bodyA : pair.bodyB;
-          gameRef.current.score += (b.scoreValue || 100);
+          gameRef.current.score += b.scoreValue;
           setScore(gameRef.current.score);
         }
-        
-        if (labels.includes('drain')) {
-          const ballFound = pair.bodyA.label === 'ball' || pair.bodyB.label === 'ball';
-          if (ballFound) handleBallLoss();
+        if (labels.includes('drain') && labels.includes('ball')) {
+          handleBallLoss();
         }
       });
     });
 
     Matter.Composite.add(engine.world, [
-      ...walls, ...bumpers, plunger,
+      ...walls, ...arcWalls, ...bumpers,
       flippers.current.left.body, flippers.current.left.constraint,
       flippers.current.right.body, flippers.current.right.constraint
     ]);
@@ -225,129 +201,130 @@ export default function App() {
     const runner = Matter.Runner.create();
     runnerRef.current = runner;
     Matter.Runner.run(runner, engine);
-
     spawnBall();
-  }, [spawnBall, handleBallLoss]);
+  };
+
+  const handleBallLoss = useCallback(() => {
+    if (gameRef.current.state !== 'PLAYING') return;
+    gameRef.current.balls -= 1;
+    setBallsRemaining(gameRef.current.balls);
+
+    if (gameRef.current.balls <= 0) {
+      setGameState('GAMEOVER');
+      gameRef.current.state = 'GAMEOVER';
+    } else {
+      setTimeout(() => {
+        if (gameRef.current.state === 'PLAYING') spawnBall();
+      }, 1000);
+    }
+  }, [spawnBall]);
 
   useEffect(() => {
-    const down = (e) => {
+    const handleDown = (e) => {
       const k = e.key.toLowerCase();
       if (k === 'a' || k === 'arrowleft') keys.current.left = true;
       if (k === 'd' || k === 'arrowright') keys.current.right = true;
       if (k === ' ' || k === 'arrowdown') keys.current.space = true;
     };
-    const up = (e) => {
+    const handleUp = (e) => {
       const k = e.key.toLowerCase();
       if (k === 'a' || k === 'arrowleft') keys.current.left = false;
       if (k === 'd' || k === 'arrowright') keys.current.right = false;
       if (k === ' ' || k === 'arrowdown') keys.current.space = false;
     };
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
+    window.addEventListener('keydown', handleDown);
+    window.addEventListener('keyup', handleUp);
     return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
-      if (runnerRef.current) Matter.Runner.stop(runnerRef.current);
+      window.removeEventListener('keydown', handleDown);
+      window.removeEventListener('keyup', handleUp);
+      cleanup();
     };
   }, []);
 
-  const handleStart = () => {
+  const startGame = () => {
     gameRef.current = { score: 0, balls: 3, state: 'PLAYING' };
     setBallsRemaining(3);
     setScore(0);
     setGameState('PLAYING');
-    initGame();
+    setTimeout(initGame, 50);
   };
 
   return (
-    <div className="min-h-screen bg-[#050508] flex flex-col items-center justify-center p-4 select-none overflow-hidden font-sans">
+    <div className="min-h-screen bg-[#020205] flex flex-col items-center justify-center p-4 text-slate-100 overflow-hidden">
       
-      {/* HUD */}
       <div className="w-full max-w-[450px] flex justify-between items-end mb-6 px-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-indigo-400 text-[10px] font-bold uppercase tracking-widest">
-            <Activity size={14} className="animate-pulse" /> Kinetic Data
+        <div>
+          <div className="flex items-center gap-2 text-indigo-400 text-[10px] font-bold uppercase tracking-[0.25em] mb-1">
+            <Cpu size={12} className="animate-pulse" /> Core Status: Nominal
           </div>
-          <div className="text-6xl font-black text-white tracking-tighter tabular-nums drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+          <div className="text-6xl font-black tabular-nums tracking-tighter text-white drop-shadow-[0_0_20px_rgba(99,102,241,0.6)]">
             {score.toLocaleString().padStart(6, '0')}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-3 pb-1">
-          <div className="flex gap-2">
+        <div className="flex flex-col items-end gap-3 mb-2">
+           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reserve Units</div>
+           <div className="flex gap-2">
             {[...Array(3)].map((_, i) => (
-              <div 
-                key={i} 
-                className={`w-4 h-4 rounded-full border-2 transition-all duration-500 ${
-                  i < ballsRemaining 
-                  ? 'bg-indigo-500 border-indigo-200 shadow-[0_0_10px_#6366f1]' 
-                  : 'bg-neutral-900 border-neutral-800 scale-75 opacity-30'
-                }`} 
-              />
+              <div key={i} className={`w-4 h-4 rounded-full transition-all duration-700 ${i < ballsRemaining ? 'bg-indigo-500 shadow-[0_0_15px_#6366f1]' : 'bg-neutral-800'}`} />
             ))}
           </div>
-          <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-[0.2em]">Ball Cache</span>
         </div>
       </div>
 
-      {/* Game Table Container */}
-      <div className="relative w-[450px] h-[800px] bg-neutral-950 rounded-[3rem] border-[12px] border-[#1a1a1e] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden ring-1 ring-white/10">
-        <div ref={containerRef} className="absolute inset-0" />
+      <div className="relative w-[450px] h-[800px] bg-[#080810] rounded-[3.5rem] border-[14px] border-[#1e1e30] shadow-[0_40px_100px_rgba(0,0,0,0.8)] overflow-hidden">
+        <div ref={containerRef} className="absolute inset-0 z-10" />
         
-        {/* Glow Effects */}
-        <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-30 bg-[radial-gradient(circle_at_50%_30%,_rgba(99,102,241,0.2)_0%,_transparent_70%)]" />
-        
-        {/* Plunger Gauge */}
-        <div className="absolute right-3.5 bottom-24 w-1.5 h-40 bg-neutral-900/80 rounded-full overflow-hidden border border-white/5 backdrop-blur-md">
+        <div className="absolute right-[12px] bottom-[30px] w-[30px] h-[160px] bg-neutral-900/50 rounded-full border border-white/5 overflow-hidden z-20 flex flex-col justify-end p-1">
           <div 
-            className="w-full bg-gradient-to-t from-indigo-600 via-indigo-400 to-white shadow-[0_0_15px_#6366f1] transition-all duration-75" 
-            style={{ height: `${plungerPower}%`, marginTop: `${100 - plungerPower}%` }} 
+            className="w-full bg-gradient-to-t from-indigo-600 via-indigo-400 to-white rounded-full transition-all duration-75 shadow-[0_0_15px_rgba(99,102,241,0.5)]"
+            style={{ height: `${plungerPower}%` }}
           />
+          <ChevronUp className="absolute top-2 left-1/2 -translate-x-1/2 text-white/20 animate-bounce" size={16} />
         </div>
 
-        {/* Modal Overlays */}
         {gameState !== 'PLAYING' && (
-          <div className="absolute inset-0 z-50 bg-[#050508]/90 backdrop-blur-2xl flex flex-col items-center justify-center p-12 text-center animate-in fade-in duration-500">
+          <div className="absolute inset-0 z-50 bg-[#020205]/90 backdrop-blur-xl flex flex-col items-center justify-center p-12 text-center">
             {gameState === 'START' ? (
               <>
-                <div className="w-24 h-24 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-8">
-                   <Shield size={48} className="text-indigo-500" />
-                </div>
-                <h1 className="text-6xl font-black text-white italic tracking-tighter mb-2">
+                <Zap size={100} className="text-indigo-500 mb-8" />
+                <h1 className="text-7xl font-black mb-4 uppercase italic tracking-tighter leading-none">
                   NEO<span className="text-indigo-500">PIN</span>
                 </h1>
-                <p className="text-neutral-500 text-[10px] font-bold tracking-[0.4em] mb-16 uppercase">Advanced Physics Engine</p>
+                <p className="text-indigo-400/60 text-[10px] font-bold tracking-[0.4em] mb-16 uppercase">Physical Logic Engine v2.5</p>
               </>
             ) : (
               <>
-                <Trophy size={80} className="text-rose-500 mb-8 animate-bounce" />
-                <h2 className="text-4xl font-black text-white tracking-tight mb-2 uppercase italic">Mission Over</h2>
-                <div className="mb-16 p-8 rounded-3xl bg-white/5 border border-white/10 w-full">
-                  <p className="text-neutral-500 text-[10px] uppercase tracking-widest mb-2 font-bold opacity-50">Yield Harvested</p>
-                  <p className="text-7xl font-black text-white tracking-tighter">{score.toLocaleString()}</p>
-                </div>
+                <Trophy size={100} className="text-yellow-500 mb-8 animate-pulse" />
+                <h2 className="text-4xl font-black mb-2 tracking-tighter uppercase">MISSION COMPLETE</h2>
+                <div className="text-7xl font-black text-white mb-16 drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">{score.toLocaleString()}</div>
               </>
             )}
             
             <button 
-              onClick={handleStart}
-              className="group relative flex items-center gap-5 bg-white text-black px-14 py-6 rounded-2xl font-black text-xl transition-all hover:bg-indigo-500 hover:text-white active:scale-95 shadow-2xl"
+              onClick={startGame} 
+              className="group relative bg-white text-black font-black px-16 py-6 rounded-3xl overflow-hidden transition-all hover:scale-105 active:scale-95"
             >
-              {gameState === 'START' ? <Play fill="currentColor" size={24} /> : <RotateCcw size={24} />}
-              <span>{gameState === 'START' ? 'INITIALIZE' : 'REBOOT'}</span>
+              <span className="relative z-10 flex items-center gap-3 text-2xl tracking-tight uppercase">
+                {gameState === 'START' ? 'Engage' : 'Re-Engage'} <PlayCircle size={28} />
+              </span>
+              <div className="absolute inset-0 bg-indigo-600 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
             </button>
           </div>
         )}
       </div>
 
-      {/* Control Legend */}
-      <div className="mt-10 flex gap-12 text-[11px] text-neutral-600 font-bold uppercase tracking-[0.3em]">
-        <div className="flex items-center gap-3">
-          <kbd className="bg-neutral-900 px-2.5 py-1.5 rounded border border-neutral-800 text-neutral-400 font-mono">A / D</kbd>
-          <span>Impulse</span>
+      <div className="mt-10 grid grid-cols-3 gap-16 text-[11px] text-slate-500 font-black tracking-[0.25em]">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <span className="bg-[#1e1e30] px-4 py-2 rounded-xl text-white border border-white/5 shadow-xl min-w-[48px]">A</span>
+          <span>L-FLIP</span>
         </div>
-        <div className="flex items-center gap-3">
-          <kbd className="bg-neutral-900 px-2.5 py-1.5 rounded border border-neutral-800 text-neutral-400 font-mono">SPACE</kbd>
-          <span>Launch</span>
+        <div className="flex flex-col items-center gap-3 text-center">
+          <span className="bg-indigo-600 px-4 py-2 rounded-xl text-white border border-white/20 shadow-[0_0_20px_rgba(99,102,241,0.4)]">SPACE</span>
+          <span>PULSE</span>
+        </div>
+        <div className="flex flex-col items-center gap-3 text-center">
+          <span className="bg-[#1e1e30] px-4 py-2 rounded-xl text-white border border-white/5 shadow-xl min-w-[48px]">D</span>
+          <span>R-FLIP</span>
         </div>
       </div>
     </div>
