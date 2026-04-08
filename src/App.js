@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { create } from 'zustand';
-import { LucideTrophy, LucidePlay, LucideRotateCcw, LucideZap, LucideChevronUp } from 'lucide-react';
+import { 
+  Cpu, Orbit, TrendingUp, Gauge, Zap, Trophy, Shield, 
+  RotateCw, Share2, Layers, Activity, Hexagon
+} from 'lucide-react';
 
 /**
  * Game State Management
@@ -10,366 +13,425 @@ const useGameStore = create((set) => ({
   highScore: 0,
   gameState: 'START', 
   ballsLeft: 3,
-  addScore: (points) => set((state) => ({ score: state.score + points })),
-  startGame: () => set({ score: 0, gameState: 'PLAYING', ballsLeft: 3 }),
+  multiplier: 1,
+  addScore: (points) => set((state) => ({ 
+    score: state.score + Math.round(points * state.multiplier) 
+  })),
+  incrementMultiplier: () => set((state) => ({ 
+    multiplier: Math.min(state.multiplier + 0.2, 12) 
+  })),
+  startGame: () => set({ 
+    score: 0, gameState: 'PLAYING', ballsLeft: 3, multiplier: 1
+  }),
   endBall: () => set((state) => {
     const nextBalls = state.ballsLeft - 1;
     if (nextBalls <= 0) {
-      return { 
-        gameState: 'GAMEOVER', 
-        ballsLeft: 0, 
-        highScore: Math.max(state.score, state.highScore) 
-      };
+      return { gameState: 'GAMEOVER', highScore: Math.max(state.score, state.highScore) };
     }
-    return { ballsLeft: nextBalls };
+    return { ballsLeft: nextBalls, multiplier: 1 };
   }),
 }));
 
 const CANVAS_WIDTH = 400;
-const CANVAS_HEIGHT = 600;
-const BALL_RADIUS = 8;
-const GRAVITY = 0.25;
-const FRICTION = 0.992;
-const FLIPPER_LENGTH = 70;
-const FLIPPER_WIDTH = 14;
-const MAX_FLIPPER_ANGLE = 0.6; 
-const FLIPPER_SPEED = 0.3;
-const LAUNCHER_X = 375; 
-
-const COLORS = {
-  bg: '#05070a',
-  ball: '#ffffff',
-  flipper: '#38bdf8',
-  flipperActive: '#7dd3fc',
-  bumper: '#f43f5e',
-  wall: '#1e293b',
-  accent: '#6366f1',
-  gold: '#fbbf24'
-};
+const CANVAS_HEIGHT = 640;
+const BALL_RADIUS = 7.5;
+const GRAVITY = 0.38;
+const MAX_VELOCITY = 18;
+const SUB_STEPS = 10; 
 
 const App = () => {
   const canvasRef = useRef(null);
   const requestRef = useRef();
-  
-  // Ref-based physics state for 60fps performance
-  const ball = useRef({ x: LAUNCHER_X, y: 550, vx: 0, vy: 0, inPlay: false });
-  const flippers = useRef({
-    left: { x: 130, y: 550, angle: 0.5, active: false, targetAngle: 0.5 },
-    right: { x: 270, y: 550, angle: -0.5, active: false, targetAngle: -0.5 }
+  const store = useGameStore();
+
+  // Reference-based physics state for high performance
+  const ball = useRef({ 
+    x: 380, y: 580, vx: 0, vy: 0, 
+    inPlay: false, trail: [] 
   });
   
-  const bumpers = useRef([
-    { x: 120, y: 150, r: 25, hit: 0, score: 500 },
-    { x: 280, y: 150, r: 25, hit: 0, score: 500 },
-    { x: 200, y: 260, r: 30, hit: 0, score: 1000 },
-    { x: 70, y: 350, r: 20, hit: 0, score: 250 },
-    { x: 330, y: 350, r: 20, hit: 0, score: 250 },
-  ]);
+  const flippers = useRef({
+    left: { x: 120, y: 580, angle: 0.5, active: false, targetUp: -0.6, targetDown: 0.5, length: 78, r: 10 },
+    right: { x: 280, y: 580, angle: -0.5, active: false, targetUp: 0.6, targetDown: -0.5, length: 78, r: 10 }
+  });
+  
+  const [shake, setShake] = useState(0);
 
-  const { score, highScore, gameState, ballsLeft, addScore, startGame, endBall } = useGameStore();
+  const world = useRef({
+    bumpers: [
+      { x: 130, y: 150, r: 26, color: '#f43f5e', power: 1.7, id: 1 },
+      { x: 270, y: 150, r: 26, color: '#f43f5e', power: 1.7, id: 2 },
+      { x: 200, y: 70, r: 32, color: '#0ea5e9', power: 1.9, id: 3 },
+    ],
+    portals: [
+      { x: 40, y: 250, r: 20, color: '#f59e0b', pair: 1 },
+      { x: 360, y: 250, r: 20, color: '#8b5cf6', pair: 0 },
+    ],
+    walls: [
+      { x1: 5, y1: 640, x2: 5, y2: 150 },      
+      { x1: 395, y1: 640, x2: 395, y2: 150 },  
+      { x1: 360, y1: 640, x2: 360, y2: 200 }, 
+      { x1: 5, y1: 450, x2: 80, y2: 540 },    
+      { x1: 80, y1: 540, x2: 80, y2: 600 },   
+      { x1: 360, y1: 450, x2: 320, y2: 540 }, 
+      { x1: 320, y1: 540, x2: 320, y2: 600 }, 
+      { x1: 0, y1: 639, x2: 100, y2: 639 },
+      { x1: 300, y1: 639, x2: 400, y2: 639 },
+    ]
+  });
 
-  const launchBall = () => {
-    // Only launch if the ball is in the chute (x > 350)
-    if (ball.current.x > 350) {
-      ball.current.vy = -22; 
-      ball.current.vx = 0;
-      ball.current.inPlay = false; // Stay false until it clears the top curve
-    }
+  const getClosestPointOnSegment = (px, py, x1, y1, x2, y2) => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const l2 = dx * dx + dy * dy;
+    if (l2 === 0) return { x: x1, y: y1 };
+    let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return { x: x1 + t * dx, y: y1 + t * dy };
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.code === 'KeyZ' || e.code === 'ArrowLeft') flippers.current.left.active = true;
-      if (e.code === 'KeyM' || e.code === 'ArrowRight') flippers.current.right.active = true;
-      if (e.code === 'Space') {
-        if (gameState !== 'PLAYING') startGame();
-        else launchBall();
-      }
-    };
-    const handleKeyUp = (e) => {
-      if (e.code === 'KeyZ' || e.code === 'ArrowLeft') flippers.current.left.active = false;
-      if (e.code === 'KeyM' || e.code === 'ArrowRight') flippers.current.right.active = false;
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [gameState, startGame]);
-
   const updatePhysics = useCallback(() => {
-    if (gameState !== 'PLAYING') return;
-
+    if (store.gameState !== 'PLAYING') return;
     const b = ball.current;
-    b.vy += GRAVITY;
-    b.vx *= FRICTION;
-    b.vy *= FRICTION;
 
-    const f = flippers.current;
-    f.left.targetAngle = f.left.active ? -MAX_FLIPPER_ANGLE : 0.5;
-    f.left.angle += (f.left.targetAngle - f.left.angle) * FLIPPER_SPEED;
-    f.right.targetAngle = f.right.active ? MAX_FLIPPER_ANGLE : -0.5;
-    f.right.angle += (f.right.targetAngle - f.right.angle) * FLIPPER_SPEED;
+    for (let s = 0; s < SUB_STEPS; s++) {
+      // Integration
+      b.vy += GRAVITY / SUB_STEPS;
+      b.x += b.vx / SUB_STEPS;
+      b.y += b.vy / SUB_STEPS;
 
-    b.x += b.vx;
-    b.y += b.vy;
+      // Flipper Movement
+      const f = flippers.current;
+      const fSpeed = 0.55;
+      f.left.angle += (f.left.active ? f.left.targetUp - f.left.angle : f.left.targetDown - f.left.angle) * fSpeed;
+      f.right.angle += (f.right.active ? f.right.targetUp - f.right.angle : f.right.targetDown - f.right.angle) * fSpeed;
 
-    // --- LAUNCHER LANE & TOP CURVE ---
-    const chuteWallX = 350;
-    
-    // Top Curve Logic: If ball reaches the top of the chute
-    if (b.y < 50 && b.x > 340) {
-      b.vx = -10; // Kick it left into the main field
-      b.vy = 2;
-      b.inPlay = true;
+      // Collisions: Flippers
+      [ {fl: f.left, side: 1}, {fl: f.right, side: -1} ].forEach(({fl, side}) => {
+        const tipX = fl.x + Math.cos(fl.angle) * fl.length * side;
+        const tipY = fl.y + Math.sin(fl.angle) * fl.length * side;
+        const closest = getClosestPointOnSegment(b.x, b.y, fl.x, fl.y, tipX, tipY);
+        const dx = b.x - closest.x;
+        const dy = b.y - closest.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < BALL_RADIUS + fl.r) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+          // Eject ball from interior
+          b.x = closest.x + nx * (BALL_RADIUS + fl.r);
+          b.y = closest.y + ny * (BALL_RADIUS + fl.r);
+          
+          const dot = b.vx * nx + b.vy * ny;
+          if (dot < 0) {
+            const bounce = fl.active ? 15 : 4;
+            b.vx = (b.vx - 2 * dot * nx) + (nx * bounce);
+            b.vy = (b.vy - 2 * dot * ny) + (ny * bounce);
+            if(fl.active) {
+                setShake(5);
+                store.addScore(5);
+            }
+          }
+        }
+      });
+
+      // Collisions: World Walls
+      world.current.walls.forEach(w => {
+        const closest = getClosestPointOnSegment(b.x, b.y, w.x1, w.y1, w.x2, w.y2);
+        const dx = b.x - closest.x;
+        const dy = b.y - closest.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < BALL_RADIUS) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+          b.x = closest.x + nx * (BALL_RADIUS + 0.1);
+          b.y = closest.y + ny * (BALL_RADIUS + 0.1);
+          const dot = b.vx * nx + b.vy * ny;
+          if (dot < 0) {
+            b.vx = (b.vx - 2 * dot * nx) * 0.7;
+            b.vy = (b.vy - 2 * dot * ny) * 0.7;
+          }
+        }
+      });
+
+      // Collisions: Curved Top Dome
+      if (b.y < 150) {
+        const dx = b.x - 200;
+        const dy = b.y - 150;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const r = 195;
+        if (dist > r - BALL_RADIUS) {
+          const nx = -dx / dist;
+          const ny = -dy / dist;
+          b.x = 200 - nx * (r - BALL_RADIUS - 0.2);
+          b.y = 150 - ny * (r - BALL_RADIUS - 0.2);
+          const dot = b.vx * nx + b.vy * ny;
+          if (dot < 0) {
+            b.vx = (b.vx - 2 * dot * nx) * 0.8;
+            b.vy = (b.vy - 2 * dot * ny) * 0.8;
+          }
+        }
+      }
+
+      // Collisions: Bumpers
+      world.current.bumpers.forEach(bump => {
+        const dx = b.x - bump.x;
+        const dy = b.y - bump.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < bump.r + BALL_RADIUS) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+          b.x = bump.x + nx * (bump.r + BALL_RADIUS + 0.2);
+          b.y = bump.y + ny * (bump.r + BALL_RADIUS + 0.2);
+          const dot = b.vx * nx + b.vy * ny;
+          b.vx = (b.vx - 2 * dot * nx) * bump.power;
+          b.vy = (b.vy - 2 * dot * ny) * bump.power;
+          store.addScore(200);
+          store.incrementMultiplier();
+          setShake(8);
+        }
+      });
     }
 
-    // Walls
-    // Side Walls
-    if (b.x < BALL_RADIUS) { b.x = BALL_RADIUS; b.vx *= -0.5; }
-    if (b.x > CANVAS_WIDTH - BALL_RADIUS) { b.x = CANVAS_WIDTH - BALL_RADIUS; b.vx *= -0.5; }
-    if (b.y < BALL_RADIUS) { b.y = BALL_RADIUS; b.vy *= -0.5; }
-
-    // Chute Internal Wall (Prevents entering chute from main field)
-    if (b.inPlay) {
-      if (b.x > chuteWallX - BALL_RADIUS && b.y > 80) {
-        b.x = chuteWallX - BALL_RADIUS;
-        b.vx *= -0.5;
+    // Portals
+    world.current.portals.forEach((p, idx) => {
+      const dx = b.x - p.x;
+      const dy = b.y - p.y;
+      if (Math.sqrt(dx*dx + dy*dy) < p.r) {
+        const target = world.current.portals[p.pair];
+        b.x = target.x + (b.vx > 0 ? 30 : -30);
+        b.y = target.y;
+        setShake(4);
       }
-    } else {
-      // Keep ball in chute until it goes over the top
-      if (b.x < chuteWallX + BALL_RADIUS && b.y > 80) {
-        b.x = chuteWallX + BALL_RADIUS;
-        b.vx *= -0.2;
-      }
-    }
-
-    // Drain & Reset
-    if (b.y > CANVAS_HEIGHT + 50) {
-      endBall();
-      b.x = LAUNCHER_X; 
-      b.y = 550; 
-      b.vx = 0; 
-      b.vy = 0; 
-      b.inPlay = false;
-    }
-
-    // Bumpers Collision
-    bumpers.current.forEach(bumper => {
-      const dx = b.x - bumper.x;
-      const dy = b.y - bumper.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < bumper.r + BALL_RADIUS) {
-        const nx = dx / dist;
-        const ny = dy / dist;
-        b.x = bumper.x + nx * (bumper.r + BALL_RADIUS);
-        b.vx = nx * 14;
-        b.vy = ny * 14;
-        bumper.hit = 10;
-        addScore(bumper.score);
-      }
-      if (bumper.hit > 0) bumper.hit--;
     });
 
-    // Flipper Collision (Advanced Line-Segment Check)
-    const checkFlipper = (flip, isLeft) => {
-      const tipX = flip.x + Math.cos(flip.angle) * FLIPPER_LENGTH * (isLeft ? 1 : -1);
-      const tipY = flip.y + Math.sin(flip.angle) * FLIPPER_LENGTH * (isLeft ? 1 : -1);
-      
-      const dx = tipX - flip.x;
-      const dy = tipY - flip.y;
-      const lengthSq = dx * dx + dy * dy;
-      let t = ((b.x - flip.x) * dx + (b.y - flip.y) * dy) / lengthSq;
-      t = Math.max(0, Math.min(1, t));
-      
-      const closestX = flip.x + t * dx;
-      const closestY = flip.y + t * dy;
-      const dist = Math.sqrt((b.x - closestX)**2 + (b.y - closestY)**2);
+    // Velocity Clamp
+    const currentSpeed = Math.sqrt(b.vx**2 + b.vy**2);
+    if (currentSpeed > MAX_VELOCITY) {
+      b.vx = (b.vx / currentSpeed) * MAX_VELOCITY;
+      b.vy = (b.vy / currentSpeed) * MAX_VELOCITY;
+    }
 
-      if (dist < BALL_RADIUS + FLIPPER_WIDTH / 2) {
-        const nx = (b.x - closestX) / dist;
-        const ny = (b.y - closestY) / dist;
-        b.x = closestX + nx * (BALL_RADIUS + FLIPPER_WIDTH / 2);
-        b.y = closestY + ny * (BALL_RADIUS + FLIPPER_WIDTH / 2);
-        
-        // Flipper kick strength depends on activity
-        const power = flip.active ? 15 : 5;
-        b.vx = nx * power + b.vx * 0.2;
-        b.vy = ny * power + b.vy * 0.2;
-      }
-    };
-    checkFlipper(f.left, true);
-    checkFlipper(f.right, false);
+    // Drain
+    if (b.y > CANVAS_HEIGHT + 20) {
+      store.endBall();
+      b.x = 380; b.y = 580; b.vx = 0; b.vy = 0; b.inPlay = false; b.trail = [];
+    }
 
-  }, [gameState, addScore, endBall]);
+    // Trail logic
+    b.trail.push({x: b.x, y: b.y});
+    if (b.trail.length > 10) b.trail.shift();
+  }, [store]);
 
-  const draw = useCallback(() => {
+  const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     
-    // Clear
-    ctx.fillStyle = COLORS.bg;
+    ctx.save();
+    if (shake > 0) {
+      ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+      setShake(s => Math.max(0, s - 0.6));
+    }
+
+    // BG
+    ctx.fillStyle = '#020617';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Aesthetic Playfield Grid
+    // Grid
     ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 1;
-    for(let i=0; i<CANVAS_HEIGHT; i+=50) {
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(CANVAS_WIDTH, i); ctx.stroke();
-    }
-    for(let i=0; i<CANVAS_WIDTH; i+=50) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, CANVAS_HEIGHT); ctx.stroke();
-    }
+    for(let i=0; i<CANVAS_WIDTH; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,640); ctx.stroke(); }
+    for(let i=0; i<CANVAS_HEIGHT; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(CANVAS_WIDTH,i); ctx.stroke(); }
 
-    // Launcher Chute Visuals
-    ctx.strokeStyle = COLORS.wall;
-    ctx.lineWidth = 8;
-    ctx.beginPath();
-    ctx.moveTo(350, 600);
-    ctx.lineTo(350, 80);
-    ctx.quadraticCurveTo(350, 10, 200, 10); // The critical entry curve
+    // Table Bounds
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    world.current.walls.forEach(w => {
+      ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
+    });
+
+    // Dome
+    ctx.beginPath(); ctx.arc(200, 150, 195, Math.PI, 0); 
     ctx.stroke();
 
+    // Portals
+    world.current.portals.forEach(p => {
+      ctx.shadowBlur = 10; ctx.shadowColor = p.color;
+      ctx.strokeStyle = p.color; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.stroke();
+      ctx.shadowBlur = 0;
+    });
+
     // Bumpers
-    bumpers.current.forEach(bumper => {
-      ctx.beginPath();
-      ctx.arc(bumper.x, bumper.y, bumper.r + (bumper.hit * 1.2), 0, Math.PI * 2);
-      ctx.fillStyle = bumper.hit > 0 ? '#fff' : COLORS.bumper;
-      ctx.fill();
-      ctx.strokeStyle = COLORS.gold;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      // Bumper glow
-      if (bumper.hit > 0) {
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = COLORS.bumper;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      }
+    world.current.bumpers.forEach(bump => {
+      ctx.shadowBlur = 15; ctx.shadowColor = bump.color;
+      ctx.fillStyle = bump.color;
+      ctx.beginPath(); ctx.arc(bump.x, bump.y, bump.r, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.shadowBlur = 0;
     });
 
     // Flippers
-    const drawF = (f, isLeft) => {
+    const drawFlip = (f, side) => {
       ctx.save();
       ctx.translate(f.x, f.y);
       ctx.rotate(f.angle);
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = f.active ? COLORS.flipperActive : COLORS.flipper;
-      ctx.lineWidth = FLIPPER_WIDTH;
+      const grad = ctx.createLinearGradient(0, 0, f.length * side, 0);
+      grad.addColorStop(0, '#1d4ed8');
+      grad.addColorStop(1, f.active ? '#38bdf8' : '#2563eb');
+      ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(isLeft ? FLIPPER_LENGTH : -FLIPPER_LENGTH, 0);
-      ctx.stroke();
+      if (side === 1) ctx.roundRect(0, -f.r, f.length, f.r * 2, f.r);
+      else ctx.roundRect(-f.length, -f.r, f.length, f.r * 2, f.r);
+      ctx.fill();
+      ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 2; ctx.stroke();
       ctx.restore();
     };
-    drawF(flippers.current.left, true);
-    drawF(flippers.current.right, false);
+    drawFlip(flippers.current.left, 1);
+    drawFlip(flippers.current.right, -1);
 
     // Ball
     const b = ball.current;
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, BALL_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS.ball;
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = 'white';
-    ctx.fill();
+    b.trail.forEach((t, i) => {
+      ctx.globalAlpha = (i / b.trail.length) * 0.3;
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath(); ctx.arc(t.x, t.y, BALL_RADIUS - 1, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath(); ctx.arc(b.x, b.y, BALL_RADIUS, 0, Math.PI*2); ctx.fill();
     ctx.shadowBlur = 0;
 
+    ctx.restore();
     updatePhysics();
-    requestRef.current = requestAnimationFrame(draw);
-  }, [updatePhysics]);
+    requestRef.current = requestAnimationFrame(render);
+  }, [updatePhysics, shake]);
 
   useEffect(() => {
-    requestRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(requestRef.current);
-  }, [draw]);
+    const handleKey = (e, down) => {
+      if (e.code === 'KeyZ' || e.code === 'ArrowLeft') flippers.current.left.active = down;
+      if (e.code === 'KeyM' || e.code === 'ArrowRight') flippers.current.right.active = down;
+      
+      if (down && e.code === 'Space') {
+        if (store.gameState === 'PLAYING') {
+          // Launch only from gutter
+          if (!ball.current.inPlay && ball.current.x > 360 && ball.current.y > 550) {
+            ball.current.vy = -36; 
+            ball.current.vx = -0.05;
+            ball.current.inPlay = true;
+          }
+        } else {
+          store.startGame();
+        }
+      }
+    };
+    window.addEventListener('keydown', (e) => handleKey(e, true));
+    window.addEventListener('keyup', (e) => handleKey(e, false));
+    requestRef.current = requestAnimationFrame(render);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('keyup', handleKey);
+      cancelAnimationFrame(requestRef.current);
+    }
+  }, [store, render]);
 
   return (
-    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center font-sans text-slate-100 p-4 select-none">
-      <div className="w-[400px] flex justify-between items-end mb-4 px-2">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <LucideZap className="text-yellow-400 fill-yellow-400 w-4 h-4" />
-            <h1 className="text-xl font-black italic tracking-tighter text-white">NEOPIN V4</h1>
+    <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-4 select-none">
+      
+      {/* Header HUD */}
+      <div className="w-[420px] mb-6 flex justify-between items-end px-4">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-sky-400">
+            <Hexagon size={16} className="animate-spin-slow" />
+            <span className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-60">System Online</span>
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className={`w-3 h-3 rounded-full ${i < ballsLeft ? 'bg-sky-400' : 'bg-slate-800'}`} />
+              <div key={i} className={`w-3 h-3 rounded-full transition-all duration-500 ${i < store.ballsLeft ? 'bg-sky-500 shadow-[0_0_12px_#38bdf8]' : 'bg-slate-800'}`} />
             ))}
           </div>
         </div>
+        
         <div className="text-right">
-          <span className="text-[10px] text-slate-500 font-bold uppercase block tracking-widest">High Score</span>
-          <span className="text-2xl font-mono text-white font-bold leading-none">{score.toLocaleString()}</span>
+          <div className="flex items-center justify-end gap-2 text-amber-500 mb-1">
+            <TrendingUp size={14} />
+            <span className="text-xs font-black">x{store.multiplier.toFixed(1)}</span>
+          </div>
+          <div className="text-5xl font-mono font-black tracking-tighter tabular-nums">
+            {store.score.toLocaleString()}
+          </div>
         </div>
       </div>
 
-      <div className="relative group">
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_WIDTH}
-          height={CANVAS_HEIGHT}
-          className="rounded-3xl border-8 border-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-black cursor-none"
-        />
+      <div className="flex gap-8 items-center">
+        {/* Machine Frame */}
+        <div className="relative p-6 bg-slate-900 rounded-[5rem] shadow-[0_40px_100px_rgba(0,0,0,0.8)] border-b-[20px] border-slate-950">
+          <div className="relative rounded-[4rem] overflow-hidden border-[10px] border-slate-950 bg-black">
+            <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="block cursor-none" />
+            
+            {/* UI Overlay */}
+            {store.gameState !== 'PLAYING' && (
+              <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-12 text-center z-50">
+                <Orbit className="w-24 h-24 text-sky-500 animate-pulse mb-8" />
+                
+                <h1 className="text-6xl font-black italic tracking-tighter mb-10 leading-none">
+                  NEO<span className="text-sky-500">PIN</span>
+                </h1>
+                
+                <div className="space-y-4 w-full mb-10">
+                  <div className="flex justify-between items-center bg-slate-900/50 p-4 rounded-3xl border border-slate-800/50">
+                    <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Left</span>
+                    <span className="text-sky-400 font-mono font-bold">Z / ←</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-slate-900/50 p-4 rounded-3xl border border-slate-800/50">
+                    <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Right</span>
+                    <span className="text-sky-400 font-mono font-bold">M / →</span>
+                  </div>
+                </div>
 
-        {gameState !== 'PLAYING' && (
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center p-8 text-center border-4 border-slate-800/50">
-            {gameState === 'START' ? (
-              <div className="animate-in fade-in zoom-in duration-500">
-                <div className="w-20 h-20 bg-sky-500 rounded-2xl flex items-center justify-center mb-6 mx-auto rotate-3 shadow-lg shadow-sky-500/20">
-                    <LucidePlay className="w-10 h-10 text-white fill-white" />
-                </div>
-                <h2 className="text-4xl font-black mb-2 tracking-tighter italic">INSERT COIN</h2>
-                <p className="text-slate-400 mb-8 text-sm font-medium uppercase tracking-widest">Z/M Keys • Space to Launch</p>
                 <button 
-                    onClick={startGame}
-                    className="px-10 py-4 bg-white text-black rounded-xl font-black text-sm uppercase tracking-widest hover:bg-sky-400 hover:text-white transition-all shadow-xl"
+                  onClick={store.startGame}
+                  className="w-full py-6 bg-sky-600 hover:bg-sky-500 text-white font-black rounded-3xl transition-all active:scale-95 shadow-xl flex items-center justify-center gap-3"
                 >
-                    Start Game
+                  <Zap size={20} className="text-amber-300" />
+                  <span className="tracking-widest uppercase text-xl">Initialize</span>
                 </button>
-              </div>
-            ) : (
-              <div className="animate-in fade-in zoom-in duration-500">
-                <LucideTrophy className="w-16 h-16 text-yellow-500 mb-4 mx-auto drop-shadow-[0_0_15px_rgba(234,179,8,0.4)]" />
-                <h2 className="text-4xl font-black mb-1 italic">GAME OVER</h2>
-                <div className="mb-8">
-                    <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest mb-1">Final Score</p>
-                    <p className="text-3xl font-mono text-sky-400 font-bold">{score.toLocaleString()}</p>
-                </div>
-                <button 
-                  onClick={startGame}
-                  className="bg-sky-500 text-white font-black py-4 px-10 rounded-xl hover:bg-sky-400 transition-all flex items-center justify-center gap-2 mx-auto"
-                >
-                  <LucideRotateCcw size={18} /> PLAY AGAIN
-                </button>
+
+                {store.gameState === 'GAMEOVER' && (
+                  <div className="mt-8 flex flex-col items-center gap-1">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sector Best</p>
+                    <p className="text-3xl font-mono text-white font-black">{store.highScore.toLocaleString()}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-
-        {gameState === 'PLAYING' && (
-            <div className="absolute bottom-10 right-4 flex flex-col items-center opacity-40">
-                <div className="animate-bounce">
-                    <LucideChevronUp className="text-sky-400 w-6 h-6" />
-                </div>
-                <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest">Launch</span>
-            </div>
-        )}
-      </div>
-
-      <div className="mt-8 grid grid-cols-2 gap-8 text-[10px] font-black text-slate-600 tracking-[0.3em] uppercase border-t border-slate-900 pt-6 w-[400px]">
-        <div className="flex flex-col items-start gap-1">
-            <span>Controls</span>
-            <span className="text-slate-400">Z/Left • M/Right</span>
-        </div>
-        <div className="flex flex-col items-end gap-1 text-right">
-            <span>System Status</span>
-            <span className="text-emerald-500">Physics Stable</span>
         </div>
       </div>
+      
+      {/* Footer Instructions */}
+      <div className="mt-10 flex items-center gap-8 text-slate-700 text-[10px] font-bold tracking-[0.4em] uppercase">
+        <div className="flex items-center gap-2">
+          <Shield size={12} className="text-emerald-600" />
+          <span>Buffer: Stable</span>
+        </div>
+        <span>Space to Launch</span>
+      </div>
+
+      <style>{`
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow { animation: spin-slow 15s linear infinite; }
+        canvas {
+          image-rendering: pixelated;
+        }
+      `}</style>
     </div>
   );
 };
