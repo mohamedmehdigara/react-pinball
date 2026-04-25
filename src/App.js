@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { create } from 'zustand';
 import { 
-  Cpu, Orbit, TrendingUp, Gauge, Zap, Trophy, Shield, 
-  RotateCw, Share2, Layers, Activity, Hexagon
+  Orbit, TrendingUp, Zap, Hexagon, Shield, Activity
 } from 'lucide-react';
 
 /**
- * Game State Management
+ * Game State Management via Zustand
+ * This replaces the need for the 'flux' package entirely.
  */
 const useGameStore = create((set) => ({
   score: 0,
@@ -36,10 +36,10 @@ const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 640;
 const BALL_RADIUS = 7.5;
 const GRAVITY = 0.38;
-const MAX_VELOCITY = 18;
-const SUB_STEPS = 10; 
+const MAX_VELOCITY = 20;
+const SUB_STEPS = 8; 
 
-const App = () => {
+export default function App() {
   const canvasRef = useRef(null);
   const requestRef = useRef();
   const store = useGameStore();
@@ -59,9 +59,9 @@ const App = () => {
 
   const world = useRef({
     bumpers: [
-      { x: 130, y: 150, r: 26, color: '#f43f5e', power: 1.7, id: 1 },
-      { x: 270, y: 150, r: 26, color: '#f43f5e', power: 1.7, id: 2 },
-      { x: 200, y: 70, r: 32, color: '#0ea5e9', power: 1.9, id: 3 },
+      { x: 130, y: 150, r: 26, color: '#f43f5e', power: 1.8, id: 1 },
+      { x: 270, y: 150, r: 26, color: '#f43f5e', power: 1.8, id: 2 },
+      { x: 200, y: 70, r: 32, color: '#0ea5e9', power: 2.0, id: 3 },
     ],
     portals: [
       { x: 40, y: 250, r: 20, color: '#f59e0b', pair: 1 },
@@ -95,18 +95,16 @@ const App = () => {
     const b = ball.current;
 
     for (let s = 0; s < SUB_STEPS; s++) {
-      // Integration
       b.vy += GRAVITY / SUB_STEPS;
       b.x += b.vx / SUB_STEPS;
       b.y += b.vy / SUB_STEPS;
 
-      // Flipper Movement
       const f = flippers.current;
-      const fSpeed = 0.55;
+      const fSpeed = 0.6;
       f.left.angle += (f.left.active ? f.left.targetUp - f.left.angle : f.left.targetDown - f.left.angle) * fSpeed;
       f.right.angle += (f.right.active ? f.right.targetUp - f.right.angle : f.right.targetDown - f.right.angle) * fSpeed;
 
-      // Collisions: Flippers
+      // Flipper Collision logic
       [ {fl: f.left, side: 1}, {fl: f.right, side: -1} ].forEach(({fl, side}) => {
         const tipX = fl.x + Math.cos(fl.angle) * fl.length * side;
         const tipY = fl.y + Math.sin(fl.angle) * fl.length * side;
@@ -118,24 +116,23 @@ const App = () => {
         if (dist < BALL_RADIUS + fl.r) {
           const nx = dx / dist;
           const ny = dy / dist;
-          // Eject ball from interior
           b.x = closest.x + nx * (BALL_RADIUS + fl.r);
           b.y = closest.y + ny * (BALL_RADIUS + fl.r);
           
           const dot = b.vx * nx + b.vy * ny;
           if (dot < 0) {
-            const bounce = fl.active ? 15 : 4;
+            const bounce = fl.active ? 16 : 4;
             b.vx = (b.vx - 2 * dot * nx) + (nx * bounce);
             b.vy = (b.vy - 2 * dot * ny) + (ny * bounce);
             if(fl.active) {
                 setShake(5);
-                store.addScore(5);
+                store.addScore(10);
             }
           }
         }
       });
 
-      // Collisions: World Walls
+      // Wall Collisions
       world.current.walls.forEach(w => {
         const closest = getClosestPointOnSegment(b.x, b.y, w.x1, w.y1, w.x2, w.y2);
         const dx = b.x - closest.x;
@@ -149,13 +146,13 @@ const App = () => {
           b.y = closest.y + ny * (BALL_RADIUS + 0.1);
           const dot = b.vx * nx + b.vy * ny;
           if (dot < 0) {
-            b.vx = (b.vx - 2 * dot * nx) * 0.7;
-            b.vy = (b.vy - 2 * dot * ny) * 0.7;
+            b.vx = (b.vx - 2 * dot * nx) * 0.75;
+            b.vy = (b.vy - 2 * dot * ny) * 0.75;
           }
         }
       });
 
-      // Collisions: Curved Top Dome
+      // Dome Top
       if (b.y < 150) {
         const dx = b.x - 200;
         const dy = b.y - 150;
@@ -174,7 +171,7 @@ const App = () => {
         }
       }
 
-      // Collisions: Bumpers
+      // Bumpers
       world.current.bumpers.forEach(bump => {
         const dx = b.x - bump.x;
         const dy = b.y - bump.y;
@@ -182,19 +179,19 @@ const App = () => {
         if (dist < bump.r + BALL_RADIUS) {
           const nx = dx / dist;
           const ny = dy / dist;
-          b.x = bump.x + nx * (bump.r + BALL_RADIUS + 0.2);
-          b.y = bump.y + ny * (bump.r + BALL_RADIUS + 0.2);
+          b.x = bump.x + nx * (bump.r + BALL_RADIUS + 0.5);
+          b.y = bump.y + ny * (bump.r + BALL_RADIUS + 0.5);
           const dot = b.vx * nx + b.vy * ny;
           b.vx = (b.vx - 2 * dot * nx) * bump.power;
           b.vy = (b.vy - 2 * dot * ny) * bump.power;
-          store.addScore(200);
+          store.addScore(250);
           store.incrementMultiplier();
           setShake(8);
         }
       });
     }
 
-    // Portals
+    // Portal Logic
     world.current.portals.forEach((p, idx) => {
       const dx = b.x - p.x;
       const dy = b.y - p.y;
@@ -206,22 +203,19 @@ const App = () => {
       }
     });
 
-    // Velocity Clamp
-    const currentSpeed = Math.sqrt(b.vx**2 + b.vy**2);
-    if (currentSpeed > MAX_VELOCITY) {
-      b.vx = (b.vx / currentSpeed) * MAX_VELOCITY;
-      b.vy = (b.vy / currentSpeed) * MAX_VELOCITY;
+    const speed = Math.sqrt(b.vx**2 + b.vy**2);
+    if (speed > MAX_VELOCITY) {
+      b.vx = (b.vx / speed) * MAX_VELOCITY;
+      b.vy = (b.vy / speed) * MAX_VELOCITY;
     }
 
-    // Drain
     if (b.y > CANVAS_HEIGHT + 20) {
       store.endBall();
       b.x = 380; b.y = 580; b.vx = 0; b.vy = 0; b.inPlay = false; b.trail = [];
     }
 
-    // Trail logic
     b.trail.push({x: b.x, y: b.y});
-    if (b.trail.length > 10) b.trail.shift();
+    if (b.trail.length > 8) b.trail.shift();
   }, [store]);
 
   const render = useCallback(() => {
@@ -232,20 +226,19 @@ const App = () => {
     ctx.save();
     if (shake > 0) {
       ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
-      setShake(s => Math.max(0, s - 0.6));
+      setShake(s => Math.max(0, s - 0.5));
     }
 
-    // BG
     ctx.fillStyle = '#020617';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Grid
+    // Dynamic Grid
     ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 1;
     for(let i=0; i<CANVAS_WIDTH; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,640); ctx.stroke(); }
     for(let i=0; i<CANVAS_HEIGHT; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(CANVAS_WIDTH,i); ctx.stroke(); }
 
-    // Table Bounds
+    // World Rendering
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
@@ -253,11 +246,8 @@ const App = () => {
       ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
     });
 
-    // Dome
-    ctx.beginPath(); ctx.arc(200, 150, 195, Math.PI, 0); 
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(200, 150, 195, Math.PI, 0); ctx.stroke();
 
-    // Portals
     world.current.portals.forEach(p => {
       ctx.shadowBlur = 10; ctx.shadowColor = p.color;
       ctx.strokeStyle = p.color; ctx.lineWidth = 3;
@@ -265,7 +255,6 @@ const App = () => {
       ctx.shadowBlur = 0;
     });
 
-    // Bumpers
     world.current.bumpers.forEach(bump => {
       ctx.shadowBlur = 15; ctx.shadowColor = bump.color;
       ctx.fillStyle = bump.color;
@@ -274,7 +263,6 @@ const App = () => {
       ctx.shadowBlur = 0;
     });
 
-    // Flippers
     const drawFlip = (f, side) => {
       ctx.save();
       ctx.translate(f.x, f.y);
@@ -293,15 +281,14 @@ const App = () => {
     drawFlip(flippers.current.left, 1);
     drawFlip(flippers.current.right, -1);
 
-    // Ball
     const b = ball.current;
     b.trail.forEach((t, i) => {
-      ctx.globalAlpha = (i / b.trail.length) * 0.3;
+      ctx.globalAlpha = (i / b.trail.length) * 0.4;
       ctx.fillStyle = '#38bdf8';
       ctx.beginPath(); ctx.arc(t.x, t.y, BALL_RADIUS - 1, 0, Math.PI*2); ctx.fill();
     });
     ctx.globalAlpha = 1;
-    ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 15; ctx.shadowColor = '#fff';
     ctx.fillStyle = '#f8fafc';
     ctx.beginPath(); ctx.arc(b.x, b.y, BALL_RADIUS, 0, Math.PI*2); ctx.fill();
     ctx.shadowBlur = 0;
@@ -318,10 +305,9 @@ const App = () => {
       
       if (down && e.code === 'Space') {
         if (store.gameState === 'PLAYING') {
-          // Launch only from gutter
           if (!ball.current.inPlay && ball.current.x > 360 && ball.current.y > 550) {
-            ball.current.vy = -36; 
-            ball.current.vx = -0.05;
+            ball.current.vy = -38; 
+            ball.current.vx = -0.1;
             ball.current.inPlay = true;
           }
         } else {
@@ -341,13 +327,11 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-4 select-none">
-      
-      {/* Header HUD */}
       <div className="w-[420px] mb-6 flex justify-between items-end px-4">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sky-400">
             <Hexagon size={16} className="animate-spin-slow" />
-            <span className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-60">System Online</span>
+            <span className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-60">Engine v14.2</span>
           </div>
           <div className="flex gap-2">
             {[...Array(3)].map((_, i) => (
@@ -368,36 +352,33 @@ const App = () => {
       </div>
 
       <div className="flex gap-8 items-center">
-        {/* Machine Frame */}
-        <div className="relative p-6 bg-slate-900 rounded-[5rem] shadow-[0_40px_100px_rgba(0,0,0,0.8)] border-b-[20px] border-slate-950">
+        <div className="relative p-6 bg-slate-900 rounded-[5rem] shadow-[0_40px_100px_rgba(0,0,0,0.9)] border-b-[20px] border-slate-950 ring-1 ring-white/5">
           <div className="relative rounded-[4rem] overflow-hidden border-[10px] border-slate-950 bg-black">
             <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="block cursor-none" />
             
-            {/* UI Overlay */}
             {store.gameState !== 'PLAYING' && (
-              <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-12 text-center z-50">
-                <Orbit className="w-24 h-24 text-sky-500 animate-pulse mb-8" />
-                
+              <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-12 text-center z-50 backdrop-blur-sm">
+                <Orbit className="w-20 h-20 text-sky-500 animate-pulse mb-8" />
                 <h1 className="text-6xl font-black italic tracking-tighter mb-10 leading-none">
                   NEO<span className="text-sky-500">PIN</span>
                 </h1>
                 
                 <div className="space-y-4 w-full mb-10">
                   <div className="flex justify-between items-center bg-slate-900/50 p-4 rounded-3xl border border-slate-800/50">
-                    <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Left</span>
-                    <span className="text-sky-400 font-mono font-bold">Z / ←</span>
+                    <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Flippers</span>
+                    <span className="text-sky-400 font-mono font-bold">Z / M</span>
                   </div>
                   <div className="flex justify-between items-center bg-slate-900/50 p-4 rounded-3xl border border-slate-800/50">
-                    <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Right</span>
-                    <span className="text-sky-400 font-mono font-bold">M / →</span>
+                    <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Launch</span>
+                    <span className="text-sky-400 font-mono font-bold">SPACE</span>
                   </div>
                 </div>
 
                 <button 
                   onClick={store.startGame}
-                  className="w-full py-6 bg-sky-600 hover:bg-sky-500 text-white font-black rounded-3xl transition-all active:scale-95 shadow-xl flex items-center justify-center gap-3"
+                  className="w-full py-6 bg-sky-600 hover:bg-sky-500 text-white font-black rounded-3xl transition-all active:scale-95 shadow-xl flex items-center justify-center gap-3 group"
                 >
-                  <Zap size={20} className="text-amber-300" />
+                  <Zap size={20} className="text-amber-300 group-hover:scale-125 transition-transform" />
                   <span className="tracking-widest uppercase text-xl">Initialize</span>
                 </button>
 
@@ -413,13 +394,15 @@ const App = () => {
         </div>
       </div>
       
-      {/* Footer Instructions */}
       <div className="mt-10 flex items-center gap-8 text-slate-700 text-[10px] font-bold tracking-[0.4em] uppercase">
         <div className="flex items-center gap-2">
           <Shield size={12} className="text-emerald-600" />
-          <span>Buffer: Stable</span>
+          <span>Core: Optimized</span>
         </div>
-        <span>Space to Launch</span>
+        <div className="flex items-center gap-2">
+          <Activity size={12} className="text-sky-600" />
+          <span>Substeps: Active</span>
+        </div>
       </div>
 
       <style>{`
@@ -428,12 +411,7 @@ const App = () => {
           to { transform: rotate(360deg); }
         }
         .animate-spin-slow { animation: spin-slow 15s linear infinite; }
-        canvas {
-          image-rendering: pixelated;
-        }
       `}</style>
     </div>
   );
-};
-
-export default App;
+}
